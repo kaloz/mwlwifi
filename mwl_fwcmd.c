@@ -830,7 +830,7 @@ struct aes_type_key {
 
 } __packed;
 
-union key_type {
+union mwl_key_type {
 
 	struct wep_type_key	wep_key;
 	struct tkip_type_key tkip_key;
@@ -852,7 +852,7 @@ struct key_param_set {
 	/* Size of the key */
 	u16 key_len;
 	/* Key material (variable size array) */
-	union key_type key;
+	union mwl_key_type key;
 	u8 mac_addr[ETH_ALEN];
 
 } __packed;
