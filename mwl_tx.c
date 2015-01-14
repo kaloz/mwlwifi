@@ -65,7 +65,6 @@ static inline void mwl_tx_insert_ccmp_hdr(u8 *pccmp_hdr,
 static inline int mwl_tx_tid_queue_mapping(u8 tid);
 static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid);
 static inline void mwl_tx_skbs(struct ieee80211_hw *hw);
-/* static void mwl_tx_descriptor_dump(struct mwl_priv *priv); */
 
 /* PUBLIC FUNCTION DEFINITION
 */
@@ -854,38 +853,3 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 	WLDBG_EXIT(DBG_LEVEL_3);
 }
 
-#if 0
-static void mwl_tx_descriptor_dump(struct mwl_priv *priv)
-{
-	int curr_desc;
-	int num;
-	char *p1 = NULL;
-	char *p2 = NULL;
-	char str1[12] = " <- CURR_TXD";
-	char str2[14] = " <- NEXT_TXD";
-	char blank[2] = " ";
-
-	WLDBG_ENTER(DBG_LEVEL_3);
-
-	BUG_ON(!priv);
-
-	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
-		if (priv->desc_data[num].ptx_ring != NULL) {
-
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-
-				p1 = blank;
-				p2 = blank;
-				if ((u32)&CURR_TXD(num) == (u32)priv->desc_data[num].pstale_tx_desc)
-					p1 = str1;
-				if ((u32)&CURR_TXD(num) == (u32)priv->desc_data[num].pnext_tx_desc)
-					p2 = str2;
-				WLDBG_PRINT("TxDescriptor(%d.%d) Status=0x%x %s %s", num, curr_desc, CURR_TXD(num).status, p1, p2);
-			}
-		}
-	}
-
-	WLDBG_EXIT(DBG_LEVEL_3);
-}
-#endif
