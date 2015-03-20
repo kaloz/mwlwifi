@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -16,7 +16,7 @@
 
 /*
 *
-*   Description:  This file implements frimware downloa related functions.
+*   Description:  This file implements firmware download related functions.
 *
 */
 
@@ -89,7 +89,6 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	while (readl(priv->iobase1 + 0xc40) == 0);
 
 	while (size_fw_downloaded < fw->size) {
-
 		len = readl(priv->iobase1 + 0xc40);
 
 		if (!len)
@@ -112,25 +111,20 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		 * can alternatively tweak this routines to fit your platform
 		 */
 		do {
-
 			int_code = readl(priv->iobase1 + 0xc1c);
 			if (int_code != 0)
 				break;
 			curr_iteration--;
-
 		} while (curr_iteration);
 
 		do {
-
 			int_code = readl(priv->iobase1 + 0xc1c);
 			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=  MACREG_H2ARIC_BIT_DOOR_BELL)
 				break;
 			curr_iteration--;
-
 		} while (curr_iteration);
 
 		if (curr_iteration == 0) {
-
 			/* This limited loop check allows you to exit gracefully without locking up
 			 * your entire system just because fw download failed
 			 */
@@ -153,18 +147,15 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	mwl_fwdl_trig_pcicmd(priv);
 	curr_iteration = FW_MAX_NUM_CHECKS;
 	do {
-
 		curr_iteration--;
 		writel(HOSTCMD_SOFTAP_MODE, priv->iobase1 + MACREG_REG_GEN_PTR);
 		WL_MSEC_SLEEP(FW_CHECK_MSECS);
 		int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
 		if (!(curr_iteration % 0xff))
 			WLDBG_PRINT("%x;", int_code);
-
 	} while ((curr_iteration) &&  (int_code != HOSTCMD_SOFTAP_FWRDY_SIGNATURE));
 
 	if (curr_iteration == 0) {
-
 		WLDBG_PRINT("Exhausted curr_iteration waiting for fw signature; firmware seems failed to operate");
 		goto err_download;
 	}

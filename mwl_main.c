@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -38,12 +38,13 @@
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 88W8864 802.11ac Adapter"
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.2.6.1.p4"
+#define MWL_DRV_VERSION	 "10.2.8.5.p0"
 
 #define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
 
 #define INVALID_WATCHDOG 0xAA
+
 
 /* PRIVATE FUNCTION DECLARATION
 */
@@ -53,10 +54,12 @@ static void mwl_remove(struct pci_dev *pdev);
 static int mwl_alloc_pci_resource(struct mwl_priv *priv);
 static void mwl_free_pci_resource(struct mwl_priv *priv);
 static int mwl_init_firmware(struct mwl_priv *priv, char *fw_image);
-static int mwl_load_tx_pwr_tbl(struct mwl_priv *priv, char *pwr_tbl);
-static void mwl_set_ht_caps(struct ieee80211_hw *hw,
+static void mwl_reg_notifier(struct wiphy *wiphy,
+			     struct regulatory_request *request);
+static void mwl_process_of_dts(struct mwl_priv *priv);
+static void mwl_set_ht_caps(struct mwl_priv *priv,
 			    struct ieee80211_supported_band *band);
-static void mwl_set_vht_caps(struct ieee80211_hw *hw,
+static void mwl_set_vht_caps(struct mwl_priv *priv,
 			     struct ieee80211_supported_band *band);
 static void mwl_set_caps(struct mwl_priv *priv);
 static int mwl_wl_init(struct mwl_priv *priv);
@@ -64,34 +67,25 @@ static void mwl_wl_deinit(struct mwl_priv *priv);
 static void mwl_watchdog_ba_events(struct work_struct *work);
 static irqreturn_t mwl_interrupt(int irq, void *dev_id);
 
-static int atoi(const char *num_str);
-static long atohex(const char *number);
-static long atohex2(const char *number);
 
 /* PRIVATE VARIABLES
 */
 
-static char fw_image_path[FILE_PATH_LEN] = "88W8864.bin";
-static char pwr_tbl_path[FILE_PATH_LEN] = "PWR_TABLE.ini";
+static char fw_image_path[FILE_PATH_LEN] = "mwlwifi/88W8864.bin";
 
 static struct pci_device_id mwl_pci_id_tbl[SYSADPT_MAX_CARDS_SUPPORT + 1] = {
-
 	{ 0x11ab, 0x2a55, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (unsigned long)MWL_DEV_NAME },
 	{ 0, 0, 0, 0, 0, 0, 0 }
-
 };
 
 static struct pci_driver mwl_pci_driver = {
-
 	.name     = MWL_DRV_NAME,
 	.id_table = mwl_pci_id_tbl,
 	.probe    = mwl_probe,
 	.remove   = mwl_remove
-
 };
 
 static const struct ieee80211_channel mwl_channels_24[] = {
-
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2412, .hw_value = 1, },
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2417, .hw_value = 2, },
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2422, .hw_value = 3, },
@@ -106,11 +100,9 @@ static const struct ieee80211_channel mwl_channels_24[] = {
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2467, .hw_value = 12, },
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2472, .hw_value = 13, },
 	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2484, .hw_value = 14, },
-
 };
 
 static const struct ieee80211_rate mwl_rates_24[] = {
-
 	{ .bitrate = 10, .hw_value = 2, },
 	{ .bitrate = 20, .hw_value = 4, },
 	{ .bitrate = 55, .hw_value = 11, },
@@ -124,11 +116,9 @@ static const struct ieee80211_rate mwl_rates_24[] = {
 	{ .bitrate = 360, .hw_value = 72, },
 	{ .bitrate = 480, .hw_value = 96, },
 	{ .bitrate = 540, .hw_value = 108, },
-
 };
 
 static const struct ieee80211_channel mwl_channels_50[] = {
-
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5180, .hw_value = 36, },
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5200, .hw_value = 40, },
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5220, .hw_value = 44, },
@@ -153,11 +143,9 @@ static const struct ieee80211_channel mwl_channels_50[] = {
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5765, .hw_value = 153, },
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5785, .hw_value = 157, },
 	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5805, .hw_value = 161, },
-
 };
 
 static const struct ieee80211_rate mwl_rates_50[] = {
-
 	{ .bitrate = 60, .hw_value = 12, },
 	{ .bitrate = 90, .hw_value = 18, },
 	{ .bitrate = 120, .hw_value = 24, },
@@ -166,48 +154,27 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 	{ .bitrate = 360, .hw_value = 72, },
 	{ .bitrate = 480, .hw_value = 96, },
 	{ .bitrate = 540, .hw_value = 108, },
-
 };
 
 static const struct ieee80211_iface_limit ap_if_limits[] = {
-
-	{ .max = 8,	.types = BIT(NL80211_IFTYPE_AP) },
+	{ .max = SYSADPT_NUM_OF_AP,	.types = BIT(NL80211_IFTYPE_AP) },
 	{ .max = 1,	.types = BIT(NL80211_IFTYPE_STATION) },
-
 };
 
 static const struct ieee80211_iface_combination ap_if_comb = {
-
 	.limits = ap_if_limits,
 	.n_limits = ARRAY_SIZE(ap_if_limits),
-	.max_interfaces = 8,
+	.max_interfaces = SYSADPT_NUM_OF_AP,
 	.num_different_channels = 1,
-
 };
 
-/* PUBLIC FUNCTION DEFINITION
-*/
-
-module_param_string(fw_name, fw_image_path, FILE_PATH_LEN, 0);
-MODULE_PARM_DESC(fw_name, "Specify where to load the F/W image");
-module_param_string(pwr_tbl, pwr_tbl_path, FILE_PATH_LEN, 0);
-MODULE_PARM_DESC(pwr_tbl, "Specify where to load TX power table");
-
-module_pci_driver(mwl_pci_driver);
-
-MODULE_DESCRIPTION(MWL_DESC);
-MODULE_VERSION(MWL_DRV_VERSION);
-MODULE_AUTHOR("Marvell Semiconductor, Inc.");
-MODULE_LICENSE("Dual BSD/GPL");
-MODULE_SUPPORTED_DEVICE(MWL_DEV_NAME);
-MODULE_DEVICE_TABLE(pci, mwl_pci_id_tbl);
 
 /* PRIVATE FUNCTION DEFINITION
 */
 
 static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	static int printed_version;
+	static bool printed_version = false;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	int rc = 0;
@@ -215,14 +182,12 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	WLDBG_ENTER(DBG_LEVEL_0);
 
 	if (!printed_version) {
-
 		WLDBG_PRINT("<<%s version %s>>", MWL_DESC, MWL_DRV_VERSION);
-		printed_version = 1;
+		printed_version = true;
 	}
 
 	rc = pci_enable_device(pdev);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot enable new PCI device",
 			    MWL_DRV_NAME);
 		WLDBG_EXIT_INFO(DBG_LEVEL_0, "init error");
@@ -231,7 +196,6 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = pci_set_dma_mask(pdev, 0xffffffff);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: 32-bit PCI DMA not supported",
 			    MWL_DRV_NAME);
 		goto err_pci_disable_device;
@@ -241,12 +205,15 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw = ieee80211_alloc_hw(sizeof(*priv), mwl_mac80211_get_ops());
 	if (hw == NULL) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: ieee80211 alloc failed",
 			    MWL_DRV_NAME);
 		rc = -ENOMEM;
 		goto err_pci_disable_device;
 	}
+
+	/* hook regulatory domain change notification
+	*/
+	hw->wiphy->reg_notifier = mwl_reg_notifier;
 
 	/* set interrupt service routine to mac80211 module
 	*/
@@ -265,7 +232,6 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = mwl_init_firmware(priv, fw_image_path);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize firmware",
 			    MWL_DRV_NAME);
 		goto err_init_firmware;
@@ -275,16 +241,10 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	*/
 	release_firmware(priv->fw_ucode);
 
-	rc = mwl_load_tx_pwr_tbl(priv, pwr_tbl_path);
-	if (rc) {
-
-		WLDBG_PRINT("%s: fail to load tx power table",
-			    MWL_DRV_NAME);
-	}
+	mwl_process_of_dts(priv);
 
 	rc = mwl_wl_init(priv);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize wireless lan",
 			    MWL_DRV_NAME);
 		goto err_wl_init;
@@ -321,7 +281,6 @@ static void mwl_remove(struct pci_dev *pdev)
 	WLDBG_ENTER(DBG_LEVEL_0);
 
 	if (hw == NULL) {
-
 		WLDBG_EXIT_INFO(DBG_LEVEL_0, "ieee80211 hw is null");
 		return;
 	}
@@ -390,8 +349,7 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	phys_addr2[1] = 0;
 	priv->iobase1 = phys_addr2[0];
 
-	if (!priv->iobase1)
-	{
+	if (!priv->iobase1) {
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot remap PCI memory region 1",
 			    MWL_DRV_NAME);
 		goto err_release_mem_region_bar1;
@@ -400,10 +358,9 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	WLDBG_PRINT("priv->iobase1 = %x", (unsigned int)priv->iobase1);
 
 	priv->pcmd_buf = (unsigned short *)
-		pci_alloc_consistent(priv->pdev, CMD_BUF_SIZE, &priv->pphys_cmd_buf);
+		dma_alloc_coherent(&priv->pdev->dev, CMD_BUF_SIZE, &priv->pphys_cmd_buf, GFP_KERNEL);
 
 	if (priv->pcmd_buf == NULL) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot alloc memory for command buffer",
 			    MWL_DRV_NAME);
 		goto err_iounmap_iobase1;
@@ -456,7 +413,7 @@ static void mwl_free_pci_resource(struct mwl_priv *priv)
 	iounmap(priv->iobase1);
 	release_mem_region(pci_resource_start(pdev, priv->next_bar_num), pci_resource_len(pdev, priv->next_bar_num));
 	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
-	pci_free_consistent(priv->pdev, CMD_BUF_SIZE, priv->pcmd_buf, priv->pphys_cmd_buf);
+	dma_free_coherent(&priv->pdev->dev, CMD_BUF_SIZE, priv->pcmd_buf, priv->pphys_cmd_buf);
 
 	WLDBG_EXIT(DBG_LEVEL_0);
 }
@@ -474,7 +431,6 @@ static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
 
 	rc = request_firmware(&priv->fw_ucode, fw_name, &priv->pdev->dev);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot load firmware image <%s>",
 			    MWL_DRV_NAME, fw_name);
 		goto err_load_fw;
@@ -482,7 +438,6 @@ static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
 
 	rc = mwl_fwdl_download_firmware(priv->hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot download firmware image <%s>",
 			    MWL_DRV_NAME, fw_name);
 		goto err_download_fw;
@@ -503,100 +458,179 @@ err_load_fw:
 	return rc;
 }
 
-static int mwl_load_tx_pwr_tbl(struct mwl_priv *priv, char *pwr_tbl)
+static void mwl_reg_notifier(struct wiphy *wiphy,
+			     struct regulatory_request *request)
 {
-	struct file *filp = NULL;
-	mm_segment_t oldfs;
-	char buff[120], *s;
-	int len, index = 0, i, value = 0;
-	char param[20][32];
-	int rc = 0;
+	struct ieee80211_hw *hw;
+	struct mwl_priv *priv;
+	struct property *prop;
+	struct property *fcc_prop = NULL;
+	struct property *etsi_prop = NULL;
+	struct property *specific_prop = NULL;
+	u32 prop_value;
+	int i, j, k;
+
+	WLDBG_ENTER(DBG_LEVEL_0);
+
+	BUG_ON(!wiphy);
+	hw = (struct ieee80211_hw *) wiphy_priv(wiphy);
+	BUG_ON(!hw);
+	priv = hw->priv;
+	BUG_ON(!priv);
+
+	if (priv->pwr_node != NULL) {
+		for_each_property_of_node(priv->pwr_node, prop) {
+			if(strcmp(prop->name, "FCC") == 0)
+				fcc_prop = prop;
+			if (strcmp(prop->name, "ETSI") == 0)
+				etsi_prop = prop;
+			if ((prop->name[0] == request->alpha2[0]) &&
+			    (prop->name[1] == request->alpha2[1]))
+			    	specific_prop = prop;
+		}
+
+		prop = NULL;
+
+		if (specific_prop != NULL) {
+			prop = specific_prop;
+		} else {
+			if (request->dfs_region == NL80211_DFS_ETSI)
+				prop = etsi_prop;
+			else
+				prop = fcc_prop;
+		}
+
+		if (prop != NULL) {
+			/* Reset the whole table
+			*/
+			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++)
+				memset(&priv->tx_pwr_tbl[i], 0,
+				       sizeof(struct mwl_tx_pwr_tbl));
+			
+			/* Load related power table
+			*/
+			i = 0;
+			j = 0;
+			while (i < prop->length) {
+				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				priv->tx_pwr_tbl[j].channel = prop_value;
+				i += 4;
+				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				priv->tx_pwr_tbl[j].setcap = prop_value;
+				i += 4;
+				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL; k++) {
+					prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+					priv->tx_pwr_tbl[j].tx_power[k] = prop_value;
+					i += 4;
+				}
+				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				priv->tx_pwr_tbl[j].cdd = prop_value;
+				i += 4;
+				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				priv->tx_pwr_tbl[j].txantenna2 = prop_value;
+				i += 4;
+				j++;
+			}
+
+			/* Dump loaded power tabel
+			*/
+			WLDBG_PRINT("%s: %s\n", dev_name(&wiphy->dev), prop->name);
+			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
+				char disp_buf[64];
+				char *disp_ptr;
+				
+				if (priv->tx_pwr_tbl[i].channel == 0)
+					break;
+				WLDBG_PRINT("Channel: %d: 0x%x 0x%x 0x%x",
+					    priv->tx_pwr_tbl[i].channel,
+					    priv->tx_pwr_tbl[i].setcap,
+					    priv->tx_pwr_tbl[i].cdd,
+					    priv->tx_pwr_tbl[i].txantenna2);
+				disp_ptr = disp_buf;
+				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL; j++) {
+					disp_ptr += 
+						sprintf(disp_ptr, "%x ",
+							priv->tx_pwr_tbl[i].tx_power[j]);
+				}
+				WLDBG_PRINT("%s", disp_buf);
+			}
+		}
+	}
+
+	WLDBG_EXIT(DBG_LEVEL_0);
+}
+
+static void mwl_process_of_dts(struct mwl_priv *priv)
+{
+	struct property *prop;
+	u32 prop_value;
 
 	WLDBG_ENTER(DBG_LEVEL_0);
 
 	BUG_ON(!priv);
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
+	priv->disable_2g = false;
+	priv->disable_5g = false;
+	priv->antenna_tx = ANTENNA_TX_4_AUTO;
+	priv->antenna_rx = ANTENNA_RX_4_AUTO;
 
-	filp = filp_open(pwr_tbl, O_RDONLY, 0);
+	priv->dt_node =
+		of_find_node_by_name(pci_bus_to_OF_node(priv->pdev->bus),
+				     "mwlwifi");
 
-	if (!IS_ERR(filp)) {   /* MUST use this one, important!!! */
-
-		WLDBG_PRINT("open tx power table <%s>: OK", pwr_tbl);
-
-		/* reset the whole table */
-		for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++)
-			memset(&priv->tx_pwr_tbl[i], 0, sizeof(struct mwl_tx_pwr_tbl));
-
-		while (1) {
-
-			s = buff;
-			while ((len = vfs_read(filp, s, 0x01, &filp->f_pos)) == 1) {
-
-				if (*s == '\n') {
-					/* skip blank line */
-					if (s == buff)
-						break;
-
-					/* parse this line and assign value to data structure */
-					*s = '\0';
-					/* WLDBG_PRINT("index=<%d>: <%s>", index, buff); */
-					/* 8864 total param: ch + setcap + 16 txpower + CDD + tx2 = 16 */
-					sscanf(buff, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",  param[0], param[1], param[2], param[3], param[4], param[5]
-						, param[6], param[7], param[8], param[9], param[10], param[11], param[12], param[13], param[14], param[15], param[16], param[17]
-						, param[18], param[19]);
-
-					if (strcmp(param[18], "on") == 0)
-						value = 1;
-					else if (strcmp(param[18], "off") == 0)
-						value = 0;
-					else {
-						WLDBG_PRINT("txpower table format error: CCD should be on|off");
-						break;
-					}
-
-					priv->tx_pwr_tbl[index].cdd = value;
-					priv->tx_pwr_tbl[index].txantenna2 = atohex2(param[19]);
-					priv->tx_pwr_tbl[index].channel = atoi(param[0]);
-					priv->tx_pwr_tbl[index].setcap = atoi(param[1]);
-
-					for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++)
-						priv->tx_pwr_tbl[index].tx_power[i] = atohex2(param[i+2]);
-
-					index++;
-					break;
-
-				} else {
-
-					s++;
-
-				}
+	/* look for all matching property names
+	*/
+	if (priv->dt_node != NULL) {
+		for_each_property_of_node(priv->dt_node, prop) {
+			if (strcmp(prop->name, "marvell,2ghz") == 0)
+				priv->disable_2g = true;
+			if (strcmp(prop->name, "marvell,5ghz") == 0)
+				priv->disable_5g = true;
+			if (strcmp(prop->name, "marvell,chainmask") == 0) {
+				prop_value = be32_to_cpu(*((u32 *)prop->value));
+				if (prop_value == 2)
+					priv->antenna_tx = ANTENNA_TX_2;
+			
+				prop_value = be32_to_cpu(*((u32 *)(prop->value + 4)));
+				if (prop_value == 2)
+					priv->antenna_rx = ANTENNA_RX_2;
 			}
-
-			if (len <= 0)
-			break;
 		}
 
-		filp_close(filp, current->files);
-
-	} else {
-
-		WLDBG_PRINT("open tx power table <%s>: FAIL", pwr_tbl);
-		rc = -EIO;
-
+		priv->pwr_node = of_find_node_by_name(priv->dt_node,
+						      "marvell,powertable");
 	}
 
-	set_fs(oldfs);
+	WLDBG_PRINT("2G: %s\n", priv->disable_2g ? "disable" : "enable");
+	WLDBG_PRINT("5G: %s\n", priv->disable_5g ? "disable" : "enable");
 
-	WLDBG_EXIT_INFO(DBG_LEVEL_0, "result: %d", rc);
+	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
+		WLDBG_PRINT("TX: 4 antennas\n");
+	else if (priv->antenna_tx == ANTENNA_TX_2)
+		WLDBG_PRINT("TX: 2 antennas\n");
+	else
+		WLDBG_PRINT("TX: unknown\n");
+	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
+		WLDBG_PRINT("RX: 4 antennas\n");
+	else if (priv->antenna_rx == ANTENNA_RX_2)
+		WLDBG_PRINT("RX: 2 antennas\n");
+	else
+		WLDBG_PRINT("RX: unknown\n");
 
-	return rc;
+	WLDBG_EXIT(DBG_LEVEL_0);
 }
 
-static void mwl_set_ht_caps(struct ieee80211_hw *hw,
+static void mwl_set_ht_caps(struct mwl_priv *priv,
 			    struct ieee80211_supported_band *band)
 {
+	struct ieee80211_hw *hw;
+
+	WLDBG_ENTER(DBG_LEVEL_0);
+
+	BUG_ON(!priv);
+	hw = priv->hw;
+	BUG_ON(!hw);
+
 	band->ht_cap.ht_supported = 1;
 
 	band->ht_cap.cap |= IEEE80211_HT_CAP_LDPC_CODING;
@@ -611,15 +645,20 @@ static void mwl_set_ht_caps(struct ieee80211_hw *hw,
 
 	band->ht_cap.mcs.rx_mask[0] = 0xff;
 	band->ht_cap.mcs.rx_mask[1] = 0xff;
-	band->ht_cap.mcs.rx_mask[2] = 0xff;
+	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
+		band->ht_cap.mcs.rx_mask[2] = 0xff;
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
 
 	band->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
+
+	WLDBG_EXIT(DBG_LEVEL_0);
 }
 
-static void mwl_set_vht_caps(struct ieee80211_hw *hw,
+static void mwl_set_vht_caps(struct mwl_priv *priv,
 			     struct ieee80211_supported_band *band)
 {
+	WLDBG_ENTER(DBG_LEVEL_0);
+
 	band->vht_cap.vht_supported = 1;
 
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454;
@@ -634,8 +673,17 @@ static void mwl_set_vht_caps(struct ieee80211_hw *hw,
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN;
 
-	band->vht_cap.vht_mcs.rx_mcs_map = 0xffea;
-	band->vht_cap.vht_mcs.tx_mcs_map = 0xffea;
+	if (priv->antenna_rx == ANTENNA_RX_2)
+		band->vht_cap.vht_mcs.rx_mcs_map = 0xfffa;
+	else
+		band->vht_cap.vht_mcs.rx_mcs_map = 0xffea;
+
+	if (priv->antenna_tx == ANTENNA_TX_2)
+		band->vht_cap.vht_mcs.tx_mcs_map = 0xfffa;
+	else
+		band->vht_cap.vht_mcs.tx_mcs_map = 0xffea;
+
+	WLDBG_EXIT(DBG_LEVEL_0);
 }
 
 static void mwl_set_caps(struct mwl_priv *priv)
@@ -650,41 +698,45 @@ static void mwl_set_caps(struct mwl_priv *priv)
 
 	/* set up band information for 2.4G
 	*/
-	BUILD_BUG_ON(sizeof(priv->channels_24) != sizeof(mwl_channels_24));
-	memcpy(priv->channels_24, mwl_channels_24, sizeof(mwl_channels_24));
+	if (priv->disable_2g == false) {
+		BUILD_BUG_ON(sizeof(priv->channels_24) != sizeof(mwl_channels_24));
+		memcpy(priv->channels_24, mwl_channels_24, sizeof(mwl_channels_24));
 
-	BUILD_BUG_ON(sizeof(priv->rates_24) != sizeof(mwl_rates_24));
-	memcpy(priv->rates_24, mwl_rates_24, sizeof(mwl_rates_24));
+		BUILD_BUG_ON(sizeof(priv->rates_24) != sizeof(mwl_rates_24));
+		memcpy(priv->rates_24, mwl_rates_24, sizeof(mwl_rates_24));
 
-	priv->band_24.band = IEEE80211_BAND_2GHZ;
-	priv->band_24.channels = priv->channels_24;
-	priv->band_24.n_channels = ARRAY_SIZE(mwl_channels_24);
-	priv->band_24.bitrates = priv->rates_24;
-	priv->band_24.n_bitrates = ARRAY_SIZE(mwl_rates_24);
+		priv->band_24.band = IEEE80211_BAND_2GHZ;
+		priv->band_24.channels = priv->channels_24;
+		priv->band_24.n_channels = ARRAY_SIZE(mwl_channels_24);
+		priv->band_24.bitrates = priv->rates_24;
+		priv->band_24.n_bitrates = ARRAY_SIZE(mwl_rates_24);
 
-	mwl_set_ht_caps(hw, &priv->band_24);
-	mwl_set_vht_caps(hw, &priv->band_24);
+		mwl_set_ht_caps(priv, &priv->band_24);
+		mwl_set_vht_caps(priv, &priv->band_24);
 
-	hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &priv->band_24;
+		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &priv->band_24;
+	}
 
 	/* set up band information for 5G
 	*/
-	BUILD_BUG_ON(sizeof(priv->channels_50) != sizeof(mwl_channels_50));
-	memcpy(priv->channels_50, mwl_channels_50, sizeof(mwl_channels_50));
+	if (priv->disable_5g == false) {
+		BUILD_BUG_ON(sizeof(priv->channels_50) != sizeof(mwl_channels_50));
+		memcpy(priv->channels_50, mwl_channels_50, sizeof(mwl_channels_50));
 
-	BUILD_BUG_ON(sizeof(priv->rates_50) != sizeof(mwl_rates_50));
-	memcpy(priv->rates_50, mwl_rates_50, sizeof(mwl_rates_50));
+		BUILD_BUG_ON(sizeof(priv->rates_50) != sizeof(mwl_rates_50));
+		memcpy(priv->rates_50, mwl_rates_50, sizeof(mwl_rates_50));
 
-	priv->band_50.band = IEEE80211_BAND_5GHZ;
-	priv->band_50.channels = priv->channels_50;
-	priv->band_50.n_channels = ARRAY_SIZE(mwl_channels_50);
-	priv->band_50.bitrates = priv->rates_50;
-	priv->band_50.n_bitrates = ARRAY_SIZE(mwl_rates_50);
+		priv->band_50.band = IEEE80211_BAND_5GHZ;
+		priv->band_50.channels = priv->channels_50;
+		priv->band_50.n_channels = ARRAY_SIZE(mwl_channels_50);
+		priv->band_50.bitrates = priv->rates_50;
+		priv->band_50.n_bitrates = ARRAY_SIZE(mwl_rates_50);
 
-	mwl_set_ht_caps(hw, &priv->band_50);
-	mwl_set_vht_caps(hw, &priv->band_50);
+		mwl_set_ht_caps(priv, &priv->band_50);
+		mwl_set_vht_caps(priv, &priv->band_50);
 
-	hw->wiphy->bands[IEEE80211_BAND_5GHZ] = &priv->band_50;
+		hw->wiphy->bands[IEEE80211_BAND_5GHZ] = &priv->band_50;
+	}
 
 	WLDBG_EXIT(DBG_LEVEL_0);
 }
@@ -722,8 +774,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
 
-	priv->ap_macids_supported = 0x000000ff;
-	priv->sta_macids_supported = 0x00000100;
+	priv->ap_macids_supported = 0x0000ffff;
+	priv->sta_macids_supported = 0x00010000;
 	priv->macids_used = 0;
 	INIT_LIST_HEAD(&priv->vif_list);
 
@@ -754,7 +806,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_tx_init(hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize TX",
 			    MWL_DRV_NAME);
 		goto err_mwl_tx_init;
@@ -762,7 +813,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_rx_init(hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize RX",
 			    MWL_DRV_NAME);
 		goto err_mwl_rx_init;
@@ -770,7 +820,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_fwcmd_get_hw_specs(hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to get HW specifications",
 			    MWL_DRV_NAME);
 		goto err_get_hw_specs;
@@ -792,17 +841,18 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_fwcmd_set_hw_specs(hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to set HW specifications",
 			    MWL_DRV_NAME);
 		goto err_set_hw_specs;
 	}
 
+	WLDBG_PRINT("firmware version: 0x%x", priv->hw_data.fw_release_num);
+
 	mwl_fwcmd_radio_disable(hw);
 
-	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_RX, 0);
+	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, priv->antenna_tx);
 
-	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, 0);
+	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_RX, priv->antenna_rx);
 
 	hw->wiphy->interface_modes = 0;
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP);
@@ -814,7 +864,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = ieee80211_register_hw(hw);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to register device",
 			    MWL_DRV_NAME);
 		goto err_register_hw;
@@ -881,7 +930,6 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 	/* the bitmap is the hw queue number.  Map it to the ampdu queue.
 	*/
 	if (bitmap != INVALID_WATCHDOG) {
-
 		if (bitmap == SYSADPT_TX_AMPDU_QUEUES)
 			stream_index = 0;
 		else if (bitmap > SYSADPT_TX_AMPDU_QUEUES)
@@ -890,28 +938,22 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 			stream_index = bitmap + 3; /** queue 0 is stream 3*/
 
 		if (bitmap != 0xFF) {
-
 			/* Check if the stream is in use before disabling it
 			*/
 			streams = &priv->ampdu[stream_index];
 
 			if (streams->state == AMPDU_STREAM_ACTIVE) {
-
 				ieee80211_stop_tx_ba_session(streams->sta,
 							     streams->tid);
 				SPIN_UNLOCK(&priv->locks.stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream_index);
 				SPIN_LOCK(&priv->locks.stream_lock);
 			}
-
 		} else {
-
 			for (stream_index = 0; stream_index < SYSADPT_TX_AMPDU_QUEUES; stream_index++) {
-
 				streams = &priv->ampdu[stream_index];
 
 				if (streams->state == AMPDU_STREAM_ACTIVE) {
-
 					ieee80211_stop_tx_ba_session(streams->sta,
 								     streams->tid);
 					SPIN_UNLOCK(&priv->locks.stream_lock);
@@ -950,19 +992,14 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 		return IRQ_NONE;
 
 	if (int_status == 0xffffffff) {
-
 		WLDBG_INFO(DBG_LEVEL_0, "card plugged out???");
-
 	} else {
-
 		clr_status = int_status;
 
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
-
 			int_status &= ~MACREG_A2HRIC_BIT_TX_DONE;
 
 			if (priv->is_tx_schedule == false) {
-
 				status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 				writel((status & ~MACREG_A2HRIC_BIT_TX_DONE),
 				       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
@@ -972,11 +1009,9 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
-
 			int_status &= ~MACREG_A2HRIC_BIT_RX_RDY;
 
 			if (priv->is_rx_schedule == false) {
-
 				status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 				writel((status & ~MACREG_A2HRIC_BIT_RX_RDY),
 				       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
@@ -986,7 +1021,6 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 		}
 
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG) {
-
 			status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 			writel((status & ~MACREG_A2HRIC_BA_WATCHDOG),
 			       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
@@ -1001,70 +1035,12 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int atoi(const char *num_str)
-{
-	int val = 0;
 
-	for (;; num_str++) {
+module_pci_driver(mwl_pci_driver);
 
-		switch (*num_str) {
-
-		case '0'...'9':
-			val = 10*val+(*num_str-'0');
-			break;
-
-		default:
-			return val;
-		}
-	}
-}
-
-static long atohex(const char *number)
-{
-	long n = 0;
-
-	if (*number == '0' && (*(number + 1) == 'x' || *(number + 1) == 'X'))
-		number += 2;
-
-	while (*number <= ' ' && *number > 0)
-		++number;
-
-	while ((*number >= '0' && *number <= '9') ||
-	       (*number >= 'A' && *number <= 'F') ||
-		(*number >= 'a' && *number <= 'f')) {
-
-		if (*number >= '0' && *number <= '9') {
-
-			n = (n * 0x10) + ((*number++) - '0');
-
-		} else if (*number >= 'A' && *number <= 'F') {
-
-			n = (n * 0x10) + ((*number++) - 'A' + 10);
-
-		} else {
-
-			n = (n * 0x10) + ((*number++) - 'a' + 10);
-
-		}
-	}
-
-	return n;
-}
-
-static long atohex2(const char *number)
-{
-	long n = 0;
-
-	while (*number <= ' ' && *number > 0)
-		++number;
-
-	if (*number == 0)
-		return n;
-
-	if (*number == '0' && (*(number + 1) == 'x' || *(number + 1) == 'X'))
-		n = atohex(number+2);
-	else
-		n = atoi(number);
-
-	return n;
-}
+MODULE_DESCRIPTION(MWL_DESC);
+MODULE_VERSION(MWL_DRV_VERSION);
+MODULE_AUTHOR("Marvell Semiconductor, Inc.");
+MODULE_LICENSE("Dual BSD/GPL");
+MODULE_SUPPORTED_DEVICE(MWL_DEV_NAME);
+MODULE_DEVICE_TABLE(pci, mwl_pci_id_tbl);

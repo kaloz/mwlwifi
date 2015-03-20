@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -38,11 +38,13 @@
 
 #define SYSADPT_TX_AMPDU_QUEUES        4
 
-#define SYSADPT_TOTAL_TX_QUEUES        SYSADPT_TX_WMM_QUEUES
+#define SYSADPT_NUM_OF_AP              16
+
+#define SYSADPT_TOTAL_TX_QUEUES        (SYSADPT_TX_WMM_QUEUES + SYSADPT_NUM_OF_AP)
 
 #define SYSADPT_TOTAL_HW_QUEUES        (SYSADPT_TX_WMM_QUEUES + SYSADPT_TX_AMPDU_QUEUES)
 
-#define SYSADPT_NUM_OF_DESC_DATA       4
+#define SYSADPT_NUM_OF_DESC_DATA       (4 + SYSADPT_NUM_OF_AP)
 
 #define SYSADPT_MAX_NUM_TX_DESC        256
 

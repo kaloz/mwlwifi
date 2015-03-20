@@ -1,5 +1,5 @@
 WIRELESS CORE LIBRARY & FIRMWARE LICENSE TERMS
-Copyright (c) 2002-2014 Marvell International Ltd.
+Copyright (c) 2002-2015 Marvell International Ltd.
 All rights reserved.
 
 Redistribution. Redistribution and use in binary form, without modification,

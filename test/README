@@ -1,16 +1,16 @@
 1. Files for test:
 
-	a. 88W8864.bin: F/W binary. Please put this file under directory '/lib/firmware'.
-	b. Mamba_FCC_v1.2_5G4TX.ini: power table for Mamba.
-	c. mwlwifi.ko: 88W8864 mac80211 driver kernel module.
-	d. hostapd.conf: configuration file used to configure hostapd.
-	e. openwrt-mvebu-jffs2-128k.img: OpenWRT download image (built with kernel cfg80211/mac80211, iw and hostapd).
+	a. 88W8864.bin: F/W binary. Please put this file under directory '/lib/firmware/mwlwifi'.
+	b. mwlwifi.ko: 88W8864 mac80211 driver kernel module.
+	c. hostapd.conf: configuration file used to configure hostapd.
+	d. wpa_supplicant.conf: configuration file used to configure wpa_supplicant.
+	e. openwrt-mvebu-armada-xp-mamba-squashfs-factory.img: OpenWRT download image (built with kernel cfg80211/mac80211, iw, hostapd and wpa_supplicant).
 	
 2. Bring up driver:
 
 	a. iw reg set US
 		--> set regulatory domain (Note: cfg80211 will disable DFS channels).
-	b. insmod mwlwifi.ko fw_name=88W8864.bin pwr_tbl=Mamba_FCC_v1.2_5G4TX.ini
+	b. insmod mwlwifi.ko
 		--> After module is inserted, physical interfaces phy0 and phy1 and network device wlan0 and wlan1
 				will be created. You can issue "iw dev" to check them.
 	c. hostapd -B ./hostapd.conf
@@ -46,7 +46,7 @@
 					(5490 - 5590 @ 80), (30, 0)
 					(5650 - 5710 @ 40), (30, 0)
 					(5735 - 5835 @ 80), (30, 0)
-		It allows you set use two ranges to do 80 MHz operation (100 ~ 116) and (149 ~ 161).
+		It allows you to use two ranges to do 80 MHz operation (100 ~ 116) and (149 ~ 161).
 		
 	b. After regulatory is set and make sure the channel range you want to use is allowable by the 
 		setting regulatory, you can modify hostapd.conf to run 80 Mhz as:
@@ -76,3 +76,78 @@
 				ht_capab=[LDPC][HT40-][SHORT-GI-20][SHORT-GI-40]
 				vht_oper_centr_freq_seg0_idx=106
 
+5. Station mode:
+
+	a. Use iw utlity to set correct regulatory domain.
+	
+	b. Make sure dirver is loaded.
+	
+	c. wpa_supplicant -B -D nl80211 -i wlan1 -c wpa_supplicant.conf
+		--> There are few sample configuration files under this directory. Please use them to do test.
+		
+	d. There are two ways to change configuration for wpa_supplicant:
+
+		* Kill and rerun
+		killall wpa_supplicant
+		<Modify configuration file for new setting>
+		wpa_supplicant -B -D nl80211 -i wlan1 -c wpa_supplicant.conf
+	
+		* Reload configuration file
+		<Modify configuration file for new setting>
+		kill -1 <PID of wpa_supplicant>
+		
+6. Debug mode:
+
+	a. hostapd:
+	
+	hostapd -d[dd] ./hostapd.conf
+	
+	b. wpa_supplicant:
+	
+	wpa_supplicant -ddK -D nl80211 -i wlan1 -c wpa_supplicant.conf
+	
+7. Add/Delete interface via iw:
+
+	iw dev <devname> del
+	iw dev <devname> interface add <name> type <type>
+	
+	You can omit the 'phy' or 'dev' if the identification is unique,
+	e.g. "iw wlan0 info" or "iw phy0 info". (Don't when scripting.)
+
+	Example:
+	root@OpenWrt:/test# iw dev
+	phy#1
+        Interface wlan1
+                ifindex 6
+                wdev 0x100000001
+                addr 00:25:9c:13:01:9a
+                type managed
+	phy#0
+        Interface wlan0
+                ifindex 8
+                wdev 0x3
+                addr 00:25:9c:13:01:99
+                type AP
+	root@OpenWrt:/test# iw wlan0 del
+	root@OpenWrt:/test# iw dev
+	phy#1
+        Interface wlan1
+                ifindex 6
+                wdev 0x100000001
+                addr 00:25:9c:13:01:9a
+                type managed
+	root@OpenWrt:/test# iw phy0 interface add wlan0 type managed
+	root@OpenWrt:/test# iw dev
+	phy#1
+        Interface wlan1
+                ifindex 6
+                wdev 0x100000001
+                addr 00:25:9c:13:01:9a
+                type managed
+	phy#0
+        Interface wlan0
+                ifindex 9
+                wdev 0x4
+                addr 00:25:9c:13:01:99
+                type managed
+	root@OpenWrt:/test#

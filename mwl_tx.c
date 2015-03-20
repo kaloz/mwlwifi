@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 */
 
 #include <linux/etherdevice.h>
+#include <linux/skbuff.h>
 
 #include "mwl_sysadpt.h"
 #include "mwl_dev.h"
@@ -85,14 +86,10 @@ int mwl_tx_init(struct ieee80211_hw *hw)
 
 	rc = mwl_tx_ring_alloc(priv);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_3, "allocating TX ring failed");
-
 	} else {
-
 		rc = mwl_tx_ring_init(priv);
 		if (rc) {
-
 			mwl_tx_ring_free(priv);
 			WLDBG_ERROR(DBG_LEVEL_3, "initializing TX ring failed");
 		}
@@ -158,13 +155,11 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		qos = 0;
 
 	if (skb->protocol == cpu_to_be16(ETH_P_PAE)) {
-
 		index = IEEE80211_AC_VO;
 		eapol_frame = true;
 	}
 
 	if (ieee80211_is_mgmt(wh->frame_control)) {
-
 		mgmtframe = true;
 		mgmt = (struct ieee80211_mgmt *)skb->data;
 	}
@@ -177,7 +172,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	mwl_vif = MWL_VIF(tx_info->control.vif);
 
 	if (tx_info->flags & IEEE80211_TX_CTL_ASSIGN_SEQ) {
-
 		wh->seq_ctrl &= ENDIAN_SWAP16(IEEE80211_SCTL_FRAG);
 		wh->seq_ctrl |= ENDIAN_SWAP16(mwl_vif->seqno);
 		mwl_vif->seqno += 0x10;
@@ -188,11 +182,8 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	xmitcontrol = 0;
 
 	if (mgmtframe || ieee80211_is_ctl(wh->frame_control)) {
-
 		qos = 0;
-
 	} else if (ieee80211_is_data(wh->frame_control)) {
-
 		qos &= ~MWL_QOS_ACK_POLICY_MASK;
 
 		if (tx_info->flags & IEEE80211_TX_CTL_AMPDU) {
@@ -204,25 +195,31 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		}
 
 		if (is_multicast_ether_addr(wh->addr1)) {
-
 			xmitcontrol |= EAGLE_TXD_XMITCTRL_USE_MC_RATE;
 
 			if (ccmp) {
-
 				mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
-						       mwl_vif->keyidx, mwl_vif->iv16, mwl_vif->iv32);
+						       mwl_vif->keyidx,
+						       mwl_vif->iv16,
+						       mwl_vif->iv32);
 				INCREASE_IV(mwl_vif->iv16, mwl_vif->iv32);
 			}
-
 		} else {
-
 			if (ccmp) {
+				if (mwl_vif->is_sta == true) {
+					mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
+							       mwl_vif->keyidx,
+							       mwl_vif->iv16,
+							       mwl_vif->iv32);
+					INCREASE_IV(mwl_vif->iv16, mwl_vif->iv32);
+				} else {
+					struct mwl_sta *sta_info = MWL_STA(sta);
 
-				struct mwl_sta *sta_info = MWL_STA(sta);
-
-				mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
-						       0, sta_info->iv16, sta_info->iv32);
-				INCREASE_IV(sta_info->iv16, sta_info->iv32);
+					mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
+							       0, sta_info->iv16,
+							       sta_info->iv32);
+					INCREASE_IV(sta_info->iv16, sta_info->iv32);
+				}
 			}
 		}
 	}
@@ -237,13 +234,10 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	 * been setup.
 	 */
 	if (mgmtframe) {
-
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
-			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
-		mgmt->u.action.u.addba_req.action_code == WLAN_ACTION_ADDBA_REQ)) {
-
+			mgmt->u.action.category == WLAN_CATEGORY_BACK &&
+			mgmt->u.action.u.addba_req.action_code == WLAN_ACTION_ADDBA_REQ)) {
 			u16 capab = ENDIAN_SWAP16(mgmt->u.action.u.addba_req.capab);
-
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			index = mwl_tx_tid_queue_mapping(tid);
 		}
@@ -253,7 +247,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 	if (sta && sta->ht_cap.ht_supported && !eapol_frame &&
 	    ieee80211_is_data_qos(wh->frame_control)) {
-
 		tid = qos & 0xf;
 		mwl_tx_count_packet(sta, tid);
 
@@ -261,14 +254,11 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		stream = mwl_fwcmd_lookup_stream(hw, sta->addr, tid);
 
 		if (stream != NULL) {
-
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
-
 				WARN_ON(!(qos & MWL_QOS_ACK_POLICY_BLOCKACK));
 
 				txpriority = (SYSADPT_TX_WMM_QUEUES + stream->idx) %
 					SYSADPT_TOTAL_HW_QUEUES;
-
 			} else if (stream->state == AMPDU_STREAM_NEW) {
 				/* We get here if the driver sends us packets
 				 * after we've initiated a stream, but before
@@ -297,7 +287,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 				dev_kfree_skb_any(skb);
 				return;
 			}
-
 		} else {
 			/* Defer calling mwl8k_start_stream so that the current
 			 * skb can go out before the ADDBA request.  This
@@ -305,7 +294,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			 * as described above.
 			 */
 			if (mwl_fwcmd_ampdu_allowed(sta, tid)) {
-
 				stream = mwl_fwcmd_add_stream(hw, sta, tid);
 
 				if (stream != NULL)
@@ -314,9 +302,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		}
 
 		SPIN_UNLOCK(&priv->locks.stream_lock);
-
 	} else {
-
 		qos &= ~MWL_QOS_ACK_POLICY_MASK;
 		qos |= MWL_QOS_ACK_POLICY_NORMAL;
 	}
@@ -330,12 +316,9 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	tx_ctrl->ccmp = ccmp;
 
 	if (skb_queue_len(&priv->txq[index]) > priv->txq_limit) {
-
 		dev_kfree_skb_any(skb);
 		WLDBG_INFO(DBG_LEVEL_3, "queue len > limit");
-
 	} else {
-
 		skb_queue_tail(&priv->txq[index], skb);
 	}
 
@@ -344,7 +327,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	/* Initiate the ampdu session here
 	*/
 	if (start_ba_session) {
-
 		SPIN_LOCK(&priv->locks.stream_lock);
 		if (mwl_fwcmd_start_stream(hw, stream))
 			mwl_fwcmd_remove_stream(hw, stream);
@@ -371,13 +353,11 @@ void mwl_tx_done(unsigned long data)
 	SPIN_LOCK_IRQSAVE(&priv->locks.xmit_lock, flags);
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
 		while (STALE_TXD(num)
 			&& (STALE_TXD(num)->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_OK))
 			&& (!(STALE_TXD(num)->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED)))) {
-
 			pci_unmap_single(priv->pdev,
-					 ENDIAN_SWAP32(STALE_TXD(num)->pkt_ptr),
+				ENDIAN_SWAP32(STALE_TXD(num)->pkt_ptr),
 				STALE_TXD(num)->psk_buff->len,
 				PCI_DMA_TODEVICE);
 			done_skb = STALE_TXD(num)->psk_buff;
@@ -395,8 +375,11 @@ void mwl_tx_done(unsigned long data)
 
 				tr = (struct mwl_dma_data *)done_skb->data;
 
-				if (ieee80211_is_assoc_resp(tr->wh.frame_control)) {
-
+				if (ieee80211_is_assoc_resp(tr->wh.frame_control) ||
+					ieee80211_is_reassoc_resp(tr->wh.frame_control) ||
+					ieee80211_is_auth(tr->wh.frame_control) ||
+					ieee80211_is_nullfunc(tr->wh.frame_control) ||
+					ieee80211_is_qos_nullfunc(tr->wh.frame_control)) {
 					/* Remove H/W dma header
 					*/
 					hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
@@ -416,9 +399,7 @@ void mwl_tx_done(unsigned long data)
 					info->flags |= IEEE80211_TX_STAT_ACK;
 
 					ieee80211_tx_status(hw, done_skb);
-
 				} else {
-
 					/* Due to firmware does not return real tx status,
 					 * we should not ACK data frame, otherwise, hostap will
 					 * think station is always existed.
@@ -432,10 +413,9 @@ void mwl_tx_done(unsigned long data)
 		}
 	}
 
-    SPIN_UNLOCK_IRQRESTORE(&priv->locks.xmit_lock, flags);
+	SPIN_UNLOCK_IRQRESTORE(&priv->locks.xmit_lock, flags);
 
 	if (priv->irq != -1) {
-
 		u32 status;
 
 		status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
@@ -462,19 +442,17 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 
 	BUG_ON(!priv);
 
-	mem = (u8 *)pci_alloc_consistent(priv->pdev,
+	mem = (u8 *)dma_alloc_coherent(&priv->pdev->dev,
 		MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
-		&priv->desc_data[0].pphys_tx_ring);
+		&priv->desc_data[0].pphys_tx_ring, GFP_KERNEL);
 
 	if (mem == NULL) {
-
 		WLDBG_ERROR(DBG_LEVEL_3, "can not alloc mem");
 		WLDBG_EXIT_INFO(DBG_LEVEL_3, "no memory");
 		return -ENOMEM;
 	}
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
 		WLDBG_INFO(DBG_LEVEL_3, "allocating %i (0x%x) bytes",
 			   MAX_NUM_TX_RING_BYTES, MAX_NUM_TX_RING_BYTES);
 
@@ -505,16 +483,13 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
 		skb_queue_head_init(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
 
 		if (priv->desc_data[num].ptx_ring != NULL) {
-
 			WLDBG_INFO(DBG_LEVEL_3, "initializing %i descriptors", SYSADPT_MAX_NUM_TX_DESC);
 
 			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-
 				CURR_TXD(num).status = ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
 				CURR_TXD(num).pnext = &NEXT_TXD(num);
 				CURR_TXD(num).pphys_next =
@@ -535,8 +510,7 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 				   "last txdesc vnext: 0x%p pnext: 0x%x pstale 0x%x vfirst 0x%x",
 				LAST_TXD(num).pnext, ENDIAN_SWAP32(LAST_TXD(num).pphys_next),
 				priv->desc_data[num].pstale_tx_desc, priv->desc_data[num].pnext_tx_desc);
-		} else
-		{
+		} else {
 			WLDBG_ERROR(DBG_LEVEL_3, "no valid TX mem");
 			WLDBG_EXIT_INFO(DBG_LEVEL_3, "no valid memory");
 			return -ENOMEM;
@@ -559,15 +533,11 @@ static void mwl_tx_ring_cleanup(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
 		skb_queue_purge(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
 		if (priv->desc_data[num].ptx_ring != NULL) {
-
 			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-
 				if (CURR_TXD(num).psk_buff != NULL) {
-
 					WLDBG_INFO(DBG_LEVEL_3,
 						   "unmapped and free'd txdesc %i vaddr: 0x%p paddr: 0x%x",
 						curr_desc, CURR_TXD(num).psk_buff->data,
@@ -599,15 +569,13 @@ static void mwl_tx_ring_free(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	if (priv->desc_data[0].ptx_ring != NULL) {
-
-		pci_free_consistent(priv->pdev,
-				    MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
+		dma_free_coherent(&priv->pdev->dev,
+			MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
 			priv->desc_data[0].ptx_ring,
 			priv->desc_data[0].pphys_tx_ring);
 	}
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
 		if (priv->desc_data[num].ptx_ring != NULL)
 			priv->desc_data[num].ptx_ring = NULL;
 		priv->desc_data[num].pstale_tx_desc = NULL;
@@ -689,20 +657,16 @@ static inline void mwl_tx_encapsulate_frame(struct mwl_priv *priv,
 	data_pad = 0;
 
 	if (key_conf != NULL) {
-
 		head_pad = key_conf->iv_len;
 
 		switch (key_conf->cipher) {
-
 		case WLAN_CIPHER_SUITE_WEP40:
 		case WLAN_CIPHER_SUITE_WEP104:
 			data_pad = 4;
 			break;
-
 		case WLAN_CIPHER_SUITE_TKIP:
 			data_pad = 12;
 			break;
-
 		case WLAN_CIPHER_SUITE_CCMP:
 			data_pad = 8;
 			*ccmp = true;
@@ -770,10 +734,8 @@ static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 	 * an ampdu stream to be started.
 	 */
 	if (jiffies - tx_stats->start_time > HZ) {
-
 		tx_stats->pkts = 0;
 		tx_stats->start_time = 0;
-
 	} else
 		tx_stats->pkts++;
 }
@@ -796,9 +758,7 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 	SPIN_LOCK_IRQSAVE(&priv->locks.xmit_lock, flags);
 
 	while (num--) {
-
 		while (skb_queue_len(&priv->txq[num]) > 0) {
-
 			if (priv->desc_data[num].pnext_tx_desc == NULL)
 				break;
 
@@ -808,7 +768,6 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 			 * when fwDescCnt==256 and pStaleTxDesc->Status==0.
 			 */
 			if (priv->desc_data[num].pnext_tx_desc->status != EAGLE_TXD_STATUS_IDLE) {
-
 				/* Interrupt F/W anyway
 				*/
 				if (priv->desc_data[num].pnext_tx_desc->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED))
@@ -816,7 +775,6 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 					       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
 
 				break;
-
 			}
 
 			tx_skb = skb_dequeue(&priv->txq[num]);
@@ -830,7 +788,7 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 			priv->desc_data[num].pnext_tx_desc->qos_ctrl = tx_ctrl->qos_ctrl;
 			priv->desc_data[num].pnext_tx_desc->psk_buff = tx_skb;
 			priv->desc_data[num].pnext_tx_desc->pkt_len = ENDIAN_SWAP16(tx_skb->len);
-			priv->desc_data[num].pnext_tx_desc->ack_wcb_addr = 0;
+			priv->desc_data[num].pnext_tx_desc->packet_info = 0;
 			priv->desc_data[num].pnext_tx_desc->data_rate = 0;
 			priv->desc_data[num].pnext_tx_desc->sta_info = tx_ctrl->sta_info;
 			priv->desc_data[num].pnext_tx_desc->type = tx_ctrl->type;
@@ -853,39 +811,3 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 
 	WLDBG_EXIT(DBG_LEVEL_3);
 }
-
-#if 0
-static void mwl_tx_descriptor_dump(struct mwl_priv *priv)
-{
-	int curr_desc;
-	int num;
-	char *p1 = NULL;
-	char *p2 = NULL;
-	char str1[12] = " <- CURR_TXD";
-	char str2[14] = " <- NEXT_TXD";
-	char blank[2] = " ";
-
-	WLDBG_ENTER(DBG_LEVEL_3);
-
-	BUG_ON(!priv);
-
-	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-
-		if (priv->desc_data[num].ptx_ring != NULL) {
-
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-
-				p1 = blank;
-				p2 = blank;
-				if ((u32)&CURR_TXD(num) == (u32)priv->desc_data[num].pstale_tx_desc)
-					p1 = str1;
-				if ((u32)&CURR_TXD(num) == (u32)priv->desc_data[num].pnext_tx_desc)
-					p2 = str2;
-				WLDBG_PRINT("TxDescriptor(%d.%d) Status=0x%x %s %s", num, curr_desc, CURR_TXD(num).status, p1, p2);
-			}
-		}
-	}
-
-	WLDBG_EXIT(DBG_LEVEL_3);
-}
-#endif

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -34,28 +34,32 @@
  *      16 bit host command code
  */
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
-#define HOSTCMD_CMD_SET_HW_SPEC				0x0004
+#define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
 #define HOSTCMD_CMD_802_11_GET_STAT             0x0014
 #define HOSTCMD_CMD_802_11_RADIO_CONTROL        0x001c
 #define HOSTCMD_CMD_802_11_TX_POWER             0x001f
 #define HOSTCMD_CMD_802_11_RF_ANTENNA           0x0020
 #define HOSTCMD_CMD_BROADCAST_SSID_ENABLE       0x0050 /* per-vif */
 #define HOSTCMD_CMD_SET_RF_CHANNEL              0x010a
+#define HOSTCMD_CMD_SET_AID                     0x010d /* per-vif */
+#define HOSTCMD_CMD_SET_INFRA_MODE              0x010e /* per-vif */
 #define HOSTCMD_CMD_802_11_RTS_THSD             0x0113
 #define HOSTCMD_CMD_SET_EDCA_PARAMS             0x0115
 #define HOSTCMD_CMD_SET_WMM_MODE                0x0123
 #define HOSTCMD_CMD_SET_FIXED_RATE              0x0126
 #define HOSTCMD_CMD_SET_IES                     0x0127
-#define HOSTCMD_CMD_SET_RATE_ADAPT_MODE			0x0203
+#define HOSTCMD_CMD_SET_MAC_ADDR                0x0202 /* per-vif */
+#define HOSTCMD_CMD_SET_RATE_ADAPT_MODE         0x0203
 #define HOSTCMD_CMD_GET_WATCHDOG_BITMAP         0x0205
+#define HOSTCMD_CMD_DEL_MAC_ADDR                0x0206 /* pre-vif */
 #define HOSTCMD_CMD_BSS_START                   0x1100 /* per-vif */
 #define HOSTCMD_CMD_AP_BEACON                   0x1101 /* per-vif */
 #define HOSTCMD_CMD_SET_NEW_STN                 0x1111 /* per-vif */
 #define HOSTCMD_CMD_SET_APMODE                  0x1114
-#define HOSTCMD_CMD_UPDATE_ENCRYPTION			0x1122 /* per-vif */
-#define HOSTCMD_CMD_BASTREAM					0x1125
-#define HOSTCMD_CMD_DWDS_ENABLE					0x1144
-#define HOSTCMD_CMD_FW_FLUSH_TIMER				0x1148
+#define HOSTCMD_CMD_UPDATE_ENCRYPTION           0x1122 /* per-vif */
+#define HOSTCMD_CMD_BASTREAM                    0x1125
+#define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
+#define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
 
 /*
@@ -71,8 +75,8 @@
 /*
  *      Define channel related constants
  */
-#define FREQ_BAND_2DOT4GHZ	                    0x1
-#define FREQ_BAND_4DOT9GHZ	                    0x2
+#define FREQ_BAND_2DOT4GHZ                      0x1
+#define FREQ_BAND_4DOT9GHZ                      0x2
 #define FREQ_BAND_5GHZ                          0x4
 #define FREQ_BAND_5DOT2GHZ                      0x8
 #define CH_AUTO_WIDTH	                        0
@@ -111,15 +115,15 @@
 #define MAX_ENCR_KEY_LENGTH                     16
 #define MIC_KEY_LENGTH                          8
 
-#define KEY_TYPE_ID_WEP							0x00       /* Key type is WEP		*/
-#define KEY_TYPE_ID_TKIP						0x01       /* Key type is TKIP		*/
-#define KEY_TYPE_ID_AES							0x02       /* Key type is AES-CCMP	*/
+#define KEY_TYPE_ID_WEP                         0x00       /* Key type is WEP		*/
+#define KEY_TYPE_ID_TKIP                        0x01       /* Key type is TKIP		*/
+#define KEY_TYPE_ID_AES	                        0x02       /* Key type is AES-CCMP	*/
 
-#define ENCR_KEY_FLAG_TXGROUPKEY				0x00000004 /* Group key for TX */
-#define ENCR_KEY_FLAG_PAIRWISE					0x00000008 /* pairwise */
-#define ENCR_KEY_FLAG_TSC_VALID					0x00000040 /* Sequence counters are valid */
-#define ENCR_KEY_FLAG_WEP_TXKEY					0x01000000 /* Tx key for WEP */
-#define ENCR_KEY_FLAG_MICKEY_VALID				0x02000000 /* Tx/Rx MIC keys are valid */
+#define ENCR_KEY_FLAG_TXGROUPKEY                0x00000004 /* Group key for TX */
+#define ENCR_KEY_FLAG_PAIRWISE                  0x00000008 /* pairwise */
+#define ENCR_KEY_FLAG_TSC_VALID                 0x00000040 /* Sequence counters are valid */
+#define ENCR_KEY_FLAG_WEP_TXKEY                 0x01000000 /* Tx key for WEP */
+#define ENCR_KEY_FLAG_MICKEY_VALID              0x02000000 /* Tx/Rx MIC keys are valid */
 
 /*
  *      Define block ack related constants
@@ -137,7 +141,7 @@
 /*      Misc
 */
 #define MWL_SPIN_LOCK(X)                        SPIN_LOCK_IRQSAVE(X, flags)
-#define MWL_SPIN_UNLOCK(X)	                    SPIN_UNLOCK_IRQRESTORE(X, flags)
+#define MWL_SPIN_UNLOCK(X)                      SPIN_UNLOCK_IRQRESTORE(X, flags)
 
 #define MAX_ENCR_KEY_LENGTH                     16
 #define MIC_KEY_LENGTH                          8
@@ -146,31 +150,24 @@
 */
 
 enum {
-
 	WL_DISABLE = 0,
 	WL_ENABLE = 1,
 	WL_DISABLE_VMAC = 0x80,
-
 };
 
 enum {
-
 	WL_GET = 0,
 	WL_SET = 1,
 	WL_RESET = 2,
-
 };
 
 enum {
-
 	WL_LONG_PREAMBLE = 1,
 	WL_SHORT_PREAMBLE = 3,
 	WL_AUTO_PREAMBLE = 5,
-
 };
 
 enum encr_action_type {
-
 	/* request to enable/disable HW encryption */
 	ENCR_ACTION_ENABLE_HW_ENCR,
 	/* request to set encryption key */
@@ -178,17 +175,21 @@ enum encr_action_type {
 	/* request to remove one or more keys */
 	ENCR_ACTION_TYPE_REMOVE_KEY,
 	ENCR_ACTION_TYPE_SET_GROUP_KEY,
-
 };
 
 enum ba_action_type {
-
 	BA_CREATE_STREAM,
 	BA_UPDATE_STREAM,
 	BA_DESTROY_STREAM,
 	BA_FLUSH_STREAM,
 	BA_CHECK_STREAM,
+};
 
+enum mac_type {
+	WL_MAC_TYPE_PRIMARY_CLIENT,
+	WL_MAC_TYPE_SECONDARY_CLIENT,
+	WL_MAC_TYPE_PRIMARY_AP,
+	WL_MAC_TYPE_SECONDARY_AP,
 };
 
 /*
@@ -196,13 +197,11 @@ enum ba_action_type {
  */
 
 struct hostcmd_header {
-
 	u16 cmd;
 	u16 len;
 	u8 seq_num;
 	u8 macid;
 	u16 result;
-
 } __packed;
 
 /*
@@ -210,7 +209,6 @@ struct hostcmd_header {
  */
 
 struct hostcmd_cmd_get_hw_spec {
-
 	struct hostcmd_header cmd_hdr;
 	u8 version;                  /* version of the HW                    */
 	u8 host_if;                  /* host interface                       */
@@ -225,7 +223,6 @@ struct hostcmd_cmd_get_hw_spec {
 	u32 rxpd_rd_ptr;
 	u32 fw_awake_cookie;
 	u32 wcb_base[SYSADPT_TOTAL_TX_QUEUES - 1];
-
 } __packed;
 
 /*
@@ -233,7 +230,6 @@ struct hostcmd_cmd_get_hw_spec {
  */
 
 struct hostcmd_cmd_set_hw_spec {
-
 	struct hostcmd_header cmd_hdr;
 	u8 version;                             /* HW revision */
 	u8 host_if;                             /* Host interface */
@@ -259,7 +255,6 @@ struct hostcmd_cmd_set_hw_spec {
 	u32 reserved: 21;                       /* Reserved */
 	u32 tx_wcb_num_per_queue;
 	u32 total_rx_wcb;
-
 } __packed;
 
 /*
@@ -267,7 +262,6 @@ struct hostcmd_cmd_set_hw_spec {
  */
 
 struct hostcmd_cmd_802_11_get_stat {
-
 	struct hostcmd_header cmd_hdr;
 	u32 tx_retry_successes;
 	u32 tx_multiple_retry_successes;
@@ -302,7 +296,6 @@ struct hostcmd_cmd_802_11_get_stat {
 	u32 rx_errors;
 	u32 rx_rts_count;
 	u32 tx_cts_count;
-
 } __packed;
 
 /*
@@ -310,12 +303,10 @@ struct hostcmd_cmd_802_11_get_stat {
  */
 
 struct hostcmd_cmd_802_11_radio_control {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u16 control;	             /* @bit0: 1/0,on/off, @bit1: 1/0, long/short @bit2: 1/0,auto/fix */
 	u16 radio_on;
-
 } __packed;
 
 /*
@@ -323,7 +314,6 @@ struct hostcmd_cmd_802_11_radio_control {
  */
 
 struct hostcmd_cmd_802_11_tx_power {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u16 band;
@@ -331,7 +321,6 @@ struct hostcmd_cmd_802_11_tx_power {
 	u16 bw;
 	u16 sub_ch;
 	u16 power_level_list[SYSADPT_TX_POWER_LEVEL_TOTAL];
-
 } __packed;
 
 /*
@@ -339,11 +328,9 @@ struct hostcmd_cmd_802_11_tx_power {
  */
 
 struct hostcmd_cmd_802_11_rf_antenna {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u16 antenna_mode;            /* Number of antennas or 0xffff(diversity) */
-
 } __packed;
 
 /*
@@ -351,10 +338,8 @@ struct hostcmd_cmd_802_11_rf_antenna {
  */
 
 struct hostcmd_cmd_broadcast_ssid_enable {
-
 	struct hostcmd_header cmd_hdr;
 	u32 enable;
-
 } __packed;
 
 /*
@@ -362,21 +347,37 @@ struct hostcmd_cmd_broadcast_ssid_enable {
  */
 
 struct chnl_flags_11ac {
-
 	u32	freq_band:6;             /* bit0=1: 2.4GHz,bit1=1: 4.9GHz,bit2=1: 5GHz,bit3=1: 5.2GHz, */
 	u32	chnl_width:5;            /* bit6=1:10MHz, bit7=1:20MHz, bit8=1:40MHz */
 	u32	act_primary:3;           /* 000: 1st 20MHz chan, 001:2nd 20MHz chan, 011:3rd 20MHz chan, 100:4th 20MHz chan */
 	u32	reserved:18;
-
 } __packed;
 
 struct hostcmd_cmd_set_rf_channel {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u8 curr_chnl;
 	struct chnl_flags_11ac chnl_flags;
+} __packed;
 
+/*
+ *     HOSTCMD_CMD_SET_AID
+ */
+
+struct hostcmd_cmd_set_aid {
+	struct hostcmd_header cmd_hdr;
+	u16 aid;
+	u8 mac_addr[ETH_ALEN];       /* AP's Mac Address(BSSID) */
+	u32 gprotect;
+	u8 ap_rates[SYSADPT_MAX_DATA_RATES_G];
+} __packed;
+
+/*
+ *     HOSTCMD_CMD_SET_INFRA_MODE
+ */
+
+struct hostcmd_cmd_set_infra_mode {
+	struct hostcmd_header cmd_hdr;
 } __packed;
 
 /*
@@ -384,11 +385,9 @@ struct hostcmd_cmd_set_rf_channel {
  */
 
 struct hostcmd_cmd_802_11_rts_thsd {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u16	threshold;
-
 } __packed;
 
 /*
@@ -396,7 +395,6 @@ struct hostcmd_cmd_802_11_rts_thsd {
  */
 
 struct hostcmd_cmd_set_edca_params {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;                  /* 0 = get all, 0x1 =set CWMin/Max,  0x2 = set TXOP , 0x4 =set AIFSN */
 	u16 txop;                    /* in unit of 32 us */
@@ -404,7 +402,6 @@ struct hostcmd_cmd_set_edca_params {
 	u32 cw_min;                  /* 0~15 */
 	u8 aifsn;
 	u8 txq_num;                  /* Tx Queue number. */
-
 } __packed;
 
 /*
@@ -412,33 +409,26 @@ struct hostcmd_cmd_set_edca_params {
  */
 
 struct hostcmd_cmd_set_wmm_mode {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;                  /* 0->unset, 1->set */
-
 } __packed;
 
 /*
  *     HOSTCMD_CMD_SET_FIXED_RATE
  */
 
-struct fix_rate_flag {
-                                 /* lower rate after the retry count */
+struct fix_rate_flag {           /* lower rate after the retry count */
 	u32 fix_rate_type;           /* 0: legacy, 1: HT */
 	u32 retry_count_valid;       /* 0: retry count is not valid, 1: use retry count specified */
-
 } __packed;
 
 struct fix_rate_entry {
-
 	struct fix_rate_flag fix_rate_type_flags;
 	u32 fixed_rate;              /* depending on the flags above, this can be either a legacy rate(not index) or an MCS code. */
 	u32 retry_count;
-
 } __packed;
 
 struct hostcmd_cmd_set_fixed_rate {
-
 	struct hostcmd_header cmd_hdr;
 	u32 action;                  /* HOSTCMD_ACT_NOT_USE_FIXED_RATE 0x0002 */
 	u32 allow_rate_drop;         /* use fixed rate specified but firmware can drop to */
@@ -447,7 +437,6 @@ struct hostcmd_cmd_set_fixed_rate {
 	u8 multicast_rate;
 	u8 multi_rate_tx_type;
 	u8 management_rate;
-
 } __packed;
 
 /*
@@ -455,7 +444,6 @@ struct hostcmd_cmd_set_fixed_rate {
  */
 
 struct hostcmd_cmd_set_ies {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;                  /* 0->unset, 1->set */
 	u16 ie_list_len_ht;
@@ -465,7 +453,6 @@ struct hostcmd_cmd_set_ies {
 	u8 ie_list_ht[148];
 	u8 ie_list_vht[24];
 	u8 ie_list_proprietary[112];
-
 } __packed;
 
 /*
@@ -473,11 +460,19 @@ struct hostcmd_cmd_set_ies {
  */
 
 struct hostcmd_cmd_set_rate_adapt_mode {
-
 	struct hostcmd_header cmd_hdr;
 	u16 action;
 	u16 rate_adapt_mode;         /* 0:Indoor, 1:Outdoor */
+} __packed;
 
+/*
+ *      HOSTCMD_CMD_SET_MAC_ADDR, HOSTCMD_CMD_DEL_MAC_ADDR
+ */
+
+struct hostcmd_cmd_set_mac_addr {
+	struct hostcmd_header cmd_hdr;
+	u16 mac_type;
+	u8 mac_addr[ETH_ALEN];
 } __packed;
 
 /*
@@ -485,10 +480,8 @@ struct hostcmd_cmd_set_rate_adapt_mode {
  */
 
 struct hostcmd_cmd_get_watchdog_bitmap {
-
 	struct hostcmd_header cmd_hdr;
 	u8 watchdog_bitmap;          /* for SW/BA */
-
 } __packed;
 
 /*
@@ -496,10 +489,8 @@ struct hostcmd_cmd_get_watchdog_bitmap {
  */
 
 struct hostcmd_cmd_bss_start {
-
 	struct hostcmd_header cmd_hdr;
 	u32 enable;                  /* FALSE: Disable or TRUE: Enable */
-
 } __packed;
 
 /*
@@ -507,59 +498,46 @@ struct hostcmd_cmd_bss_start {
  */
 
 struct cf_params {
-
 	u8 elem_id;
 	u8 len;
 	u8 cfp_cnt;
 	u8 cfp_period;
 	u16 cfp_max_duration;
 	u16 cfp_duration_remaining;
-
 } __packed;
 
 struct ibss_params {
-
 	u8 elem_id;
 	u8 len;
 	u16	atim_window;
-
 } __packed;
 
 union ss_params {
-
 	struct cf_params cf_param_set;
 	struct ibss_params ibss_param_set;
-
 } __packed;
 
 struct fh_params {
-
 	u8 elem_id;
 	u8 len;
 	u16 dwell_time;
 	u8 hop_set;
 	u8 hop_pattern;
 	u8 hop_index;
-
 } __packed;
 
 struct ds_params {
-
 	u8 elem_id;
 	u8 len;
 	u8 current_chnl;
-
 } __packed;
 
 union phy_params {
-
 	struct fh_params fh_param_set;
 	struct ds_params ds_param_set;
-
 } __packed;
 
 struct rsn_ie {
-
 	u8 elem_id;
 	u8 len;
 	u8 oui_type[4];              /* 00:50:f2:01 */
@@ -569,11 +547,9 @@ struct rsn_ie {
 	u8 pws_key_cipher_list[4];
 	u8 auth_key_cnt[2];
 	u8 auth_key_list[4];
-
 } __packed;
 
 struct rsn48_ie {
-
 	u8 elem_id;
 	u8 len;
 	u8 ver[2];
@@ -583,35 +559,30 @@ struct rsn48_ie {
 	u8 auth_key_cnt[2];
 	u8 auth_key_list[4];
 	u8 rsn_cap[2];
-
+	u8 pmk_id_cnt[2];
+	u8 pmk_id_list[16];          /* Should modify to 16 * S */
+	u8 reserved[8];
 } __packed;
 
 struct aci_aifsn_field {
-
 	u8 aifsn:4;
 	u8 acm:1;
 	u8 aci:2;
 	u8 rsvd:1;
-
 } __packed;
 
 struct ecw_min_max_field {
-
 	u8 ecw_min:4;
 	u8 ecw_max:4;
-
 } __packed;
 
 struct ac_param_rcd {
-
 	struct aci_aifsn_field aci_aifsn;
 	struct ecw_min_max_field ecw_min_max;
 	u16 txop_lim;
-
 } __packed;
 
 struct wmm_param_elem {
-
 	u8 elem_id;
 	u8 len;
 	u8 oui[3];
@@ -623,28 +594,22 @@ struct wmm_param_elem {
 	struct ac_param_rcd ac_bk;
 	struct ac_param_rcd ac_vi;
 	struct ac_param_rcd ac_vo;
-
 } __packed;
 
 struct channel_info {
-
 	u8 first_channel_num;
 	u8 num_channels;
 	u8 max_tx_pwr_level;
-
 } __packed;
 
 struct country {
-
 	u8 elem_id;
 	u8 len;
 	u8 country_str[3];
 	struct channel_info channel_info[40];
-
 } __packetd;
 
 struct start_cmd {
-
 	u8 sta_mac_addr[ETH_ALEN];
 	u8 ssid[IEEE80211_MAX_SSID_LEN];
 	u8 bss_type;
@@ -661,14 +626,11 @@ struct start_cmd {
 	struct wmm_param_elem wmm_param;
 	struct country country;
 	u32 ap_rf_type;              /* 0->B, 1->G, 2->Mixed, 3->A, 4->11J */
-
 } __packed;
 
 struct hostcmd_cmd_ap_beacon {
-
 	struct hostcmd_header cmd_hdr;
 	struct start_cmd start_cmd;
-
 } __packed;
 
 /*
@@ -676,7 +638,6 @@ struct hostcmd_cmd_ap_beacon {
  */
 
 struct cap_info {
-
 	u16 ess:1;
 	u16 ibss:1;
 	u16 cf_pollable:1;
@@ -693,31 +654,25 @@ struct cap_info {
 	u16 dsss_ofdm:1;
 	u16 block_ack:1;
 	u16 rsrvd2:1;
-
 } __packed;
 
 struct add_ht_chnl {
-
 	u8 ext_chnl_offset:2;
 	u8 sta_chnl_width:1;
 	u8 rifs_mode:1;
 	u8 psmp_stas_only:1;
 	u8 srvc_intvl_gran:3;
-
 } __packed;
 
 struct add_ht_op_mode {
-
 	u16 op_mode:2;
 	u16 non_gf_sta_present:1;
 	u16 rrans_burst_limit:1;
 	u16 non_ht_sta_present:1;
 	u16 rsrv:11;
-
 } __packed;
 
 struct add_ht_stbc {
-
 	u16 bsc_stbc:7;
 	u16 dual_stbc_proc:1;
 	u16 scd_bcn:1;
@@ -725,20 +680,16 @@ struct add_ht_stbc {
 	u16 pco_active:1;
 	u16 pco_phase:1;
 	u16 rsrv:4;
-
 } __packed;
 
 struct add_ht_info {
-
 	u8 control_chnl;
 	struct add_ht_chnl add_chnl;
 	struct add_ht_op_mode op_mode;
 	struct add_ht_stbc stbc;
-
 } __packed;
 
 struct peer_info {
-
 	u32 legacy_rate_bitmap;
 	u8 ht_rates[4];
 	struct cap_info cap_info;
@@ -750,11 +701,9 @@ struct peer_info {
 	u32 vht_max_rx_mcs;
 	u32 vht_cap;
 	u8 vht_rx_channel_width;     /* 0:20Mhz, 1:40Mhz, 2:80Mhz, 3:160 or 80+80Mhz */
-
 } __packed;
 
 struct hostcmd_cmd_set_new_stn {
-
 	struct hostcmd_header cmd_hdr;
 	u16 aid;
 	u8 mac_addr[ETH_ALEN];
@@ -766,7 +715,6 @@ struct hostcmd_cmd_set_new_stn {
 	u8 qos_info;
 	u8 is_qos_sta;
 	u32 fw_sta_ptr;
-
 } __packed;
 
 /*
@@ -774,10 +722,8 @@ struct hostcmd_cmd_set_new_stn {
  */
 
 struct hostcmd_cmd_set_apmode {
-
 	struct hostcmd_header cmd_hdr;
 	u8 apmode;
-
 } __packed;
 
 /*
@@ -785,7 +731,6 @@ struct hostcmd_cmd_set_apmode {
  */
 
 struct hostcmd_cmd_update_encryptoin {
-
 	struct hostcmd_header cmd_hdr;
 	/* Action type - see encr_action_type */
 	u32 action_type;             /* encr_action_type */
@@ -793,25 +738,19 @@ struct hostcmd_cmd_update_encryptoin {
 	u32 data_length;
 	u8 mac_addr[ETH_ALEN];
 	u8 action_data[1];
-
 } __packed;
 
 struct wep_type_key {
-
 	/* WEP key material (max 128bit) */
 	u8 key_material[MAX_ENCR_KEY_LENGTH];
-
 } __packed;
 
 struct encr_tkip_seqcnt {
-
 	u16 low;
 	u32 high;
-
 } __packed;
 
 struct tkip_type_key {
-
 	/* TKIP Key material. Key type (group or pairwise key) is determined by flags */
 	/* in KEY_PARAM_SET structure. */
 	u8 key_material[MAX_ENCR_KEY_LENGTH];
@@ -820,26 +759,20 @@ struct tkip_type_key {
 	u8 tkip_rx_mic_key[MIC_KEY_LENGTH];
 	struct encr_tkip_seqcnt	tkip_rsc;
 	struct encr_tkip_seqcnt	tkip_tsc;
-
 } __packed;
 
 struct aes_type_key {
-
 	/* AES Key material */
 	u8 key_material[MAX_ENCR_KEY_LENGTH];
-
 } __packed;
 
 union mwl_key_type {
-
 	struct wep_type_key	wep_key;
 	struct tkip_type_key tkip_key;
 	struct aes_type_key	aes_key;
-
 } __packed;
 
 struct key_param_set {
-
 	/* Total length of this structure (Key is variable size array) */
 	u16 length;
 	/* Key type - WEP, TKIP or AES-CCMP. */
@@ -854,11 +787,9 @@ struct key_param_set {
 	/* Key material (variable size array) */
 	union mwl_key_type key;
 	u8 mac_addr[ETH_ALEN];
-
 } __packed;
 
 struct hostcmd_cmd_set_key {
-
 	struct hostcmd_header cmd_hdr;
 	/* Action type - see encr_action_type */
 	u32 action_type;             /* encr_action_type */
@@ -866,7 +797,6 @@ struct hostcmd_cmd_set_key {
 	u32 data_length;
 	/* data buffer - maps to one KEY_PARAM_SET structure */
 	struct key_param_set key_param;
-
 } __packed;
 
 /*
@@ -874,17 +804,13 @@ struct hostcmd_cmd_set_key {
  */
 
 struct ba_stream_flags {
-
 	u32	ba_type:1;
 	u32 ba_direction:3;
 	u32 reserved:24;
-
 } __packed;
 
 struct ba_context {
-
 	u32 context;
-
 } __packed;
 
 /* parameters for block ack creation */
@@ -912,32 +838,26 @@ struct create_ba_params {
 	u8 reset_seq_no;             /** 0 or 1**/
 	u16 current_seq;
 	u8 sta_src_mac_addr[ETH_ALEN]; /* This is for virtual station in Sta proxy mode for V6FW */
-
 } __packed;
 
 /* new transmit sequence number information */
 struct ba_update_seq_num {
-
 	/* BA flags - see above */
 	struct ba_stream_flags flags;
 	/* returned by firmware in the create ba stream response */
 	struct ba_context fw_ba_context;
 	/* new sequence number for this block ack stream */
 	u16 ba_seq_num;
-
 } __packed;
 
 struct ba_stream_context {
-
 	/* BA Stream flags */
 	struct ba_stream_flags flags;
 	/* returned by firmware in the create ba stream response */
 	struct ba_context fw_ba_context;
-
 } __packed;
 
 union ba_info {
-
 	/* information required to create BA Stream... */
 	struct create_ba_params	create_params;
 	/* update starting/new sequence number etc. */
@@ -946,15 +866,12 @@ union ba_info {
 	struct ba_stream_context destroy_params;
 	/* destroy an existing stream... */
 	struct ba_stream_context flush_params;
-
 } __packed;
 
 struct hostcmd_cmd_bastream {
-
 	struct hostcmd_header cmd_hdr;
 	u32 action_type;
 	union ba_info ba_info;
-
 } __packed;
 
 /*
@@ -962,10 +879,8 @@ struct hostcmd_cmd_bastream {
  */
 
 struct hostcmd_cmd_dwds_enable {
-
 	struct hostcmd_header cmd_hdr;
 	u32 enable;                  /* 0 -- Disable. or 1 -- Enable. */
-
 } __packed;
 
 /*
@@ -973,10 +888,8 @@ struct hostcmd_cmd_dwds_enable {
  */
 
 struct hostcmd_cmd_fw_flush_timer {
-
 	struct hostcmd_header cmd_hdr;
 	u32 value;                   /* 0 -- Disable. > 0 -- holds time value in usecs. */
-
 } __packed;
 
 /*
@@ -984,10 +897,8 @@ struct hostcmd_cmd_fw_flush_timer {
  */
 
 struct hostcmd_cmd_set_cdd {
-
 	struct hostcmd_header cmd_hdr;
 	u32 enable;
-
 } __packed;
 
 /* PRIVATE FUNCTION DECLARATION
@@ -1030,7 +941,6 @@ void mwl_fwcmd_reset(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-
 		writel(ISR_RESET, priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
 	}
 
@@ -1048,9 +958,7 @@ void mwl_fwcmd_int_enable(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-
 		writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
-
 		writel((MACREG_A2HRIC_BIT_MASK),
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 	}
@@ -1069,7 +977,6 @@ void mwl_fwcmd_int_disable(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-
 		writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 	}
 
@@ -1103,7 +1010,6 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	while (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_HW_SPEC)) {
-
 		WLDBG_PRINT("failed execution");
 		WL_MSEC_SLEEP(1000);
 		WLDBG_PRINT("repeat command = %x", (unsigned int)pcmd);
@@ -1178,7 +1084,6 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 	pcmd->disablembss = 0;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_HW_SPEC)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1212,7 +1117,6 @@ int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_GET_STAT)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1306,7 +1210,6 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 	BUG_ON(!priv);
 
 	switch (fraction) {
-
 	case 0:
 		reduce_val = 0;    /* Max */
 		break;
@@ -1331,23 +1234,17 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-
 		width = CH_20_MHz_WIDTH;
 		sub_ch = NO_EXT_CHANNEL;
 
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-
 		width = CH_40_MHz_WIDTH;
-
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
 			sub_ch = EXT_CH_BELOW_CTRL_CH;
-
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-
 		width = CH_80_MHz_WIDTH;
-
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
@@ -1355,28 +1252,22 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 	}
 
 	if ((priv->powinited & 2) == 0) {
-
 		mwl_fwcmd_get_tx_powers(priv, priv->max_tx_pow,
 					channel->hw_value, band, width, sub_ch);
-
 		priv->powinited |= 2;
 	}
 
 	if ((priv->powinited & 1) == 0) {
-
 		mwl_fwcmd_get_tx_powers(priv, priv->target_powers,
 					channel->hw_value, band, width, sub_ch);
-
 		priv->powinited |= 1;
 	}
 
 	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
-
 		if (priv->target_powers[i] > priv->max_tx_pow[i])
 			tmp = priv->max_tx_pow[i];
 		else
 			tmp = priv->target_powers[i];
-
 		maxtxpow[i] = ((tmp - reduce_val) > 0) ? (tmp - reduce_val) : 0;
 	}
 
@@ -1407,7 +1298,6 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	BUG_ON(!priv);
 
 	switch (fraction) {
-
 	case 0:
 		reduce_val = 0;    /* Max */
 		break;
@@ -1432,23 +1322,16 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-
 		width = CH_20_MHz_WIDTH;
 		sub_ch = NO_EXT_CHANNEL;
-
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-
 		width = CH_40_MHz_WIDTH;
-
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
 			sub_ch = EXT_CH_BELOW_CTRL_CH;
-
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-
 		width = CH_80_MHz_WIDTH;
-
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
@@ -1458,14 +1341,12 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	/* search tx power table if exist
 	*/
 	for (index = 0; index < SYSADPT_MAX_NUM_CHANNELS; index++) {
-
 		/* do nothing if table is not loaded
 		*/
 		if (priv->tx_pwr_tbl[index].channel == 0)
 			break;
 
 		if (priv->tx_pwr_tbl[index].channel == channel->hw_value) {
-
 			priv->cdd = priv->tx_pwr_tbl[index].cdd;
 			priv->txantenna2 = priv->tx_pwr_tbl[index].txantenna2;
 
@@ -1475,7 +1356,6 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 				priv->powinited = 0x02;
 
 			for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
-
 				if (priv->tx_pwr_tbl[index].setcap)
 					priv->max_tx_pow[i] = priv->tx_pwr_tbl[index].tx_power[i];
 				else
@@ -1488,7 +1368,6 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	}
 
 	if ((priv->powinited & 2) == 0) {
-
 		mwl_fwcmd_get_tx_powers(priv, priv->max_tx_pow,
 					channel->hw_value, band, width, sub_ch);
 
@@ -1496,7 +1375,6 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	}
 
 	if ((priv->powinited & 1) == 0) {
-
 		mwl_fwcmd_get_tx_powers(priv, priv->target_powers,
 					channel->hw_value, band, width, sub_ch);
 
@@ -1504,17 +1382,13 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	}
 
 	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
-
 		if (found) {
-
 			if ((priv->tx_pwr_tbl[index].setcap)
 				&& (priv->tx_pwr_tbl[index].tx_power[i] > priv->max_tx_pow[i]))
 				tmp = priv->max_tx_pow[i];
 			else
 				tmp = priv->tx_pwr_tbl[index].tx_power[i];
-
 		} else {
-
 			if (priv->target_powers[i] > priv->max_tx_pow[i])
 				tmp = priv->max_tx_pow[i];
 			else
@@ -1555,29 +1429,24 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 	pcmd->action = ENDIAN_SWAP16(dir);
 
 	if (dir == WL_ANTENNATYPE_RX) {
-
 		u8 rx_antenna = 4; /* if auto, set 4 rx antennas in SC2 */
-
+		
 		if (antenna != 0)
 			pcmd->antenna_mode = ENDIAN_SWAP16(antenna);
 		else
 			pcmd->antenna_mode = ENDIAN_SWAP16(rx_antenna);
-
 	} else {
-
 		u8 tx_antenna = 0xf; /* if auto, set 4 tx antennas in SC2 */
 
 		if (antenna != 0)
 			pcmd->antenna_mode = ENDIAN_SWAP16(antenna);
 		else
 			pcmd->antenna_mode = ENDIAN_SWAP16(tx_antenna);
-
 	}
 
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RF_ANTENNA)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1618,7 +1487,6 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 	pcmd->enable = ENDIAN_SWAP32(enable);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BROADCAST_SSID_ENABLE)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1661,31 +1529,103 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-
 		pcmd->chnl_flags.chnl_width = CH_20_MHz_WIDTH;
 		pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_0;
-
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-
 		pcmd->chnl_flags.chnl_width = CH_40_MHz_WIDTH;
-
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_0;
 		else
 			pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_1;
-
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-
 		pcmd->chnl_flags.chnl_width = CH_80_MHz_WIDTH;
 		pcmd->chnl_flags.act_primary =
 			mwl_fwcmd_get_80m_pri_chnl_offset(pcmd->curr_chnl);
-
 	}
 
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_RF_CHANNEL)) {
+		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+		return -EIO;
+	}
 
+	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+	WLDBG_EXIT(DBG_LEVEL_2);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
+		      struct ieee80211_vif *vif, u8 *bssid, u16 aid)
+{
+	struct mwl_priv *priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_aid *pcmd;
+	unsigned long flags;
+
+	WLDBG_ENTER(DBG_LEVEL_2);
+
+	BUG_ON(!hw);
+	priv = hw->priv;
+	BUG_ON(!priv);
+
+	BUG_ON(!vif);
+	mwl_vif = MWL_VIF(vif);
+	BUG_ON(!mwl_vif);
+
+	pcmd = (struct hostcmd_cmd_set_aid *)&priv->pcmd_buf[0];
+
+	MWL_SPIN_LOCK(&priv->locks.fwcmd_lock);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_SET_AID);
+	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+	pcmd->aid = ENDIAN_SWAP16(aid);
+	memcpy(pcmd->mac_addr, bssid, ETH_ALEN);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_AID)) {
+		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+		return -EIO;
+	}
+
+	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+	WLDBG_EXIT(DBG_LEVEL_2);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif)
+{
+	struct mwl_priv *priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_infra_mode *pcmd;
+	unsigned long flags;
+
+	WLDBG_ENTER(DBG_LEVEL_2);
+
+	BUG_ON(!hw);
+	priv = hw->priv;
+	BUG_ON(!priv);
+
+	BUG_ON(!vif);
+	mwl_vif = MWL_VIF(vif);
+	BUG_ON(!mwl_vif);
+
+	pcmd = (struct hostcmd_cmd_set_infra_mode *)&priv->pcmd_buf[0];
+
+	MWL_SPIN_LOCK(&priv->locks.fwcmd_lock);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_SET_INFRA_MODE);
+	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_INFRA_MODE)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1720,7 +1660,6 @@ int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw, int threshold)
 	pcmd->threshold = ENDIAN_SWAP16(threshold);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RTS_THSD)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1772,7 +1711,6 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_EDCA_PARAMS)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1806,7 +1744,6 @@ int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw, bool enable)
 	pcmd->action = ENDIAN_SWAP16(enable ? WL_ENABLE : WL_DISABLE);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WMM_MODE)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1843,7 +1780,6 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw, int mcast, int mgmt)
 	pcmd->management_rate = mgmt;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_FIXED_RATE)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1878,7 +1814,47 @@ int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw, u16 mode)
 	pcmd->rate_adapt_mode = ENDIAN_SWAP16(mode);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_RATE_ADAPT_MODE)) {
+		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+		return -EIO;
+	}
 
+	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+	WLDBG_EXIT(DBG_LEVEL_2);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_mac_addr_client(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif, u8 *mac_addr)
+{
+	struct mwl_priv *priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_mac_addr *pcmd;
+	unsigned long flags;
+
+	WLDBG_ENTER(DBG_LEVEL_2);
+
+	BUG_ON(!hw);
+	priv = hw->priv;
+	BUG_ON(!priv);
+
+	BUG_ON(!vif);
+	mwl_vif = MWL_VIF(vif);
+	BUG_ON(!mwl_vif);
+
+	pcmd = (struct hostcmd_cmd_set_mac_addr *)&priv->pcmd_buf[0];
+
+	MWL_SPIN_LOCK(&priv->locks.fwcmd_lock);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_SET_MAC_ADDR);
+	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+	pcmd->mac_type = WL_MAC_TYPE_SECONDARY_CLIENT;
+	memcpy(pcmd->mac_addr, mac_addr, ETH_ALEN);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_MAC_ADDR)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -1911,13 +1887,52 @@ int mwl_fwcmd_get_watchdog_bitmap(struct ieee80211_hw *hw, u8 *bitmap)
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_WATCHDOG_BITMAP)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
 	}
 
 	*bitmap = pcmd->watchdog_bitmap;
+
+	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+	WLDBG_EXIT(DBG_LEVEL_2);
+
+	return 0;
+}
+
+int mwl_fwcmd_remove_mac_addr(struct ieee80211_hw *hw,
+			      struct ieee80211_vif *vif, u8 *mac_addr)
+{
+	struct mwl_priv *priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_mac_addr *pcmd;
+	unsigned long flags;
+
+	WLDBG_ENTER(DBG_LEVEL_2);
+
+	BUG_ON(!hw);
+	priv = hw->priv;
+	BUG_ON(!priv);
+
+	BUG_ON(!vif);
+	mwl_vif = MWL_VIF(vif);
+	BUG_ON(!mwl_vif);
+
+	pcmd = (struct hostcmd_cmd_set_mac_addr *)&priv->pcmd_buf[0];
+
+	MWL_SPIN_LOCK(&priv->locks.fwcmd_lock);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_DEL_MAC_ADDR);
+	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+	memcpy(pcmd->mac_addr, mac_addr, ETH_ALEN);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_DEL_MAC_ADDR)) {
+		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+		return -EIO;
+	}
 
 	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 	WLDBG_EXIT(DBG_LEVEL_2);
@@ -1959,20 +1974,15 @@ int mwl_fwcmd_bss_start(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	if (enable) {
-
 		pcmd->enable = ENDIAN_SWAP32(WL_ENABLE);
-
 	} else {
-
 		if (mwl_vif->macid == 0)
 			pcmd->enable = ENDIAN_SWAP32(WL_DISABLE);
 		else
 			pcmd->enable = ENDIAN_SWAP32(WL_DISABLE_VMAC);
-
 	}
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BSS_START)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2030,7 +2040,7 @@ err:
 
 int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif,
-	struct ieee80211_sta *sta)
+			      struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2060,9 +2070,14 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = ENDIAN_SWAP16(HOSTCMD_ACT_STA_ACTION_ADD);
-	pcmd->aid = ENDIAN_SWAP16(sta->aid);
+	if (mwl_vif->is_sta == true) {
+		pcmd->aid = 0;
+		pcmd->stn_id = 0;
+	} else {
+		pcmd->aid = ENDIAN_SWAP16(sta->aid);
+		pcmd->stn_id = ENDIAN_SWAP16(sta->aid);
+	}
 	memcpy(pcmd->mac_addr, sta->addr, ETH_ALEN);
-	pcmd->stn_id = ENDIAN_SWAP16(sta->aid);
 
 	if (hw->conf.chandef.chan->band == IEEE80211_BAND_2GHZ)
 		rates = sta->supp_rates[IEEE80211_BAND_2GHZ];
@@ -2071,7 +2086,6 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->peer_info.legacy_rate_bitmap = ENDIAN_SWAP32(rates);
 
 	if (sta->ht_cap.ht_supported) {
-
 		pcmd->peer_info.ht_rates[0] = sta->ht_cap.mcs.rx_mask[0];
 		pcmd->peer_info.ht_rates[1] = sta->ht_cap.mcs.rx_mask[1];
 		pcmd->peer_info.ht_rates[2] = sta->ht_cap.mcs.rx_mask[2];
@@ -2082,7 +2096,6 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	}
 
 	if (sta->vht_cap.vht_supported) {
-
 		pcmd->peer_info.vht_max_rx_mcs = ENDIAN_SWAP32(*((u32 *)&sta->vht_cap.vht_mcs.rx_mcs_map));
 		pcmd->peer_info.vht_cap = ENDIAN_SWAP32(sta->vht_cap.cap);
 		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
@@ -2092,10 +2105,19 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->qos_info = ((sta->uapsd_queues << 4) | (sta->max_sp << 1));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
+	}
+
+	if (mwl_vif->is_sta == true) {
+		memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+		
+		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+			return -EIO;
+		}
 	}
 
 	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2135,7 +2157,6 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 	memcpy(pcmd->mac_addr, vif->addr, ETH_ALEN);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2178,10 +2199,19 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 	memcpy(pcmd->mac_addr, addr, ETH_ALEN);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
+	}
+
+	if  (mwl_vif->is_sta == true) {
+		memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+		
+		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+			return -EIO;
+		}
 	}
 
 	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2212,7 +2242,6 @@ int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode)
 	pcmd->apmode = apmode;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_APMODE)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2256,10 +2285,22 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 	pcmd->action_data[0] = encr_type;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
+	}
+
+	if (mwl_vif->is_sta == true) {
+		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
+			memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+		else
+			memcpy(pcmd->mac_addr, mwl_vif->bssid, ETH_ALEN);
+
+		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+			return -EIO;
+		}
 	}
 
 	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2270,7 +2311,7 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 				 struct ieee80211_vif *vif, u8 *addr,
-	struct ieee80211_key_conf *key)
+				 struct ieee80211_key_conf *key)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2302,7 +2343,6 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 	rc = mwl_fwcmd_encryption_set_cmd_info(pcmd, addr, key);
 	if (rc) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "encryption not support");
 		return rc;
@@ -2316,12 +2356,9 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		action = ENCR_ACTION_TYPE_SET_GROUP_KEY;
 
 	switch (key->cipher) {
-
 	case WLAN_CIPHER_SUITE_WEP40:
 	case WLAN_CIPHER_SUITE_WEP104:
-
 		if (!mwl_vif->wep_key_conf[idx].enabled) {
-
 			memcpy(mwl_vif->wep_key_conf[idx].key, key,
 			       sizeof(*key) + key->keylen);
 			mwl_vif->wep_key_conf[idx].enabled = 1;
@@ -2330,19 +2367,13 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		keymlen = key->keylen;
 		action = ENCR_ACTION_TYPE_SET_KEY;
 		break;
-
 	case WLAN_CIPHER_SUITE_TKIP:
-
 		keymlen = MAX_ENCR_KEY_LENGTH + 2 * MIC_KEY_LENGTH;
 		break;
-
 	case WLAN_CIPHER_SUITE_CCMP:
-
 		keymlen = key->keylen;
 		break;
-
 	default:
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "encryption not support");
 		return -ENOTSUPP;
@@ -2352,10 +2383,22 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 	pcmd->action_type = ENDIAN_SWAP32(action);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
+	}
+
+	if (mwl_vif->is_sta == true) {
+		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
+			memcpy(pcmd->key_param.mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+		else
+			memcpy(pcmd->key_param.mac_addr, mwl_vif->bssid, ETH_ALEN);
+
+		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
+			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
+			return -EIO;
+		}
 	}
 
 	MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2366,7 +2409,7 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif, u8 *addr,
-	struct ieee80211_key_conf *key)
+				    struct ieee80211_key_conf *key)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2395,7 +2438,6 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 	rc = mwl_fwcmd_encryption_set_cmd_info(pcmd, addr, key);
 	if (rc) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "encryption not support");
 		return rc;
@@ -2408,7 +2450,6 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 		mwl_vif->wep_key_conf[key->keyidx].enabled = 0;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2422,7 +2463,7 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 		       struct mwl_ampdu_stream *stream,
-	struct ieee80211_vif *vif)
+		       struct ieee80211_vif *vif)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2464,14 +2505,12 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
 	}
 
 	if (pcmd->cmd_hdr.result != 0) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "result error");
 		return -EINVAL;
@@ -2485,7 +2524,7 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
-	u8 buf_size, struct ieee80211_vif *vif)
+			u8 buf_size, struct ieee80211_vif *vif)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2536,14 +2575,12 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
 	}
 
 	if (pcmd->cmd_hdr.result != 0) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "result error");
 		return -EINVAL;
@@ -2558,7 +2595,6 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 			 u8 idx)
 {
-
 	struct mwl_priv *priv;
 	struct hostcmd_cmd_bastream *pcmd;
 	unsigned long flags;
@@ -2585,7 +2621,6 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 	pcmd->ba_info.destroy_params.fw_ba_context.context = ENDIAN_SWAP32(idx);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2613,11 +2648,9 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 	BUG_ON(!sta);
 
 	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-
 		stream = &priv->ampdu[i];
 
 		if (stream->state == AMPDU_NO_STREAM) {
-
 			stream->sta = sta;
 			stream->state = AMPDU_STREAM_NEW;
 			stream->tid = tid;
@@ -2664,7 +2697,6 @@ struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
 	BUG_ON(!priv);
 
 	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-
 		stream = &priv->ampdu[i];
 
 		if (stream->state == AMPDU_NO_STREAM)
@@ -2673,7 +2705,6 @@ struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
 		if (!memcmp(stream->sta->addr, addr, ETH_ALEN) &&
 		    stream->tid == tid)
 			return stream;
-
 	}
 
 	return NULL;
@@ -2718,7 +2749,6 @@ int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable)
 	pcmd->enable = ENDIAN_SWAP32(enable);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_DWDS_ENABLE)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2752,7 +2782,6 @@ int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value)
 	pcmd->value = ENDIAN_SWAP32(value);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_FW_FLUSH_TIMER)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2786,7 +2815,6 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw)
 	pcmd->enable = ENDIAN_SWAP32(priv->cdd);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_CDD)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2812,7 +2840,6 @@ static bool mwl_fwcmd_chk_adapter(struct mwl_priv *priv)
 	regval = readl(priv->iobase1 + MACREG_REG_INT_CODE);
 
 	if (regval == 0xffffffff) {
-
 		WLDBG_ERROR(DBG_LEVEL_2, "adapter is not existed");
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "adapter is not existed");
 
@@ -2833,7 +2860,6 @@ static int mwl_fwcmd_exec_cmd(struct mwl_priv *priv, unsigned short cmd)
 	BUG_ON(!priv);
 
 	if (!mwl_fwcmd_chk_adapter(priv)) {
-
 		WLDBG_ERROR(DBG_LEVEL_2, "no adapter existed");
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "no adapter plugged in");
 		priv->in_send_cmd = false;
@@ -2841,21 +2867,15 @@ static int mwl_fwcmd_exec_cmd(struct mwl_priv *priv, unsigned short cmd)
 	}
 
 	if (!priv->in_send_cmd) {
-
 		priv->in_send_cmd = true;
-
 		mwl_fwcmd_send_cmd(priv);
-
 		if (mwl_fwcmd_wait_complete(priv, 0x8000 | cmd)) {
-
 			WLDBG_ERROR(DBG_LEVEL_2, "timeout");
 			WLDBG_EXIT_INFO(DBG_LEVEL_2, "timeout");
 			priv->in_send_cmd = false;
 			return -EIO;
 		}
-
 	} else {
-
 		WLDBG_WARNING(DBG_LEVEL_2, "previous command is still running");
 		busy = true;
 	}
@@ -2891,19 +2911,14 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	BUG_ON(!priv);
 
 	do {
-
 		int_code = ENDIAN_SWAP16(priv->pcmd_buf[0]);
 		WL_MSEC_SLEEP(1);
-
 	} while ((int_code != cmd) && (--curr_iteration));
 
-	if (curr_iteration == 0)
-	{
+	if (curr_iteration == 0) {
 		WLDBG_ERROR(DBG_LEVEL_2, "cmd 0x%04x=%s timed out",
 			    cmd, mwl_fwcmd_get_cmd_string(cmd));
-
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "timeout");
-
 		return -EIO;
 	}
 
@@ -2941,7 +2956,6 @@ static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv, bool enable, bo
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RADIO_CONTROL)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -2980,7 +2994,6 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 	pcmd->sub_ch = ENDIAN_SWAP16(sub_ch);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_TX_POWER)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -3023,7 +3036,6 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[], u8 action
 		pcmd->power_level_list[i] = ENDIAN_SWAP16(txpow[i]);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_TX_POWER)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -3040,7 +3052,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	u8 act_primary = ACT_PRIMARY_CHAN_0;
 
 	switch (channel) {
-
 	case 36:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3053,7 +3064,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	case 48:
 		act_primary = ACT_PRIMARY_CHAN_3;
 		break;
-
 	case 52:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3066,7 +3076,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	case 64:
 		act_primary = ACT_PRIMARY_CHAN_3;
 		break;
-
 	case 100:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3079,7 +3088,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	case 112:
 		act_primary = ACT_PRIMARY_CHAN_3;
 		break;
-
 	case 116:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3092,7 +3100,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	case 128:
 		act_primary = ACT_PRIMARY_CHAN_3;
 		break;
-
 	case 132:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3105,7 +3112,6 @@ static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
 	case 144:
 		act_primary = ACT_PRIMARY_CHAN_3;
 		break;
-
 	case 149:
 		act_primary = ACT_PRIMARY_CHAN_0;
 		break;
@@ -3158,7 +3164,6 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	elem_parse_failed = false;
 
 	while (left >= 2) {
-
 		u8 id, elen;
 
 		id = *pos++;
@@ -3166,13 +3171,11 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		left -= 2;
 
 		if (elen > left) {
-
 			elem_parse_failed = true;
 			break;
 		}
 
 		switch (id) {
-
 		case WLAN_EID_SUPP_RATES:
 		case WLAN_EID_EXT_SUPP_RATES:
 			{
@@ -3180,23 +3183,19 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				u8 rate;
 
 				for (basic_idx = 0; basic_idx < SYSADPT_MAX_DATA_RATES_G; basic_idx++) {
-
 					if (beacon_info->bss_basic_rate_set[basic_idx] == 0)
 						break;
 				}
 
 				for (oprate_idx = 0; oprate_idx < SYSADPT_MAX_DATA_RATES_G; oprate_idx++) {
-
 					if (beacon_info->op_rate_set[oprate_idx] == 0)
 						break;
 				}
 
 				for (idx = 0; idx < elen; idx++) {
-
 					rate = pos[idx];
 
 					if ((rate & 0x80) != 0) {
-
 						if (basic_idx < SYSADPT_MAX_DATA_RATES_G)
 							beacon_info->bss_basic_rate_set[basic_idx++] = rate & 0x7f;
 						else {
@@ -3214,12 +3213,10 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				}
 			}
 			break;
-
 		case WLAN_EID_RSN:
 			beacon_info->ie_rsn48_len = (elen + 2);
 			beacon_info->ie_rsn48_ptr = (pos - 2);
 			break;
-
 		case WLAN_EID_HT_CAPABILITY:
 		case WLAN_EID_HT_OPERATION:
 		case WLAN_EID_OVERLAP_BSS_SCAN_PARAM:
@@ -3235,7 +3232,6 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_ht_ptr += elen;
 			}
 			break;
-
 		case WLAN_EID_VHT_CAPABILITY:
 		case WLAN_EID_VHT_OPERATION:
 		case WLAN_EID_OPMODE_NOTIF:
@@ -3250,10 +3246,8 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_vht_ptr += elen;
 			}
 			break;
-
 		case WLAN_EID_VENDOR_SPECIFIC:
 			if ((pos[0] == 0x00) && (pos[1] == 0x50) && (pos[2] == 0xf2)) {
-
 				if (pos[3] == 0x01) {
 					beacon_info->ie_rsn_len = (elen + 2);
 					beacon_info->ie_rsn_ptr = (pos - 2);
@@ -3265,10 +3259,8 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				}
 			}
 			break;
-
 		default:
 			break;
-
 		}
 
 		left -= elen;
@@ -3276,7 +3268,6 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	}
 
 	if (elem_parse_failed == false) {
-
 		beacon_info->ie_ht_ptr = &beacon_info->ie_list_ht[0];
 		beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 		beacon_info->valid = true;
@@ -3338,7 +3329,6 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_IES)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -3425,7 +3415,6 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vi
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_AP_BEACON)) {
-
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 		WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
 		return -EIO;
@@ -3455,18 +3444,13 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	memcpy(cmd->key_param.mac_addr, addr, ETH_ALEN);
 
 	switch (key->cipher) {
-
 	case WLAN_CIPHER_SUITE_WEP40:
 	case WLAN_CIPHER_SUITE_WEP104:
-
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_WEP);
 		if (key->keyidx == 0)
 			cmd->key_param.key_info = ENDIAN_SWAP32(ENCR_KEY_FLAG_WEP_TXKEY);
-
 		break;
-
 	case WLAN_CIPHER_SUITE_TKIP:
-
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_TKIP);
 		cmd->key_param.key_info = (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
 			? ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE)
@@ -3474,17 +3458,13 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 		cmd->key_param.key_info |= ENDIAN_SWAP32(ENCR_KEY_FLAG_MICKEY_VALID
 			| ENCR_KEY_FLAG_TSC_VALID);
 		break;
-
 	case WLAN_CIPHER_SUITE_CCMP:
-
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_AES);
 		cmd->key_param.key_info = (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
 			? ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE)
 			: ENDIAN_SWAP32(ENCR_KEY_FLAG_TXGROUPKEY);
 		break;
-
 	default:
-
 		return -ENOTSUPP;
 	}
 
@@ -3498,12 +3478,9 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 	int curr_cmd = 0;
 
 	static const struct {
-
 		u16 cmd;
 		char *cmd_string;
-
 	} cmds[] = {
-
 		{ HOSTCMD_CMD_GET_HW_SPEC, "GetHwSpecifications" },
 		{ HOSTCMD_CMD_SET_HW_SPEC, "SetHwSepcifications" },
 		{ HOSTCMD_CMD_802_11_GET_STAT, "80211GetStat" },
@@ -3512,14 +3489,18 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_802_11_RF_ANTENNA, "80211RfAntenna" },
 		{ HOSTCMD_CMD_BROADCAST_SSID_ENABLE, "broadcast_ssid_enable" },
 		{ HOSTCMD_CMD_SET_RF_CHANNEL, "SetRfChannel" },
-        { HOSTCMD_CMD_802_11_RTS_THSD, "80211RtsThreshold" },
-        { HOSTCMD_CMD_SET_EDCA_PARAMS, "SetEDCAParams" },
+		{ HOSTCMD_CMD_SET_AID, "SetAid" },
+		{ HOSTCMD_CMD_SET_INFRA_MODE, "SetInfraMode" },
+		{ HOSTCMD_CMD_802_11_RTS_THSD, "80211RtsThreshold" },
+		{ HOSTCMD_CMD_SET_EDCA_PARAMS, "SetEDCAParams" },
 		{ HOSTCMD_CMD_SET_WMM_MODE, "SetWMMMode" },
 		{ HOSTCMD_CMD_SET_FIXED_RATE, "SetFixedRate" },
 		{ HOSTCMD_CMD_SET_IES, "SetInformationElements" },
 		{ HOSTCMD_CMD_SET_RATE_ADAPT_MODE, "SetRateAdaptationMode" },
+		{ HOSTCMD_CMD_SET_MAC_ADDR, "SetMacAddr" },
 		{ HOSTCMD_CMD_GET_WATCHDOG_BITMAP, "GetWatchdogBitMap" },
-        { HOSTCMD_CMD_BSS_START, "BssStart" },
+		{ HOSTCMD_CMD_DEL_MAC_ADDR. "DelMacAddr" },
+		{ HOSTCMD_CMD_BSS_START, "BssStart" },
 		{ HOSTCMD_CMD_AP_BEACON, "SetApBeacon" },
 		{ HOSTCMD_CMD_SET_NEW_STN, "SetNewStation" },
 		{ HOSTCMD_CMD_SET_APMODE, "SetApMode" },
@@ -3535,11 +3516,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 	max_entries = sizeof(cmds) / sizeof(cmds[0]);
 
 	for (curr_cmd = 0; curr_cmd < max_entries; curr_cmd++) {
-
 		if ((cmd & 0x7fff) == cmds[curr_cmd].cmd) {
-
 			WLDBG_EXIT(DBG_LEVEL_2);
-
 			return cmds[curr_cmd].cmd_string;
 		}
 	}

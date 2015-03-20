@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -44,20 +44,16 @@
 */
 
 enum {
-
 	WL_ANTENNATYPE_RX = 1,
 	WL_ANTENNATYPE_TX = 2,
-
 };
 
 enum encr_type {
-
 	ENCR_TYPE_WEP = 0,
 	ENCR_TYPE_DISABLE = 1,
 	ENCR_TYPE_TKIP = 4,
 	ENCR_TYPE_AES = 6,
 	ENCR_TYPE_MIX = 7,
-
 };
 
 /* PUBLIC FUNCTION DECLARATION
@@ -97,6 +93,12 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf);
 
+int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
+		      struct ieee80211_vif *vif, u8 *bssid, u16 aid);
+
+int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif);
+
 int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw,
 				int threshold);
 
@@ -112,8 +114,14 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw,
 				  u16 mode);
 
+int mwl_fwcmd_set_mac_addr_client(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif, u8 *mac_addr);
+
 int mwl_fwcmd_get_watchdog_bitmap(struct ieee80211_hw *hw,
 				  u8 *bitmap);
+
+int mwl_fwcmd_remove_mac_addr(struct ieee80211_hw *hw,
+			      struct ieee80211_vif *vif, u8 *mac_addr);
 
 int mwl_fwcmd_bss_start(struct ieee80211_hw *hw,
 			struct ieee80211_vif *vif, bool enable);
@@ -123,7 +131,7 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif,
-	struct ieee80211_sta *sta);
+			      struct ieee80211_sta *sta);
 
 int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif);
@@ -138,19 +146,19 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 				 struct ieee80211_vif *vif, u8 *addr,
-	struct ieee80211_key_conf *key);
+				 struct ieee80211_key_conf *key);
 
 int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif, u8 *addr,
-	struct ieee80211_key_conf *key);
+				    struct ieee80211_key_conf *key);
 
 int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 		       struct mwl_ampdu_stream *stream,
-	struct ieee80211_vif *vif);
+		       struct ieee80211_vif *vif);
 
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
-	u8 buf_size, struct ieee80211_vif *vif);
+			u8 buf_size, struct ieee80211_vif *vif);
 
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 			 u8 idx);

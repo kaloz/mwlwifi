@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -59,7 +59,6 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 			return;
 
 		if ((level & dbg_levels) != level) {
-
 			if (class != DBG_CLASS_PANIC && class != DBG_CLASS_ERROR)
 				return;
 		}
@@ -69,18 +68,14 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 		return;
 
 	if (format != NULL) {
-
 		va_start(a_start, format);
 		vsprintf(debug_string, format, a_start);
 		va_end(a_start);
-
 	} else {
-
 		debug_string[0] = '\0';
 	}
 
 	switch (class) {
-
 	case DBG_CLASS_ENTER:
 		printk("Enter %s() ...\n", func);
 		break;
@@ -101,7 +96,6 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 	}
 
 	if (strlen(debug_string) > 0) {
-
 		if (debug_string[strlen(debug_string)-1] == '\n')
 			debug_string[strlen(debug_string)-1] = '\0';
 			printk("%s(): %s\n", func, debug_string);
@@ -132,31 +126,23 @@ void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int l
 		return;
 
 	if (format != NULL) {
-
 		va_start(a_start, format);
 		vsprintf(dbg_string, format, a_start);
 		va_end(a_start);
-
 	} else {
-
 		dbg_string[0] = '\0';
 	}
 
 	if (strlen(dbg_string) > 0) {
-
 		if (dbg_string[strlen(dbg_string) - 1] == '\n')
 			dbg_string[strlen(dbg_string)-1] = '\0';
 			printk("%s() %s\n", func, dbg_string);
-
 	} else {
-
 		printk("%s()\n", func);
 	}
 
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
-
 		if ((curr_byte + 8) < len) {
-
 			printk("0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
 				*(memptr + curr_byte + 0),
 				*(memptr + curr_byte + 1),
@@ -167,11 +153,9 @@ void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int l
 				*(memptr + curr_byte + 6),
 				*(memptr + curr_byte + 7));
 		} else {
-
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
 			for (curr_byte = 0; curr_byte < num_bytes; curr_byte++) {
-
 				sprintf(dbg_data, "0x%02x ", *(memptr + offset + curr_byte));
 				strcat(dbg_string, dbg_data);
 			}
@@ -193,9 +177,7 @@ void mwl_debug_dumpdata(const void *data, int len, char *marker)
 	printk("%s\n", marker);
 
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
-
 		if ((curr_byte + 8) < len) {
-
 			printk("0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
 				*(memptr + curr_byte + 0),
 				*(memptr + curr_byte + 1),
@@ -206,7 +188,6 @@ void mwl_debug_dumpdata(const void *data, int len, char *marker)
 				*(memptr + curr_byte + 6),
 				*(memptr + curr_byte + 7));
 		} else {
-
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
 			for (curr_byte = 0; curr_byte < num_bytes; curr_byte++)

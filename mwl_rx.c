@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2006-2014 Marvell International Ltd.
+* Copyright (c) 2006-2015 Marvell International Ltd.
 *
 * Permission to use, copy, modify, and/or distribute this software for any
 * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,8 @@
 *   Description:  This file implements receive related functions.
 *
 */
+
+#include <linux/skbuff.h>
 
 #include "mwl_sysadpt.h"
 #include "mwl_dev.h"
@@ -72,14 +74,10 @@ int mwl_rx_init(struct ieee80211_hw *hw)
 
 	rc = mwl_rx_ring_alloc(priv);
 	if (rc) {
-
 		WLDBG_ERROR(DBG_LEVEL_4, "allocating RX ring failed");
-
 	} else {
-
 		rc = mwl_rx_ring_init(priv);
 		if (rc) {
-
 			mwl_rx_ring_free(priv);
 			WLDBG_ERROR(DBG_LEVEL_4, "initializing RX ring failed");
 		}
@@ -128,7 +126,6 @@ void mwl_rx_recv(unsigned long data)
 	curr_desc = priv->desc_data[0].pnext_rx_desc;
 
 	if (curr_desc == NULL) {
-
 		status_mask = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 		writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
@@ -141,21 +138,18 @@ void mwl_rx_recv(unsigned long data)
 
 	while ((curr_desc->rx_control == EAGLE_RXD_CTRL_DMA_OWN)
 		&& (work_done < priv->recv_limit)) {
-
 		prx_skb = curr_desc->psk_buff;
 		if (prx_skb == NULL)
 			goto out;
 		pci_unmap_single(priv->pdev,
-				 ENDIAN_SWAP32(curr_desc->pphys_buff_data),
+			ENDIAN_SWAP32(curr_desc->pphys_buff_data),
 			priv->desc_data[0].rx_buf_size,
 			PCI_DMA_FROMDEVICE);
 		pkt_len = curr_desc->pkt_len;
 
 		if (skb_tailroom(prx_skb) < pkt_len) {
-
-			WLDBG_INFO(DBG_LEVEL_4, "Not enough tail room =%x pkt_len=%x, curr_desc=%x, curr_desc_data=%x",
-				   skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
-			dev_kfree_skb_any(prx_skb);
+			WLDBG_PRINT("Critical error: not enough tail room =%x pkt_len=%x, curr_desc=%x, curr_desc_data=%x",
+				skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
 			goto out;
 		}
 
@@ -166,13 +160,16 @@ void mwl_rx_recv(unsigned long data)
 		wh = &((struct mwl_dma_data *)prx_skb->data)->wh;
 
 		if (ieee80211_has_protected(wh->frame_control)) {
-
 			/* Check if hw crypto has been enabled for
 			 * this bss. If yes, set the status flags
 			 * accordingly
 			 */
-			mwl_vif = mwl_rx_find_vif_bss(&priv->vif_list,
-						      wh->addr1);
+			if (ieee80211_has_tods(wh->frame_control))
+				mwl_vif = mwl_rx_find_vif_bss(&priv->vif_list,
+							      wh->addr1);
+			else
+				mwl_vif = mwl_rx_find_vif_bss(&priv->vif_list,
+							      wh->addr2);
 
 			if (mwl_vif != NULL &&
 			    mwl_vif->is_hw_crypto_enabled) {
@@ -190,7 +187,6 @@ void mwl_rx_recv(unsigned long data)
 				 * Measure of MMIC failure.
 				 */
 				if (status.flag & RX_FLAG_MMIC_ERROR) {
-
 					struct mwl_dma_data *tr;
 
 					tr = (struct mwl_dma_data *)prx_skb->data;
@@ -199,7 +195,6 @@ void mwl_rx_recv(unsigned long data)
 				}
 
 				if (!ieee80211_is_auth(wh->frame_control))
-
 					status.flag |= RX_FLAG_IV_STRIPPED |
 						RX_FLAG_DECRYPTED |
 						RX_FLAG_MMIC_STRIPPED;
@@ -242,12 +237,11 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	priv->desc_data[0].prx_ring =
-		(struct mwl_rx_desc *)pci_alloc_consistent(priv->pdev,
+		(struct mwl_rx_desc *)dma_alloc_coherent(&priv->pdev->dev,
 		MAX_NUM_RX_RING_BYTES,
-		&priv->desc_data[0].pphys_rx_ring);
+		&priv->desc_data[0].pphys_rx_ring, GFP_KERNEL);
 
 	if (priv->desc_data[0].prx_ring == NULL) {
-
 		WLDBG_ERROR(DBG_LEVEL_4, "can not alloc mem");
 		WLDBG_EXIT_INFO(DBG_LEVEL_4, "no memory");
 		return -ENOMEM;
@@ -268,15 +262,12 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 	WLDBG_ENTER_INFO(DBG_LEVEL_4,  "initializing %i descriptors", SYSADPT_MAX_NUM_RX_DESC);
 
 	if (priv->desc_data[0].prx_ring != NULL) {
-
 		priv->desc_data[0].rx_buf_size = SYSADPT_MAX_AGGR_SIZE;
 
 		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC; curr_desc++) {
-
 			CURR_RXD.psk_buff = dev_alloc_skb(priv->desc_data[0].rx_buf_size);
 
 			if (skb_linearize(CURR_RXD.psk_buff)) {
-
 				dev_kfree_skb_any(CURR_RXD.psk_buff);
 				WLDBG_ERROR(DBG_LEVEL_4, "need linearize memory");
 				WLDBG_EXIT_INFO(DBG_LEVEL_4, "no suitable memory");
@@ -289,10 +280,8 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 			CURR_RXD.qos_ctrl = 0x0000;
 			CURR_RXD.channel = 0x00;
 			CURR_RXD.rssi = 0x00;
-			CURR_RXD.sq2 = 0x00;
 
 			if (CURR_RXD.psk_buff != NULL) {
-
 				CURR_RXD.pkt_len = SYSADPT_MAX_AGGR_SIZE;
 				CURR_RXD.pbuff_data = CURR_RXD.psk_buff->data;
 				CURR_RXD.pphys_buff_data =
@@ -312,7 +301,6 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 					   "rxdesc: %i vnext: 0x%p pnext: 0x%x", curr_desc,
 					CURR_RXD.pnext, ENDIAN_SWAP32(CURR_RXD.pphys_next));
 			} else {
-
 				WLDBG_ERROR(DBG_LEVEL_4,
 					    "rxdesc %i: no skbuff available", curr_desc);
 				WLDBG_EXIT_INFO(DBG_LEVEL_4, "no socket buffer");
@@ -347,11 +335,8 @@ static void mwl_rx_ring_cleanup(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	if (priv->desc_data[0].prx_ring != NULL) {
-
 		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC; curr_desc++) {
-
 			if (CURR_RXD.psk_buff != NULL) {
-
 				if (skb_shinfo(CURR_RXD.psk_buff)->nr_frags)
 					skb_shinfo(CURR_RXD.psk_buff)->nr_frags = 0;
 
@@ -387,11 +372,10 @@ static void mwl_rx_ring_free(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	if (priv->desc_data[0].prx_ring != NULL) {
-
 		mwl_rx_ring_cleanup(priv);
 
-		pci_free_consistent(priv->pdev,
-				    MAX_NUM_RX_RING_BYTES,
+		dma_free_coherent(&priv->pdev->dev,
+			MAX_NUM_RX_RING_BYTES,
 			priv->desc_data[0].prx_ring,
 			priv->desc_data[0].pphys_rx_ring);
 
@@ -415,7 +399,7 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 
 	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
 
-	/* TODO: rate & antenna
+	/* TODO: rate information report
 	*/
 
 	if (pdesc->channel > 14)
@@ -429,12 +413,10 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 	/* check if status has a specific error bit (bit 7)set or indicates a general decrypt error
 	*/
 	if ((pdesc->status == GENERAL_DECRYPT_ERR) || (pdesc->status & DECRYPT_ERR_MASK)) {
-
 		/* check if status is not equal to 0xFF
 		 * the 0xFF check is for backward compatibility
 		 */
 		if (pdesc->status != GENERAL_DECRYPT_ERR) {
-
 			if (((pdesc->status & (~DECRYPT_ERR_MASK)) & TKIP_DECRYPT_MIC_ERR) &&
 			    !((pdesc->status & (WEP_DECRYPT_ICV_ERR | TKIP_DECRYPT_ICV_ERR)))) {
 
@@ -451,7 +433,6 @@ static inline struct mwl_vif *mwl_rx_find_vif_bss(struct list_head *vif_list, u8
 	struct mwl_vif *mwl_vif;
 
 	list_for_each_entry(mwl_vif, vif_list, list) {
-
 		if (memcmp(bssid, mwl_vif->bssid, ETH_ALEN) == 0)
 			return mwl_vif;
 	}
@@ -468,7 +449,6 @@ static inline void mwl_rx_remove_dma_header(struct sk_buff *skb, u16 qos)
 	hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
 
 	if (hdrlen != sizeof(tr->wh)) {
-
 		if (ieee80211_is_data_qos(tr->wh.frame_control)) {
 			memmove(tr->data - hdrlen, &tr->wh, hdrlen - 2);
 			*((u16 *)(tr->data - 2)) = qos;
@@ -494,7 +474,6 @@ static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc)
 		goto nomem;
 
 	if (skb_linearize(pdesc->psk_buff)) {
-
 		dev_kfree_skb_any(pdesc->psk_buff);
 		WLDBG_ERROR(DBG_LEVEL_4, "need linearize memory");
 		goto nomem;
@@ -506,7 +485,6 @@ static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc)
 	pdesc->qos_ctrl = 0x0000;
 	pdesc->channel = 0x00;
 	pdesc->rssi = 0x00;
-	pdesc->sq2 = 0x00;
 
 	pdesc->pkt_len = priv->desc_data[0].rx_buf_size;
 	pdesc->pbuff_data = pdesc->psk_buff->data;
