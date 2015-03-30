@@ -56,7 +56,7 @@ static void mwl_free_pci_resource(struct mwl_priv *priv);
 static int mwl_init_firmware(struct mwl_priv *priv, char *fw_image);
 static void mwl_reg_notifier(struct wiphy *wiphy,
 			     struct regulatory_request *request);
-static void mwl_process_of_dts(struct mwl_priv *priv);
+static int mwl_process_of_dts(struct mwl_priv *priv);
 static void mwl_set_ht_caps(struct mwl_priv *priv,
 			    struct ieee80211_supported_band *band);
 static void mwl_set_vht_caps(struct mwl_priv *priv,
@@ -188,7 +188,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = pci_enable_device(pdev);
 	if (rc) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot enable new PCI device",
+		WLDBG_PRINT("%s: cannot enable new PCI device",
 			    MWL_DRV_NAME);
 		WLDBG_EXIT_INFO(DBG_LEVEL_0, "init error");
 		return rc;
@@ -196,7 +196,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = pci_set_dma_mask(pdev, 0xffffffff);
 	if (rc) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: 32-bit PCI DMA not supported",
+		WLDBG_PRINT("%s: 32-bit PCI DMA not supported",
 			    MWL_DRV_NAME);
 		goto err_pci_disable_device;
 	}
@@ -205,7 +205,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw = ieee80211_alloc_hw(sizeof(*priv), mwl_mac80211_get_ops());
 	if (hw == NULL) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: ieee80211 alloc failed",
+		WLDBG_PRINT("%s: ieee80211 alloc failed",
 			    MWL_DRV_NAME);
 		rc = -ENOMEM;
 		goto err_pci_disable_device;
@@ -232,7 +232,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = mwl_init_firmware(priv, fw_image_path);
 	if (rc) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize firmware",
+		WLDBG_PRINT("%s: fail to initialize firmware",
 			    MWL_DRV_NAME);
 		goto err_init_firmware;
 	}
@@ -241,11 +241,16 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	*/
 	release_firmware(priv->fw_ucode);
 
-	mwl_process_of_dts(priv);
+	rc = mwl_process_of_dts(priv);
+	if (rc) {
+		WLDBG_PRINT("%s: fail to load dts mwlwifi parameters",
+			    MWL_DRV_NAME);
+		goto err_process_of_dts;
+	}
 
 	rc = mwl_wl_init(priv);
 	if (rc) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: fail to initialize wireless lan",
+		WLDBG_PRINT("%s: fail to initialize wireless lan",
 			    MWL_DRV_NAME);
 		goto err_wl_init;
 	}
@@ -255,6 +260,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	return rc;
 
 err_wl_init:
+err_process_of_dts:
 err_init_firmware:
 
 	mwl_fwcmd_reset(hw);
@@ -560,7 +566,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	WLDBG_EXIT(DBG_LEVEL_0);
 }
 
-static void mwl_process_of_dts(struct mwl_priv *priv)
+static int mwl_process_of_dts(struct mwl_priv *priv)
 {
 	struct property *prop;
 	u32 prop_value;
@@ -577,29 +583,29 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 	priv->dt_node =
 		of_find_node_by_name(pci_bus_to_OF_node(priv->pdev->bus),
 				     "mwlwifi");
+	if (priv->dt_node == NULL)
+		return -EPERM;
 
 	/* look for all matching property names
-	*/
-	if (priv->dt_node != NULL) {
-		for_each_property_of_node(priv->dt_node, prop) {
-			if (strcmp(prop->name, "marvell,2ghz") == 0)
-				priv->disable_2g = true;
-			if (strcmp(prop->name, "marvell,5ghz") == 0)
-				priv->disable_5g = true;
-			if (strcmp(prop->name, "marvell,chainmask") == 0) {
-				prop_value = be32_to_cpu(*((u32 *)prop->value));
-				if (prop_value == 2)
-					priv->antenna_tx = ANTENNA_TX_2;
-			
-				prop_value = be32_to_cpu(*((u32 *)(prop->value + 4)));
-				if (prop_value == 2)
-					priv->antenna_rx = ANTENNA_RX_2;
-			}
-		}
+	*/	
+	for_each_property_of_node(priv->dt_node, prop) {
+		if (strcmp(prop->name, "marvell,2ghz") == 0)
+			priv->disable_2g = true;
+		if (strcmp(prop->name, "marvell,5ghz") == 0)
+			priv->disable_5g = true;
+		if (strcmp(prop->name, "marvell,chainmask") == 0) {
+			prop_value = be32_to_cpu(*((u32 *)prop->value));
+			if (prop_value == 2)
+				priv->antenna_tx = ANTENNA_TX_2;
 
-		priv->pwr_node = of_find_node_by_name(priv->dt_node,
-						      "marvell,powertable");
+			prop_value = be32_to_cpu(*((u32 *)(prop->value + 4)));
+			if (prop_value == 2)
+				priv->antenna_rx = ANTENNA_RX_2;
+		}
 	}
+
+	priv->pwr_node = of_find_node_by_name(priv->dt_node,
+					      "marvell,powertable");
 
 	WLDBG_PRINT("2G: %s\n", priv->disable_2g ? "disable" : "enable");
 	WLDBG_PRINT("5G: %s\n", priv->disable_5g ? "disable" : "enable");
@@ -618,6 +624,8 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 		WLDBG_PRINT("RX: unknown\n");
 
 	WLDBG_EXIT(DBG_LEVEL_0);
+
+	return 0;
 }
 
 static void mwl_set_ht_caps(struct mwl_priv *priv,
