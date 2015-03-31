@@ -150,6 +150,12 @@ void mwl_rx_recv(unsigned long data)
 		if (skb_tailroom(prx_skb) < pkt_len) {
 			WLDBG_PRINT("Critical error: not enough tail room =%x pkt_len=%x, curr_desc=%x, curr_desc_data=%x",
 				skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
+			dev_kfree_skb_any(prx_skb);
+			goto out;
+		}
+
+		if (curr_desc->channel != hw->conf.chandef.chan->hw_value) {
+			dev_kfree_skb_any(prx_skb);
 			goto out;
 		}
 
@@ -205,10 +211,8 @@ void mwl_rx_recv(unsigned long data)
 		mwl_rx_remove_dma_header(prx_skb, curr_desc->qos_ctrl);
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
-
-		mwl_rx_refill(priv, curr_desc);
-
 out:
+		mwl_rx_refill(priv, curr_desc);
 		curr_desc->rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
 		curr_desc->qos_ctrl = 0;
 		curr_desc = curr_desc->pnext;
