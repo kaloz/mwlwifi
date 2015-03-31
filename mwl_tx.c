@@ -370,55 +370,39 @@ void mwl_tx_done(unsigned long data)
 
 			{
 				struct mwl_dma_data *tr;
-				bool ack_frame;
 				struct ieee80211_tx_info *info;
 				int hdrlen;
 
 				tr = (struct mwl_dma_data *)done_skb->data;
-				ack_frame = false;
 
-				if (ieee80211_is_assoc_resp(tr->wh.frame_control) ||
-					ieee80211_is_reassoc_resp(tr->wh.frame_control) ||
-					ieee80211_is_auth(tr->wh.frame_control) ||
-					ieee80211_is_nullfunc(tr->wh.frame_control) ||
-					ieee80211_is_qos_nullfunc(tr->wh.frame_control)) {
-					ack_frame = true;
-				} else {
+				if (ieee80211_is_data(tr->wh.frame_control) ||
+					ieee80211_is_data_qos(tr->wh.frame_control)) {
+					skb_get(done_skb);
 					skb_queue_tail(&priv->delay_freeq, done_skb);
 
-					if (skb_queue_len(&priv->delay_freeq) > SYSADPT_DELAY_FREE_Q_LIMIT) {
-						done_skb = skb_dequeue(&priv->delay_freeq);
-						tr = (struct mwl_dma_data *)done_skb->data;
-						if (ieee80211_is_data(tr->wh.frame_control) ||
-							ieee80211_is_data_qos(tr->wh.frame_control)) {
-							ack_frame = true;
-						} else {
-							dev_kfree_skb_any(done_skb);
-						}
-					}
+					if (skb_queue_len(&priv->delay_freeq) > SYSADPT_DELAY_FREE_Q_LIMIT)
+						dev_kfree_skb_any(skb_dequeue(&priv->delay_freeq));
 				}
 
-				if (ack_frame == true) {
-					/* Remove H/W dma header
-					*/
-					hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
-					memmove(tr->data - hdrlen, &tr->wh, hdrlen);
-					skb_pull(done_skb, sizeof(*tr) - hdrlen);
+				/* Remove H/W dma header
+				*/
+				hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
+				memmove(tr->data - hdrlen, &tr->wh, hdrlen);
+				skb_pull(done_skb, sizeof(*tr) - hdrlen);
 
-					info = IEEE80211_SKB_CB(done_skb);
+				info = IEEE80211_SKB_CB(done_skb);
 
-					ieee80211_tx_info_clear_status(info);
+				ieee80211_tx_info_clear_status(info);
 
-					/* Rate control is happening in the firmware.
-					 * Ensure no tx rate is being reported.
-					 */
-					info->status.rates[0].idx = -1;
-					info->status.rates[0].count = 1;
+				/* Rate control is happening in the firmware.
+				 * Ensure no tx rate is being reported.
+				 */
+				info->status.rates[0].idx = -1;
+				info->status.rates[0].count = 1;
 
-					info->flags |= IEEE80211_TX_STAT_ACK;
+				info->flags |= IEEE80211_TX_STAT_ACK;
 
-					ieee80211_tx_status(hw, done_skb);
-				}
+				ieee80211_tx_status(hw, done_skb);
 			}
 		}
 	}
