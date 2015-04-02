@@ -137,6 +137,13 @@
 #define ANTENNA_RX_4_AUTO                       0
 #define ANTENNA_RX_2                            2
 
+/* Band related constants
+*/
+#define BAND_24_CHANNEL_NUM                     14
+#define BAND_24_RATE_NUM                        13
+#define BAND_50_CHANNEL_NUM                     24
+#define BAND_50_RATE_NUM                        8
+
 /* Misc
 */
 #define WL_SEC_SLEEP(num_secs)              mdelay(num_secs * 1000)
@@ -354,11 +361,11 @@ struct mwl_priv {
 	bool is_rx_schedule;
 	s8 noise;                    /* Most recently reported noise in dBm */
 	struct ieee80211_supported_band band_24;
-	struct ieee80211_channel channels_24[14];
-	struct ieee80211_rate rates_24[13];
+	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
+	struct ieee80211_rate rates_24[BAND_24_RATE_NUM];
 	struct ieee80211_supported_band band_50;
-	struct ieee80211_channel channels_50[24];
-	struct ieee80211_rate rates_50[8];
+	struct ieee80211_channel channels_50[BAND_50_CHANNEL_NUM];
+	struct ieee80211_rate rates_50[BAND_50_RATE_NUM];
 	u32 ap_macids_supported;
 	u32 sta_macids_supported;
 	u32 macids_used;

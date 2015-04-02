@@ -45,6 +45,20 @@
 
 #define W836X_RSSI_OFFSET       8
 
+/* Receive rate information constants
+*/
+#define RX_RATE_INFO_FORMAT_11A       0
+#define RX_RATE_INFO_FORMAT_11B       1
+#define RX_RATE_INFO_FORMAT_11N       2
+#define RX_RATE_INFO_FORMAT_11AC      4
+
+#define RX_RATE_INFO_HT20             0
+#define RX_RATE_INFO_HT40             1
+#define RX_RATE_INFO_HT80             2
+
+#define RX_RATE_INFO_LONG_INTERVAL    0
+#define RX_RATE_INFO_SHORT_INTERVAL   1
+
 /* PRIVATE FUNCTION DECLARATION
 */
 
@@ -142,14 +156,14 @@ void mwl_rx_recv(unsigned long data)
 		if (prx_skb == NULL)
 			goto out;
 		pci_unmap_single(priv->pdev,
-			ENDIAN_SWAP32(curr_desc->pphys_buff_data),
-			priv->desc_data[0].rx_buf_size,
-			PCI_DMA_FROMDEVICE);
+				 ENDIAN_SWAP32(curr_desc->pphys_buff_data),
+				 priv->desc_data[0].rx_buf_size,
+				 PCI_DMA_FROMDEVICE);
 		pkt_len = curr_desc->pkt_len;
 
 		if (skb_tailroom(prx_skb) < pkt_len) {
 			WLDBG_PRINT("Critical error: not enough tail room =%x pkt_len=%x, curr_desc=%x, curr_desc_data=%x",
-				skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
+				    skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
 			dev_kfree_skb_any(prx_skb);
 			goto out;
 		}
@@ -202,8 +216,8 @@ void mwl_rx_recv(unsigned long data)
 
 				if (!ieee80211_is_auth(wh->frame_control))
 					status.flag |= RX_FLAG_IV_STRIPPED |
-						RX_FLAG_DECRYPTED |
-						RX_FLAG_MMIC_STRIPPED;
+						       RX_FLAG_DECRYPTED |
+						       RX_FLAG_MMIC_STRIPPED;
 			}
 		}
 
@@ -242,8 +256,9 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 
 	priv->desc_data[0].prx_ring =
 		(struct mwl_rx_desc *)dma_alloc_coherent(&priv->pdev->dev,
-		MAX_NUM_RX_RING_BYTES,
-		&priv->desc_data[0].pphys_rx_ring, GFP_KERNEL);
+							 MAX_NUM_RX_RING_BYTES,
+							 &priv->desc_data[0].pphys_rx_ring,
+							 GFP_KERNEL);
 
 	if (priv->desc_data[0].prx_ring == NULL) {
 		WLDBG_ERROR(DBG_LEVEL_4, "can not alloc mem");
@@ -291,19 +306,19 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 				CURR_RXD.pphys_buff_data =
 					ENDIAN_SWAP32(pci_map_single(priv->pdev,
 								     CURR_RXD.psk_buff->data,
-						priv->desc_data[0].rx_buf_size,
-						PCI_DMA_FROMDEVICE));
+								     priv->desc_data[0].rx_buf_size,
+								     PCI_DMA_FROMDEVICE));
 				CURR_RXD.pnext = &NEXT_RXD;
 				CURR_RXD.pphys_next =
 					ENDIAN_SWAP32((u32)priv->desc_data[0].pphys_rx_ring +
-						((curr_desc + 1) * sizeof(struct mwl_rx_desc)));
+						      ((curr_desc + 1) * sizeof(struct mwl_rx_desc)));
 				WLDBG_INFO(DBG_LEVEL_4,
 					   "rxdesc: %i status: 0x%x (%i) len: 0x%x (%i)",
-					curr_desc, EAGLE_TXD_STATUS_IDLE, EAGLE_TXD_STATUS_IDLE,
-					priv->desc_data[0].rx_buf_size, priv->desc_data[0].rx_buf_size);
+					   curr_desc, EAGLE_TXD_STATUS_IDLE, EAGLE_TXD_STATUS_IDLE,
+					   priv->desc_data[0].rx_buf_size, priv->desc_data[0].rx_buf_size);
 				WLDBG_INFO(DBG_LEVEL_4,
 					   "rxdesc: %i vnext: 0x%p pnext: 0x%x", curr_desc,
-					CURR_RXD.pnext, ENDIAN_SWAP32(CURR_RXD.pphys_next));
+					   CURR_RXD.pnext, ENDIAN_SWAP32(CURR_RXD.pphys_next));
 			} else {
 				WLDBG_ERROR(DBG_LEVEL_4,
 					    "rxdesc %i: no skbuff available", curr_desc);
@@ -318,8 +333,8 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 
 		WLDBG_EXIT_INFO(DBG_LEVEL_4,
 				"last rxdesc vnext: 0x%p pnext: 0x%x vfirst 0x%x",
-			LAST_RXD.pnext, ENDIAN_SWAP32(LAST_RXD.pphys_next),
-			priv->desc_data[0].pnext_rx_desc);
+				LAST_RXD.pnext, ENDIAN_SWAP32(LAST_RXD.pphys_next),
+				priv->desc_data[0].pnext_rx_desc);
 
 		return 0;
 	}
@@ -349,16 +364,16 @@ static void mwl_rx_ring_cleanup(struct mwl_priv *priv)
 
 				pci_unmap_single(priv->pdev,
 						 ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
-						priv->desc_data[0].rx_buf_size,
-						PCI_DMA_FROMDEVICE);
+						 priv->desc_data[0].rx_buf_size,
+						 PCI_DMA_FROMDEVICE);
 
 				dev_kfree_skb_any(CURR_RXD.psk_buff);
 
 				WLDBG_INFO(DBG_LEVEL_4,
 					   "unmapped+free'd rxdesc %i vaddr: 0x%p paddr: 0x%x len: %i",
-					curr_desc, CURR_RXD.pbuff_data,
-					ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
-						priv->desc_data[0].rx_buf_size);
+					   curr_desc, CURR_RXD.pbuff_data,
+					   ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
+					   priv->desc_data[0].rx_buf_size);
 
 				CURR_RXD.pbuff_data = NULL;
 				CURR_RXD.psk_buff = NULL;
@@ -379,9 +394,9 @@ static void mwl_rx_ring_free(struct mwl_priv *priv)
 		mwl_rx_ring_cleanup(priv);
 
 		dma_free_coherent(&priv->pdev->dev,
-			MAX_NUM_RX_RING_BYTES,
-			priv->desc_data[0].prx_ring,
-			priv->desc_data[0].pphys_rx_ring);
+				  MAX_NUM_RX_RING_BYTES,
+				  priv->desc_data[0].prx_ring,
+				  priv->desc_data[0].pphys_rx_ring);
 
 		priv->desc_data[0].prx_ring = NULL;
 	}
@@ -401,18 +416,49 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 
 	memset(status, 0, sizeof(*status));
 
-	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
+	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET); 
 
-	/* TODO: rate information report
-	*/
+	switch (pdesc->rate.format) {
+	case RX_RATE_INFO_FORMAT_11N:
+		status->flag |= RX_FLAG_HT;
+		if (pdesc->rate.bw == RX_RATE_INFO_HT40)
+			status->flag |= RX_FLAG_40MHZ;
+		if (pdesc->rate.gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->flag |= RX_FLAG_SHORT_GI;
+		break;
+	case RX_RATE_INFO_FORMAT_11AC:
+		status->flag |= RX_FLAG_VHT;
+		if (pdesc->rate.bw == RX_RATE_INFO_HT40)
+			status->flag |= RX_FLAG_40MHZ;
+		if (pdesc->rate.bw == RX_RATE_INFO_HT80)
+			status->vht_flag |= RX_VHT_FLAG_80MHZ;
+		if (pdesc->rate.gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->flag |= RX_FLAG_SHORT_GI;
+		status->vht_nss = (pdesc->rate.nss + 1);
+		break;
+	}
 
-	if (pdesc->channel > 14)
+	status->rate_idx = pdesc->rate.rt;
+
+	if (pdesc->channel > BAND_24_CHANNEL_NUM) {
 		status->band = IEEE80211_BAND_5GHZ;
-	else
+		if ((!(status->flag & RX_FLAG_HT)) &&
+		    (!(status->flag & RX_FLAG_VHT))) {
+			status->rate_idx -= 5;
+			if (status->rate_idx >= BAND_50_RATE_NUM)
+				status->rate_idx = BAND_50_RATE_NUM - 1;
+		}
+	} else {
 		status->band = IEEE80211_BAND_2GHZ;
+		if ((!(status->flag & RX_FLAG_HT)) &&
+		    (!(status->flag & RX_FLAG_VHT))) {
+			if (status->rate_idx >= BAND_24_RATE_NUM)
+				status->rate_idx = BAND_24_RATE_NUM - 1;
+		}
+	}
 
 	status->freq = ieee80211_channel_to_frequency(pdesc->channel,
-		status->band);
+						      status->band);
 
 	/* check if status has a specific error bit (bit 7)set or indicates a general decrypt error
 	*/
@@ -423,7 +469,6 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 		if (pdesc->status != GENERAL_DECRYPT_ERR) {
 			if (((pdesc->status & (~DECRYPT_ERR_MASK)) & TKIP_DECRYPT_MIC_ERR) &&
 			    !((pdesc->status & (WEP_DECRYPT_ICV_ERR | TKIP_DECRYPT_ICV_ERR)))) {
-
 				status->flag |= RX_FLAG_MMIC_ERROR;
 			}
 		}
@@ -495,8 +540,8 @@ static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc)
 	pdesc->pphys_buff_data =
 		ENDIAN_SWAP32(pci_map_single(priv->pdev,
 					     pdesc->psk_buff->data,
-			priv->desc_data[0].rx_buf_size,
-			PCI_DMA_BIDIRECTIONAL));
+					     priv->desc_data[0].rx_buf_size,
+					     PCI_DMA_BIDIRECTIONAL));
 
 	WLDBG_EXIT(DBG_LEVEL_4);
 
