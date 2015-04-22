@@ -50,6 +50,19 @@
 #define EXT_IV                             0x20
 #define INCREASE_IV(iv16, iv32)            {(iv16)++; if ((iv16) == 0) (iv32)++; }
 
+/* Transmit rate information constants
+*/
+#define TX_RATE_FORMAT_LEGACY         0
+#define TX_RATE_FORMAT_11N            1
+#define TX_RATE_FORMAT_11AC           2
+
+#define TX_RATE_BANDWIDTH_20          0
+#define TX_RATE_BANDWIDTH_40          1
+#define TX_RATE_BANDWIDTH_80          2
+
+#define TX_RATE_INFO_STD_GI           0
+#define TX_RATE_INFO_SHORT_GI         1
+
 /* PRIVATE FUNCTION DECLARATION
 */
 
@@ -343,6 +356,7 @@ void mwl_tx_done(unsigned long data)
 	unsigned long flags;
 	int num;
 	struct sk_buff *done_skb;
+	struct mwl_rate_info rate_info;
 
 	WLDBG_ENTER(DBG_LEVEL_3);
 
@@ -361,6 +375,7 @@ void mwl_tx_done(unsigned long data)
 				STALE_TXD(num)->psk_buff->len,
 				PCI_DMA_TODEVICE);
 			done_skb = STALE_TXD(num)->psk_buff;
+			rate_info = STALE_TXD(num)->rate_info;
 			STALE_TXD(num)->pkt_len = 0;
 			STALE_TXD(num)->psk_buff = NULL;
 			STALE_TXD(num)->status = ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
@@ -374,6 +389,10 @@ void mwl_tx_done(unsigned long data)
 				int hdrlen;
 
 				tr = (struct mwl_dma_data *)done_skb->data;
+				info = IEEE80211_SKB_CB(done_skb);
+				ieee80211_tx_info_clear_status(info);
+
+				info->status.rates[0].idx = -1;
 
 				if (ieee80211_is_data(tr->wh.frame_control) ||
 					ieee80211_is_data_qos(tr->wh.frame_control)) {
@@ -382,6 +401,34 @@ void mwl_tx_done(unsigned long data)
 
 					if (skb_queue_len(&priv->delay_freeq) > SYSADPT_DELAY_FREE_Q_LIMIT)
 						dev_kfree_skb_any(skb_dequeue(&priv->delay_freeq));
+
+					/* Prepare rate information
+					*/
+					info->status.rates[0].idx = rate_info.rate_id_mcs;
+					if (rate_info.format == TX_RATE_FORMAT_LEGACY){
+						if (hw->conf.chandef.chan->hw_value >
+						    BAND_24_CHANNEL_NUM) {
+							info->status.rates[0].idx -= 5;
+						}
+					}
+					if (rate_info.format == TX_RATE_FORMAT_11N)
+						info->status.rates[0].flags |=
+							IEEE80211_TX_RC_MCS;
+					if (rate_info.format == TX_RATE_FORMAT_11AC)
+						info->status.rates[0].flags |=
+							IEEE80211_TX_RC_VHT_MCS;
+					if (rate_info.bandwidth == TX_RATE_BANDWIDTH_40)
+						info->status.rates[0].flags |=
+							IEEE80211_TX_RC_40_MHZ_WIDTH;
+					if (rate_info.bandwidth == TX_RATE_BANDWIDTH_80)
+						info->status.rates[0].flags |=
+							IEEE80211_TX_RC_80_MHZ_WIDTH;
+					if (rate_info.short_gi == TX_RATE_INFO_SHORT_GI)
+						info->status.rates[0].flags |=
+							IEEE80211_TX_RC_SHORT_GI;
+					info->status.rates[0].count = 1;
+					
+					info->status.rates[1].idx = -1;
 				}
 
 				/* Remove H/W dma header
@@ -389,16 +436,6 @@ void mwl_tx_done(unsigned long data)
 				hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
 				memmove(tr->data - hdrlen, &tr->wh, hdrlen);
 				skb_pull(done_skb, sizeof(*tr) - hdrlen);
-
-				info = IEEE80211_SKB_CB(done_skb);
-
-				ieee80211_tx_info_clear_status(info);
-
-				/* Rate control is happening in the firmware.
-				 * Ensure no tx rate is being reported.
-				 */
-				info->status.rates[0].idx = -1;
-				info->status.rates[0].count = 1;
 
 				info->flags |= IEEE80211_TX_STAT_ACK;
 

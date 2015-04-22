@@ -30,8 +30,8 @@ int mwl_tx_init(struct ieee80211_hw *hw);
 void mwl_tx_deinit(struct ieee80211_hw *hw);
 void mwl_tx_xmit(struct ieee80211_hw *hw,
 		 int index,
-	struct ieee80211_sta *sta,
-	struct sk_buff *skb);
+		 struct ieee80211_sta *sta,
+		 struct sk_buff *skb);
 void mwl_tx_done(unsigned long data);
 
 #endif /* _mwl_tx_h_ */

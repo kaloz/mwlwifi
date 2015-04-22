@@ -209,22 +209,18 @@ struct mwl_hw_data {
 };
 
 struct mwl_rate_info {
-	u32 format:1;                /* 0 = Legacy format, 1 = Hi-throughput format */
-	u32 short_gi:1;              /* 0 = Use standard guard interval,1 = Use short guard interval */
-	u32 bandwidth:1;             /* 0 = Use 20 MHz channel,1 = Use 40 MHz channel */
-	u32 rate_id_mcs:7;           /* = RateID[3:0]; Legacy format,= MCS[5:0]; HT format */
-	u32 adv_coding:1;            /* AdvCoding 0 = No AdvCoding,1 = LDPC,2 = RS,3 = Reserved */
-	u32 ant_select:2;            /* Bitmap to select one of the transmit antennae */
-	u32 act_sub_chan:2;          /* Active subchannel for 40 MHz mode 00:lower, 01= upper, 10= both on lower and upper */
-	u32 preamble_type:1;         /* Preambletype 0= Long, 1= Short; */
-	u32 pid:4;                   /* Power ID */
-	u32 ant2:1;                  /* bit 2 of antenna selection field */
-	u32 ant3:1;
-	u32 bf:1;                    /* 0: beam forming off; 1: beam forming on */
-	u32 gf:1;                    /* 0: green field off; 1, green field on */
-	u32 count:4;
-	u32 rsvd2:3;
-	u32 drop:1;
+	u32 format:2;                /* 0 = Legacy, 1 = 11n, 2 = 11ac */
+	u32 stbc:1;
+	u32 rsvd1:1;
+	u32 bandwidth:2;             /* 0 = 20 MHz, 1 = 40 MHz, 2 = 80 MHz */
+	u32 short_gi:1;              /* 0 = standard guard interval, 1 = short */
+	u32 rsvd2:1;
+	u32 rate_id_mcs:7;
+	u32 preamble_type:1;         /* Preambletype 0 = Long, 1 = Short; */
+	u32 power_id:6;
+	u32 adv_coding:1;            /* ldpc */
+	u32 bf:1;
+	u32 ant_select:8;            /* Bitmap to select one of the transmit antenna */
 } __packed;
 
 struct mwl_tx_desc {
