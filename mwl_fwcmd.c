@@ -3326,6 +3326,12 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	memcpy(pcmd->ie_list_vht, mwl_vif->beacon_info.ie_vht_ptr,
 	       pcmd->ie_list_len_vht);
 
+	if (priv->chip_type == MWL8897) {
+		pcmd->ie_list_len_proprietary = mwl_vif->beacon_info.ie_wmm_len;
+		memcpy(pcmd->ie_list_proprietary, mwl_vif->beacon_info.ie_wmm_ptr,
+		       pcmd->ie_list_len_proprietary);
+	}
+
 	WLDBG_DUMP_DATA(DBG_LEVEL_2, (void *)pcmd, sizeof(*pcmd));
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_IES)) {

@@ -71,11 +71,10 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id);
 /* PRIVATE VARIABLES
 */
 
-static char fw_image_path[FILE_PATH_LEN] = "mwlwifi/88W8864.bin";
-
-static struct pci_device_id mwl_pci_id_tbl[SYSADPT_MAX_CARDS_SUPPORT + 1] = {
-	{ 0x11ab, 0x2a55, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (unsigned long)MWL_DEV_NAME },
-	{ 0, 0, 0, 0, 0, 0, 0 }
+static struct pci_device_id mwl_pci_id_tbl[] = {
+	{ PCI_VDEVICE(MARVELL, 0x2a55), .driver_data = MWL8864, },
+	{ PCI_VDEVICE(MARVELL, 0x2b38), .driver_data = MWL8897, },
+	{ },
 };
 
 static struct pci_driver mwl_pci_driver = {
@@ -83,6 +82,17 @@ static struct pci_driver mwl_pci_driver = {
 	.id_table = mwl_pci_id_tbl,
 	.probe    = mwl_probe,
 	.remove   = mwl_remove
+};
+
+static struct mwl_chip_info mwl_chip_tbl[] = {
+	[MWL8864] = {
+		.part_name	= "88W8864",
+		.fw_image	= "mwlwifi/88W8864.bin",
+	},
+	[MWL8897] = {
+		.part_name	= "88W8897",
+		.fw_image	= "mwlwifi/88W8897.bin",
+	},
 };
 
 static const struct ieee80211_channel mwl_channels_24[] = {
@@ -181,6 +191,9 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	WLDBG_ENTER(DBG_LEVEL_0);
 
+	if (id->driver_data >= MWLUNKNOWN)
+		return -ENODEV;
+
 	if (!printed_version) {
 		WLDBG_PRINT("<<%s version %s>>", MWL_DESC, MWL_DRV_VERSION);
 		printed_version = true;
@@ -225,12 +238,13 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv = hw->priv;
 	priv->hw = hw;
 	priv->pdev = pdev;
+	priv->chip_type = id->driver_data;
 
 	rc = mwl_alloc_pci_resource(priv);
 	if (rc)
 		goto err_alloc_pci_resource;
 
-	rc = mwl_init_firmware(priv, fw_image_path);
+	rc = mwl_init_firmware(priv, mwl_chip_tbl[priv->chip_type].fw_image);
 	if (rc) {
 		WLDBG_PRINT("%s: fail to initialize firmware",
 			    MWL_DRV_NAME);

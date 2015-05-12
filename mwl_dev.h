@@ -172,6 +172,12 @@
 */
 
 enum {
+	MWL8864 = 0,
+	MWL8897,
+	MWLUNKNOWN,
+};
+
+enum {
 	AP_MODE_11AC = 0x10,         /* generic 11ac indication mode */
 	AP_MODE_2_4GHZ_11AC_MIXED = 0x17,
 };
@@ -187,6 +193,11 @@ enum {
 	IEEE_TYPE_MANAGEMENT = 0,
 	IEEE_TYPE_CONTROL,
 	IEEE_TYPE_DATA
+};
+
+struct mwl_chip_info {
+	char *part_name;
+	char *fw_image;
 };
 
 struct mwl_tx_pwr_tbl {
@@ -322,6 +333,7 @@ struct mwl_ampdu_stream {
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	const struct firmware *fw_ucode;
+	int chip_type;
 	struct device_node *dt_node;
 	struct device_node *pwr_node;
 	bool disable_2g;
