@@ -867,7 +867,9 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 			dev_kfree_skb_any(skb);
 		}
 
-		if ((info->ssid[0] != '\0') && (info->ssid_len != 0))
+		if ((info->ssid[0] != '\0') && 
+		    (info->ssid_len != 0) &&
+		    (!info->hidden_ssid))
 			mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);
 		else
 			mwl_fwcmd_broadcast_ssid_enable(hw, vif, false);
