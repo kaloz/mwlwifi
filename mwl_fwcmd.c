@@ -20,6 +20,8 @@
 *
 */
 
+#include <linux/etherdevice.h>
+
 #include "mwl_sysadpt.h"
 #include "mwl_dev.h"
 #include "mwl_debug.h"
@@ -66,11 +68,16 @@
  *      Define general result code for each command
  */
 #define HOSTCMD_RESULT_OK                       0x0000 /* OK */
-#define HOSTCMD_RESULT_ERROR                    0x0001 /* Genenral error */
-#define HOSTCMD_RESULT_NOT_SUPPORT              0x0002 /* Command is not valid */
-#define HOSTCMD_RESULT_PENDING                  0x0003 /* Command is pending (will be processed) */
-#define HOSTCMD_RESULT_BUSY                     0x0004 /* System is busy (command ignored) */
-#define HOSTCMD_RESULT_PARTIAL_DATA             0x0005 /* Data buffer is not big enough */
+/* Genenral error */
+#define HOSTCMD_RESULT_ERROR                    0x0001
+/* Command is not valid */
+#define HOSTCMD_RESULT_NOT_SUPPORT              0x0002
+/* Command is pending (will be processed) */
+#define HOSTCMD_RESULT_PENDING                  0x0003
+/* System is busy (command ignored) */
+#define HOSTCMD_RESULT_BUSY                     0x0004
+/* Data buffer is not big enough */
+#define HOSTCMD_RESULT_PARTIAL_DATA             0x0005
 
 /*
  *      Define channel related constants
@@ -89,14 +96,22 @@
 #define EXT_CH_BELOW_CTRL_CH                    0x3
 #define NO_EXT_CHANNEL                          0x0
 
-#define ACT_PRIMARY_CHAN_0                      0 /* active primary 1st 20MHz channel */
-#define ACT_PRIMARY_CHAN_1                      1 /* active primary 2nd 20MHz channel */
-#define ACT_PRIMARY_CHAN_2                      2 /* active primary 3rd 20MHz channel */
-#define ACT_PRIMARY_CHAN_3                      3 /* active primary 4th 20MHz channel */
-#define ACT_PRIMARY_CHAN_4                      4 /* active primary 5th 20MHz channel */
-#define ACT_PRIMARY_CHAN_5                      5 /* active primary 6th 20MHz channel */
-#define ACT_PRIMARY_CHAN_6                      6 /* active primary 7th 20MHz channel */
-#define ACT_PRIMARY_CHAN_7                      7 /* active primary 8th 20MHz channel */
+/* active primary 1st 20MHz channel */
+#define ACT_PRIMARY_CHAN_0                      0
+/* active primary 2nd 20MHz channel */
+#define ACT_PRIMARY_CHAN_1                      1
+/* active primary 3rd 20MHz channel */
+#define ACT_PRIMARY_CHAN_2                      2
+/* active primary 4th 20MHz channel */
+#define ACT_PRIMARY_CHAN_3                      3
+/* active primary 5th 20MHz channel */
+#define ACT_PRIMARY_CHAN_4                      4
+/* active primary 6th 20MHz channel */
+#define ACT_PRIMARY_CHAN_5                      5
+/* active primary 7th 20MHz channel */
+#define ACT_PRIMARY_CHAN_6                      6
+/* active primary 8th 20MHz channel */
+#define ACT_PRIMARY_CHAN_7                      7
 
 /*
  *      Define rate related constants
@@ -115,15 +130,23 @@
 #define MAX_ENCR_KEY_LENGTH                     16
 #define MIC_KEY_LENGTH                          8
 
-#define KEY_TYPE_ID_WEP                         0x00       /* Key type is WEP		*/
-#define KEY_TYPE_ID_TKIP                        0x01       /* Key type is TKIP		*/
-#define KEY_TYPE_ID_AES	                        0x02       /* Key type is AES-CCMP	*/
+/* Key type is WEP		*/
+#define KEY_TYPE_ID_WEP                         0x00
+/* Key type is TKIP		*/
+#define KEY_TYPE_ID_TKIP                        0x01
+/* Key type is AES-CCMP	*/
+#define KEY_TYPE_ID_AES	                        0x02
 
-#define ENCR_KEY_FLAG_TXGROUPKEY                0x00000004 /* Group key for TX */
-#define ENCR_KEY_FLAG_PAIRWISE                  0x00000008 /* pairwise */
-#define ENCR_KEY_FLAG_TSC_VALID                 0x00000040 /* Sequence counters are valid */
-#define ENCR_KEY_FLAG_WEP_TXKEY                 0x01000000 /* Tx key for WEP */
-#define ENCR_KEY_FLAG_MICKEY_VALID              0x02000000 /* Tx/Rx MIC keys are valid */
+/* Group key for TX */
+#define ENCR_KEY_FLAG_TXGROUPKEY                0x00000004
+/* pairwise */
+#define ENCR_KEY_FLAG_PAIRWISE                  0x00000008
+/* Sequence counters are valid */
+#define ENCR_KEY_FLAG_TSC_VALID                 0x00000040
+/* Tx key for WEP */
+#define ENCR_KEY_FLAG_WEP_TXKEY                 0x01000000
+/* Tx/Rx MIC keys are valid */
+#define ENCR_KEY_FLAG_MICKEY_VALID              0x02000000
 
 /*
  *      Define block ack related constants
@@ -140,8 +163,8 @@
 
 /*      Misc
 */
-#define MWL_SPIN_LOCK(X)                        SPIN_LOCK_IRQSAVE(X, flags)
-#define MWL_SPIN_UNLOCK(X)                      SPIN_UNLOCK_IRQRESTORE(X, flags)
+#define MWL_SPIN_LOCK(X)     SPIN_LOCK_IRQSAVE(X, flags)
+#define MWL_SPIN_UNLOCK(X)   SPIN_UNLOCK_IRQRESTORE(X, flags)
 
 #define MAX_ENCR_KEY_LENGTH                     16
 #define MIC_KEY_LENGTH                          8
@@ -231,20 +254,40 @@ struct hostcmd_cmd_get_hw_spec {
 
 struct hostcmd_cmd_set_hw_spec {
 	struct hostcmd_header cmd_hdr;
-	u8 version;                             /* HW revision */
-	u8 host_if;                             /* Host interface */
-	u16 num_mcast_addr;                     /* Max. number of Multicast address FW can handle */
-	u8 permanent_addr[ETH_ALEN];            /* MAC address */
-	u16 region_code;                        /* Region Code */
-	u32 fw_release_num;                     /* 4 byte of FW release number, example 0x1234=1.2.3.4 */
-	u32 fw_awake_cookie;                    /* Firmware awake cookie - used to ensure that the device is not in sleep mode */
-	u32 device_caps;                        /* Device capabilities (see above) */
-	u32 rxpd_wr_ptr;                        /* Rx shared memory queue */
-	u32 num_tx_queues;                      /* Actual number of TX queues in WcbBase array */
-	u32 wcb_base[SYSADPT_NUM_OF_DESC_DATA]; /* TX WCB Rings */
-	u32 max_amsdu_size:2;                   /* Max AMSDU size (00 - AMSDU Disabled, 01 - 4K, 10 - 8K, 11 - not defined) */
-	u32 implicit_ampdu_ba:1;                /* Indicates supported AMPDU type (1 = implicit, 0 = explicit (default)) */
-	u32 disablembss:1;                      /* indicates mbss features disable in FW */
+	/* HW revision */
+	u8 version;
+	/* Host interface */
+	u8 host_if;
+	/* Max. number of Multicast address FW can handle */
+	u16 num_mcast_addr;
+	/* MAC address */
+	u8 permanent_addr[ETH_ALEN];
+	/* Region Code */
+	u16 region_code;
+	/* 4 byte of FW release number, example 0x1234=1.2.3.4 */
+	u32 fw_release_num;
+	/* Firmware awake cookie - used to ensure that the device
+	 * is not in sleep mode
+	 */
+	u32 fw_awake_cookie;
+	/* Device capabilities (see above) */
+	u32 device_caps;
+	/* Rx shared memory queue */
+	u32 rxpd_wr_ptr;
+	/* Actual number of TX queues in WcbBase array */
+	u32 num_tx_queues;
+	/* TX WCB Rings */
+	u32 wcb_base[SYSADPT_NUM_OF_DESC_DATA];
+	/* Max AMSDU size (00 - AMSDU Disabled,
+	 * 01 - 4K, 10 - 8K, 11 - not defined)
+	 */
+	u32 max_amsdu_size:2;
+	/* Indicates supported AMPDU type
+	 * (1 = implicit, 0 = explicit (default))
+	 */
+	u32 implicit_ampdu_ba:1;
+	/* indicates mbss features disable in FW */
+	u32 disablembss:1;
 	u32 host_form_beacon:1;
 	u32 host_form_probe_response:1;
 	u32 host_power_save:1;
@@ -280,7 +323,8 @@ struct hostcmd_cmd_802_11_get_stat {
 	u32 tx_done;
 	u32 tx_done_buf_try_put;
 	u32 tx_done_buf_put;
-	u32 wait_for_tx_buf;                    /* Put size of requested buffer in here */
+	/* Put size of requested buffer in here */
+	u32 wait_for_tx_buf;
 	u32 tx_attempts;
 	u32 tx_successes;
 	u32 tx_fragments;
@@ -305,7 +349,8 @@ struct hostcmd_cmd_802_11_get_stat {
 struct hostcmd_cmd_802_11_radio_control {
 	struct hostcmd_header cmd_hdr;
 	u16 action;
-	u16 control;	             /* @bit0: 1/0,on/off, @bit1: 1/0, long/short @bit2: 1/0,auto/fix */
+	/* @bit0: 1/0,on/off, @bit1: 1/0, long/short @bit2: 1/0,auto/fix */
+	u16 control;
 	u16 radio_on;
 } __packed;
 
@@ -330,7 +375,7 @@ struct hostcmd_cmd_802_11_tx_power {
 struct hostcmd_cmd_802_11_rf_antenna {
 	struct hostcmd_header cmd_hdr;
 	u16 action;
-	u16 antenna_mode;            /* Number of antennas or 0xffff(diversity) */
+	u16 antenna_mode;     /* Number of antennas or 0xffff(diversity) */
 } __packed;
 
 /*
@@ -347,9 +392,14 @@ struct hostcmd_cmd_broadcast_ssid_enable {
  */
 
 struct chnl_flags_11ac {
-	u32	freq_band:6;             /* bit0=1: 2.4GHz,bit1=1: 4.9GHz,bit2=1: 5GHz,bit3=1: 5.2GHz, */
-	u32	chnl_width:5;            /* bit6=1:10MHz, bit7=1:20MHz, bit8=1:40MHz */
-	u32	act_primary:3;           /* 000: 1st 20MHz chan, 001:2nd 20MHz chan, 011:3rd 20MHz chan, 100:4th 20MHz chan */
+	/* bit0=1: 2.4GHz,bit1=1: 4.9GHz,bit2=1: 5GHz,bit3=1: 5.2GHz, */
+	u32	freq_band:6;
+	/* bit6=1:10MHz, bit7=1:20MHz, bit8=1:40MHz */
+	u32	chnl_width:5;
+	/* 000: 1st 20MHz chan, 001:2nd 20MHz chan, 011:3rd 20MHz chan,
+	 * 100:4th 20MHz chan
+	 */
+	u32	act_primary:3;
 	u32	reserved:18;
 } __packed;
 
@@ -396,7 +446,8 @@ struct hostcmd_cmd_802_11_rts_thsd {
 
 struct hostcmd_cmd_set_edca_params {
 	struct hostcmd_header cmd_hdr;
-	u16 action;                  /* 0 = get all, 0x1 =set CWMin/Max,  0x2 = set TXOP , 0x4 =set AIFSN */
+	/* 0 = get all, 0x1 =set CWMin/Max,  0x2 = set TXOP , 0x4 =set AIFSN */
+	u16 action;
 	u16 txop;                    /* in unit of 32 us */
 	u32 cw_max;                  /* 0~15 */
 	u32 cw_min;                  /* 0~15 */
@@ -418,20 +469,27 @@ struct hostcmd_cmd_set_wmm_mode {
  */
 
 struct fix_rate_flag {           /* lower rate after the retry count */
-	u32 fix_rate_type;           /* 0: legacy, 1: HT */
-	u32 retry_count_valid;       /* 0: retry count is not valid, 1: use retry count specified */
+	/* 0: legacy, 1: HT */
+	u32 fix_rate_type;
+	/* 0: retry count is not valid, 1: use retry count specified */
+	u32 retry_count_valid;
 } __packed;
 
 struct fix_rate_entry {
 	struct fix_rate_flag fix_rate_type_flags;
-	u32 fixed_rate;              /* depending on the flags above, this can be either a legacy rate(not index) or an MCS code. */
+	/* depending on the flags above, this can be either a legacy
+	 * rate(not index) or an MCS code.
+	 */
+	u32 fixed_rate;
 	u32 retry_count;
 } __packed;
 
 struct hostcmd_cmd_set_fixed_rate {
 	struct hostcmd_header cmd_hdr;
-	u32 action;                  /* HOSTCMD_ACT_NOT_USE_FIXED_RATE 0x0002 */
-	u32 allow_rate_drop;         /* use fixed rate specified but firmware can drop to */
+	/* HOSTCMD_ACT_NOT_USE_FIXED_RATE 0x0002 */
+	u32 action;
+	/* use fixed rate specified but firmware can drop to */
+	u32 allow_rate_drop;
 	u32 entry_count;
 	struct fix_rate_entry fixed_rate_table[4];
 	u8 multicast_rate;
@@ -619,7 +677,7 @@ struct start_cmd {
 	union phy_params phy_param_set;
 	u16 probe_delay;
 	u16 cap_info;
-	u8 bss_basic_rate_set[SYSADPT_MAX_DATA_RATES_G];
+	u8 b_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 op_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	struct rsn_ie rsn_ie;
 	struct rsn48_ie rsn48_ie;
@@ -700,7 +758,8 @@ struct peer_info {
 	u32 tx_bf_capabilities;      /* EXBF_SUPPORT */
 	u32 vht_max_rx_mcs;
 	u32 vht_cap;
-	u8 vht_rx_channel_width;     /* 0:20Mhz, 1:40Mhz, 2:80Mhz, 3:160 or 80+80Mhz */
+	/* 0:20Mhz, 1:40Mhz, 2:80Mhz, 3:160 or 80+80Mhz */
+	u8 vht_rx_channel_width;
 } __packed;
 
 struct hostcmd_cmd_set_new_stn {
@@ -751,7 +810,9 @@ struct encr_tkip_seqcnt {
 } __packed;
 
 struct tkip_type_key {
-	/* TKIP Key material. Key type (group or pairwise key) is determined by flags */
+	/* TKIP Key material. Key type (group or pairwise key) is
+	 * determined by flags
+	 */
 	/* in KEY_PARAM_SET structure. */
 	u8 key_material[MAX_ENCR_KEY_LENGTH];
 	/* MIC keys */
@@ -819,7 +880,9 @@ struct create_ba_params {
 	struct ba_stream_flags flags;
 	/* idle threshold */
 	u32	idle_thrs;
-	/* block ack transmit threshold (after how many pkts should we send BAR?) */
+	/* block ack transmit threshold (after how many pkts should we
+	 * send BAR?)
+	 */
 	u32	bar_thrs;
 	/* receiver window size */
 	u32 window_size;
@@ -833,11 +896,14 @@ struct create_ba_params {
 	u8 queue_id;
 	u8 param_info;
 	/* returned by firmware - firmware context pointer. */
-	/* this context pointer will be passed to firmware for all future commands. */
+	/* this context pointer will be passed to firmware for all
+	 * future commands.
+	 */
 	struct ba_context fw_ba_context;
 	u8 reset_seq_no;             /** 0 or 1**/
 	u16 current_seq;
-	u8 sta_src_mac_addr[ETH_ALEN]; /* This is for virtual station in Sta proxy mode for V6FW */
+	/* This is for virtual station in Sta proxy mode for V6FW */
+	u8 sta_src_mac_addr[ETH_ALEN];
 } __packed;
 
 /* new transmit sequence number information */
@@ -889,7 +955,8 @@ struct hostcmd_cmd_dwds_enable {
 
 struct hostcmd_cmd_fw_flush_timer {
 	struct hostcmd_header cmd_hdr;
-	u32 value;                   /* 0 -- Disable. > 0 -- holds time value in usecs. */
+	/* 0 -- Disable. > 0 -- holds time value in usecs. */
+	u32 value;
 } __packed;
 
 /*
@@ -909,19 +976,23 @@ static int mwl_fwcmd_exec_cmd(struct mwl_priv *priv, unsigned short cmd);
 static void mwl_fwcmd_send_cmd(struct mwl_priv *priv);
 static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd);
 
-static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv, bool enable, bool force);
+static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
+					  bool enable, bool force);
 static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 				   u16 band, u16 width, u16 sub_ch);
-static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[], u8 action,
-				   u16 ch, u16 band, u16 width, u16 sub_ch);
+static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
+				   u8 action, u16 ch, u16 band,
+				   u16 width, u16 sub_ch);
 static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel);
 static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				   struct mwl_vif *vif, u8 *beacon, int len);
 static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif);
-static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vif,
+static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
+				   struct mwl_vif *mwl_vif,
 				   struct ieee80211_bss_conf *bss_conf);
 static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
-					     u8 *addr, struct ieee80211_key_conf *key);
+					     u8 *addr,
+					     struct ieee80211_key_conf *key);
 
 #ifdef MWL_DEBUG
 static char *mwl_fwcmd_get_cmd_string(unsigned short cmd);
@@ -941,7 +1012,8 @@ void mwl_fwcmd_reset(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-		writel(ISR_RESET, priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+		writel(ISR_RESET,
+		       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
 	}
 
 	WLDBG_EXIT(DBG_LEVEL_2);
@@ -958,7 +1030,8 @@ void mwl_fwcmd_int_enable(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-		writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
+		writel(0x00,
+		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 		writel((MACREG_A2HRIC_BIT_MASK),
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 	}
@@ -977,7 +1050,8 @@ void mwl_fwcmd_int_disable(struct ieee80211_hw *hw)
 	BUG_ON(!priv);
 
 	if (mwl_fwcmd_chk_adapter(priv)) {
-		writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
+		writel(0x00,
+		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 	}
 
 	WLDBG_EXIT(DBG_LEVEL_2);
@@ -1015,14 +1089,18 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 		WLDBG_PRINT("repeat command = %x", (unsigned int)pcmd);
 	}
 
-	memcpy(&priv->hw_data.mac_addr[0], pcmd->permanent_addr, ETH_ALEN);
-	priv->desc_data[0].wcb_base = ENDIAN_SWAP32(pcmd->wcb_base0) & 0x0000ffff;
+	ether_addr_copy(&priv->hw_data.mac_addr[0], pcmd->permanent_addr);
+	priv->desc_data[0].wcb_base =
+		ENDIAN_SWAP32(pcmd->wcb_base0) & 0x0000ffff;
 #if SYSADPT_NUM_OF_DESC_DATA > 3
 	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
-		priv->desc_data[i].wcb_base = ENDIAN_SWAP32(pcmd->wcb_base[i - 1]) & 0x0000ffff;
+		priv->desc_data[i].wcb_base =
+			ENDIAN_SWAP32(pcmd->wcb_base[i - 1]) & 0x0000ffff;
 #endif
-	priv->desc_data[0].rx_desc_read = ENDIAN_SWAP32(pcmd->rxpd_rd_ptr) & 0x0000ffff;
-	priv->desc_data[0].rx_desc_write = ENDIAN_SWAP32(pcmd->rxpd_wr_ptr) & 0x0000ffff;
+	priv->desc_data[0].rx_desc_read =
+		ENDIAN_SWAP32(pcmd->rxpd_rd_ptr) & 0x0000ffff;
+	priv->desc_data[0].rx_desc_write =
+		ENDIAN_SWAP32(pcmd->rxpd_wr_ptr) & 0x0000ffff;
 	priv->hw_data.region_code = ENDIAN_SWAP16(pcmd->region_code) & 0x00ff;
 	priv->hw_data.fw_release_num = ENDIAN_SWAP32(pcmd->fw_release_num);
 	priv->hw_data.max_num_tx_desc = ENDIAN_SWAP16(pcmd->num_wcb);
@@ -1056,14 +1134,21 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 
 	/* Info for debugging
 	*/
-    WLDBG_PRINT("%s ...", __FUNCTION__);
-    WLDBG_PRINT("  -->pPhysTxRing[0] = %x", priv->desc_data[0].pphys_tx_ring);
-    WLDBG_PRINT("  -->pPhysTxRing[1] = %x", priv->desc_data[1].pphys_tx_ring);
-    WLDBG_PRINT("  -->pPhysTxRing[2] = %x", priv->desc_data[2].pphys_tx_ring);
-    WLDBG_PRINT("  -->pPhysTxRing[3] = %x", priv->desc_data[3].pphys_tx_ring);
-    WLDBG_PRINT("  -->pPhysRxRing    = %x", priv->desc_data[0].pphys_rx_ring);
-    WLDBG_PRINT("  -->numtxq %d wcbperq %d totalrxwcb %d",
-		SYSADPT_NUM_OF_DESC_DATA, SYSADPT_MAX_NUM_TX_DESC, SYSADPT_MAX_NUM_RX_DESC);
+	WLDBG_PRINT("%s ...", __func__);
+	WLDBG_PRINT("  -->pPhysTxRing[0] = %x",
+		    priv->desc_data[0].pphys_tx_ring);
+	WLDBG_PRINT("  -->pPhysTxRing[1] = %x",
+		    priv->desc_data[1].pphys_tx_ring);
+	WLDBG_PRINT("  -->pPhysTxRing[2] = %x",
+		    priv->desc_data[2].pphys_tx_ring);
+	WLDBG_PRINT("  -->pPhysTxRing[3] = %x",
+		    priv->desc_data[3].pphys_tx_ring);
+	WLDBG_PRINT("  -->pPhysRxRing    = %x",
+		    priv->desc_data[0].pphys_rx_ring);
+	WLDBG_PRINT("  -->numtxq %d wcbperq %d totalrxwcb %d",
+		    SYSADPT_NUM_OF_DESC_DATA,
+		    SYSADPT_MAX_NUM_TX_DESC,
+		    SYSADPT_MAX_NUM_RX_DESC);
 
 	pcmd = (struct hostcmd_cmd_set_hw_spec *)&priv->pcmd_buf[0];
 
@@ -1075,7 +1160,8 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 	pcmd->wcb_base[0] = ENDIAN_SWAP32(priv->desc_data[0].pphys_tx_ring);
 #if SYSADPT_NUM_OF_DESC_DATA > 3
 	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
-		pcmd->wcb_base[i] = ENDIAN_SWAP32(priv->desc_data[i].pphys_tx_ring);
+		pcmd->wcb_base[i] =
+			ENDIAN_SWAP32(priv->desc_data[i].pphys_tx_ring);
 #endif
 	pcmd->tx_wcb_num_per_queue = ENDIAN_SWAP32(SYSADPT_MAX_NUM_TX_DESC);
 	pcmd->num_tx_queues = ENDIAN_SWAP32(SYSADPT_NUM_OF_DESC_DATA);
@@ -1223,7 +1309,8 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 		reduce_val = 6;    /* 25% -6db */
 		break;
 	default:
-		reduce_val = 0xff; /* larger than case 3,  pCmd->MaxPowerLevel is min */
+		/* larger than case 3,  pCmd->MaxPowerLevel is min */
+		reduce_val = 0xff;
 		break;
 	}
 
@@ -1311,7 +1398,8 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 		reduce_val = 6;    /* 25% -6db */
 		break;
 	default:
-		reduce_val = 0xff; /* larger than case 3,  pCmd->MaxPowerLevel is min */
+		/* larger than case 3,  pCmd->MaxPowerLevel is min */
+		reduce_val = 0xff;
 		break;
 	}
 
@@ -1341,25 +1429,31 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	/* search tx power table if exist
 	*/
 	for (index = 0; index < SYSADPT_MAX_NUM_CHANNELS; index++) {
+		struct mwl_tx_pwr_tbl *tx_pwr;
+
+		tx_pwr = &priv->tx_pwr_tbl[index];
+
 		/* do nothing if table is not loaded
 		*/
-		if (priv->tx_pwr_tbl[index].channel == 0)
+		if (tx_pwr->channel == 0)
 			break;
 
-		if (priv->tx_pwr_tbl[index].channel == channel->hw_value) {
-			priv->cdd = priv->tx_pwr_tbl[index].cdd;
-			priv->txantenna2 = priv->tx_pwr_tbl[index].txantenna2;
+		if (tx_pwr->channel == channel->hw_value) {
+			priv->cdd = tx_pwr->cdd;
+			priv->txantenna2 = tx_pwr->txantenna2;
 
-			if (priv->tx_pwr_tbl[index].setcap)
+			if (tx_pwr->setcap)
 				priv->powinited = 0x01;
 			else
 				priv->powinited = 0x02;
 
 			for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
-				if (priv->tx_pwr_tbl[index].setcap)
-					priv->max_tx_pow[i] = priv->tx_pwr_tbl[index].tx_power[i];
+				if (tx_pwr->setcap)
+					priv->max_tx_pow[i] =
+						tx_pwr->tx_power[i];
 				else
-					priv->target_powers[i] = priv->tx_pwr_tbl[index].tx_power[i];
+					priv->target_powers[i] =
+						tx_pwr->tx_power[i];
 			}
 
 			found = 1;
@@ -1383,8 +1477,9 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 
 	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
 		if (found) {
-			if ((priv->tx_pwr_tbl[index].setcap)
-				&& (priv->tx_pwr_tbl[index].tx_power[i] > priv->max_tx_pow[i]))
+			if ((priv->tx_pwr_tbl[index].setcap) &&
+			    (priv->tx_pwr_tbl[index].tx_power[i] >
+			    priv->max_tx_pow[i]))
 				tmp = priv->max_tx_pow[i];
 			else
 				tmp = priv->tx_pwr_tbl[index].tx_power[i];
@@ -1430,7 +1525,7 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 
 	if (dir == WL_ANTENNATYPE_RX) {
 		u8 rx_antenna = 4; /* if auto, set 4 rx antennas in SC2 */
-		
+
 		if (antenna != 0)
 			pcmd->antenna_mode = ENDIAN_SWAP16(antenna);
 		else
@@ -1584,7 +1679,7 @@ int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 	pcmd->aid = ENDIAN_SWAP16(aid);
-	memcpy(pcmd->mac_addr, bssid, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, bssid);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_AID)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -1692,7 +1787,7 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_SET_EDCA_PARAMS);
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 
-	pcmd->action = ENDIAN_SWAP16(0xffff);;
+	pcmd->action = ENDIAN_SWAP16(0xffff);
 	pcmd->txop = ENDIAN_SWAP16(txop);
 	pcmd->cw_max = ENDIAN_SWAP32(ilog2(cw_max + 1));
 	pcmd->cw_min = ENDIAN_SWAP32(ilog2(cw_min + 1));
@@ -1700,8 +1795,8 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 	pcmd->txq_num = index;
 
 	/* The array index defined in qos.h has a reversed bk and be.
-	 * The HW queue was not used this way; the qos code needs to be changed or
-	 * checked
+	 * The HW queue was not used this way; the qos code needs to
+	 * be changed or checked
 	 */
 	if (index == 0)
 		pcmd->txq_num = 1;
@@ -1852,7 +1947,7 @@ int mwl_fwcmd_set_mac_addr_client(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 	pcmd->mac_type = WL_MAC_TYPE_SECONDARY_CLIENT;
-	memcpy(pcmd->mac_addr, mac_addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, mac_addr);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_MAC_ADDR)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -1926,7 +2021,7 @@ int mwl_fwcmd_remove_mac_addr(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_DEL_MAC_ADDR);
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
-	memcpy(pcmd->mac_addr, mac_addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, mac_addr);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_DEL_MAC_ADDR)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2077,7 +2172,7 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		pcmd->aid = ENDIAN_SWAP16(sta->aid);
 		pcmd->stn_id = ENDIAN_SWAP16(sta->aid);
 	}
-	memcpy(pcmd->mac_addr, sta->addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, sta->addr);
 
 	if (hw->conf.chandef.chan->band == IEEE80211_BAND_2GHZ)
 		rates = sta->supp_rates[IEEE80211_BAND_2GHZ];
@@ -2091,12 +2186,15 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		pcmd->peer_info.ht_rates[2] = sta->ht_cap.mcs.rx_mask[2];
 		pcmd->peer_info.ht_rates[3] = sta->ht_cap.mcs.rx_mask[3];
 		pcmd->peer_info.ht_cap_info = ENDIAN_SWAP16(sta->ht_cap.cap);
-		pcmd->peer_info.mac_ht_param_info = (sta->ht_cap.ampdu_factor & 3) |
+		pcmd->peer_info.mac_ht_param_info =
+			(sta->ht_cap.ampdu_factor & 3) |
 			((sta->ht_cap.ampdu_density & 7) << 2);
 	}
 
 	if (sta->vht_cap.vht_supported) {
-		pcmd->peer_info.vht_max_rx_mcs = ENDIAN_SWAP32(*((u32 *)&sta->vht_cap.vht_mcs.rx_mcs_map));
+		pcmd->peer_info.vht_max_rx_mcs =
+			ENDIAN_SWAP32(*((u32 *)
+			&sta->vht_cap.vht_mcs.rx_mcs_map));
 		pcmd->peer_info.vht_cap = ENDIAN_SWAP32(sta->vht_cap.cap);
 		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
 	}
@@ -2111,8 +2209,8 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	}
 
 	if (mwl_vif->is_sta == true) {
-		memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
-		
+		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
+
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
 			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
@@ -2154,7 +2252,7 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = ENDIAN_SWAP16(HOSTCMD_ACT_STA_ACTION_ADD);
-	memcpy(pcmd->mac_addr, vif->addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, vif->addr);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2196,7 +2294,7 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = ENDIAN_SWAP16(HOSTCMD_ACT_STA_ACTION_REMOVE);
-	memcpy(pcmd->mac_addr, addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, addr);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
 		MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2205,8 +2303,8 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 	}
 
 	if  (mwl_vif->is_sta == true) {
-		memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
-		
+		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
+
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
 			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
 			WLDBG_EXIT_INFO(DBG_LEVEL_2, "failed execution");
@@ -2254,7 +2352,8 @@ int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode)
 }
 
 int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
-				       struct ieee80211_vif *vif, u8 *addr, u8 encr_type)
+				       struct ieee80211_vif *vif,
+				       u8 *addr, u8 encr_type)
 {
 	struct mwl_priv *priv;
 	struct mwl_vif *mwl_vif;
@@ -2281,7 +2380,7 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action_type = ENDIAN_SWAP32(ENCR_ACTION_ENABLE_HW_ENCR);
-	memcpy(pcmd->mac_addr, addr, ETH_ALEN);
+	ether_addr_copy(pcmd->mac_addr, addr);
 	pcmd->action_data[0] = encr_type;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
@@ -2292,9 +2391,9 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 
 	if (mwl_vif->is_sta == true) {
 		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
-			memcpy(pcmd->mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+			ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 		else
-			memcpy(pcmd->mac_addr, mwl_vif->bssid, ETH_ALEN);
+			ether_addr_copy(pcmd->mac_addr, mwl_vif->bssid);
 
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2390,9 +2489,11 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 	if (mwl_vif->is_sta == true) {
 		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
-			memcpy(pcmd->key_param.mac_addr, mwl_vif->sta_mac, ETH_ALEN);
+			ether_addr_copy(pcmd->key_param.mac_addr,
+					mwl_vif->sta_mac);
 		else
-			memcpy(pcmd->key_param.mac_addr, mwl_vif->bssid, ETH_ALEN);
+			ether_addr_copy(pcmd->key_param.mac_addr,
+					mwl_vif->bssid);
 
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 			MWL_SPIN_UNLOCK(&priv->locks.fwcmd_lock);
@@ -2635,7 +2736,8 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 /* caller must hold priv->locks.stream_lock when calling the stream functions
 */
 struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
-					      struct ieee80211_sta *sta, u8 tid)
+					      struct ieee80211_sta *sta,
+					      u8 tid)
 {
 	struct mwl_priv *priv;
 	struct mwl_ampdu_stream *stream;
@@ -2673,7 +2775,7 @@ int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 	if (stream->state != AMPDU_STREAM_NEW)
 		return 0;
 
-	return (ieee80211_start_tx_ba_session(stream->sta, stream->tid, 0));
+	return ieee80211_start_tx_ba_session(stream->sta, stream->tid, 0);
 }
 
 void mwl_fwcmd_remove_stream(struct ieee80211_hw *hw,
@@ -2904,7 +3006,7 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 {
 	unsigned int curr_iteration = MAX_WAIT_FW_COMPLETE_ITERATIONS;
 
-	volatile unsigned short int_code = 0;
+	unsigned short int_code = 0;
 
 	WLDBG_ENTER(DBG_LEVEL_2);
 
@@ -2929,7 +3031,8 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	return 0;
 }
 
-static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv, bool enable, bool force)
+static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
+					  bool enable, bool force)
 {
 	struct hostcmd_cmd_802_11_radio_control *pcmd;
 	unsigned long flags;
@@ -3008,8 +3111,9 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 	return 0;
 }
 
-static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[], u8 action,
-				   u16 ch, u16 band, u16 width, u16 sub_ch)
+static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
+				   u8 action, u16 ch, u16 band,
+				   u16 width, u16 sub_ch)
 {
 	struct hostcmd_cmd_802_11_tx_power *pcmd;
 	unsigned long flags;
@@ -3179,38 +3283,40 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		case WLAN_EID_SUPP_RATES:
 		case WLAN_EID_EXT_SUPP_RATES:
 			{
-				int idx, basic_idx, oprate_idx;
-				u8 rate;
+			int idx, bi, oi;
+			u8 rate;
 
-				for (basic_idx = 0; basic_idx < SYSADPT_MAX_DATA_RATES_G; basic_idx++) {
-					if (beacon_info->bss_basic_rate_set[basic_idx] == 0)
-						break;
-				}
+			for (bi = 0; bi < SYSADPT_MAX_DATA_RATES_G;
+			     bi++) {
+				if (beacon_info->b_rate_set[bi] == 0)
+					break;
+			}
 
-				for (oprate_idx = 0; oprate_idx < SYSADPT_MAX_DATA_RATES_G; oprate_idx++) {
-					if (beacon_info->op_rate_set[oprate_idx] == 0)
-						break;
-				}
+			for (oi = 0; oi < SYSADPT_MAX_DATA_RATES_G;
+			     oi++) {
+				if (beacon_info->op_rate_set[oi] == 0)
+					break;
+			}
 
-				for (idx = 0; idx < elen; idx++) {
-					rate = pos[idx];
-
-					if ((rate & 0x80) != 0) {
-						if (basic_idx < SYSADPT_MAX_DATA_RATES_G)
-							beacon_info->bss_basic_rate_set[basic_idx++] = rate & 0x7f;
-						else {
-							elem_parse_failed = true;
-							break;
-						}
-					}
-
-					if (oprate_idx < SYSADPT_MAX_DATA_RATES_G)
-						beacon_info->op_rate_set[oprate_idx++] = rate & 0x7f;
+			for (idx = 0; idx < elen; idx++) {
+				rate = pos[idx];
+				if ((rate & 0x80) != 0) {
+					if (bi < SYSADPT_MAX_DATA_RATES_G)
+						beacon_info->b_rate_set[bi++]
+							= rate & 0x7f;
 					else {
 						elem_parse_failed = true;
 						break;
 					}
 				}
+				if (oi < SYSADPT_MAX_DATA_RATES_G)
+					beacon_info->op_rate_set[oi++] =
+						rate & 0x7f;
+				else {
+					elem_parse_failed = true;
+					break;
+				}
+			}
 			}
 			break;
 		case WLAN_EID_RSN:
@@ -3222,9 +3328,9 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		case WLAN_EID_OVERLAP_BSS_SCAN_PARAM:
 		case WLAN_EID_EXT_CAPABILITY:
 			beacon_info->ie_ht_len += (elen + 2);
-			if (beacon_info->ie_ht_len > sizeof(beacon_info->ie_list_ht)) {
+			if (beacon_info->ie_ht_len >
+			    sizeof(beacon_info->ie_list_ht)) {
 				elem_parse_failed = true;
-				break;
 			} else {
 				*beacon_info->ie_ht_ptr++ = id;
 				*beacon_info->ie_ht_ptr++ = elen;
@@ -3236,9 +3342,9 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		case WLAN_EID_VHT_OPERATION:
 		case WLAN_EID_OPMODE_NOTIF:
 			beacon_info->ie_vht_len += (elen + 2);
-			if (beacon_info->ie_vht_len > sizeof(beacon_info->ie_list_vht)) {
+			if (beacon_info->ie_vht_len >
+			    sizeof(beacon_info->ie_list_vht)) {
 				elem_parse_failed = true;
-				break;
 			} else {
 				*beacon_info->ie_vht_ptr++ = id;
 				*beacon_info->ie_vht_ptr++ = elen;
@@ -3247,7 +3353,8 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 			}
 			break;
 		case WLAN_EID_VENDOR_SPECIFIC:
-			if ((pos[0] == 0x00) && (pos[1] == 0x50) && (pos[2] == 0xf2)) {
+			if ((pos[0] == 0x00) && (pos[1] == 0x50) &&
+			    (pos[2] == 0xf2)) {
 				if (pos[3] == 0x01) {
 					beacon_info->ie_rsn_len = (elen + 2);
 					beacon_info->ie_rsn_ptr = (pos - 2);
@@ -3272,11 +3379,15 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 		beacon_info->valid = true;
 
-		WLDBG_INFO(DBG_LEVEL_2, "wmm:%d, rsn:%d, rsn48:%d, ht:%d, vht:%d",
-			   beacon_info->ie_wmm_len, beacon_info->ie_rsn_len, beacon_info->ie_rsn48_len,
-			beacon_info->ie_ht_len, beacon_info->ie_vht_len);
+		WLDBG_INFO(DBG_LEVEL_2,
+			   "wmm:%d, rsn:%d, rsn48:%d, ht:%d, vht:%d",
+			   beacon_info->ie_wmm_len,
+			   beacon_info->ie_rsn_len,
+			   beacon_info->ie_rsn48_len,
+			   beacon_info->ie_ht_len,
+			   beacon_info->ie_vht_len);
 
-		WLDBG_DUMP_DATA(DBG_LEVEL_2, beacon_info->bss_basic_rate_set,
+		WLDBG_DUMP_DATA(DBG_LEVEL_2, beacon_info->b_rate_set,
 				SYSADPT_MAX_DATA_RATES_G);
 
 		WLDBG_DUMP_DATA(DBG_LEVEL_2, beacon_info->op_rate_set,
@@ -3284,8 +3395,6 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	}
 
 	WLDBG_EXIT_INFO(DBG_LEVEL_2, "parse valid:%d", beacon_info->valid);
-
-	return;
 }
 
 static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
@@ -3328,7 +3437,8 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	if (priv->chip_type == MWL8897) {
 		pcmd->ie_list_len_proprietary = mwl_vif->beacon_info.ie_wmm_len;
-		memcpy(pcmd->ie_list_proprietary, mwl_vif->beacon_info.ie_wmm_ptr,
+		memcpy(pcmd->ie_list_proprietary,
+		       mwl_vif->beacon_info.ie_wmm_ptr,
 		       pcmd->ie_list_len_proprietary);
 	}
 
@@ -3352,7 +3462,8 @@ einval:
 	return -EINVAL;
 }
 
-static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vif,
+static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
+				   struct mwl_vif *mwl_vif,
 				   struct ieee80211_bss_conf *bss_conf)
 {
 	struct hostcmd_cmd_ap_beacon *pcmd;
@@ -3368,16 +3479,19 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vi
 	if (!mwl_vif->beacon_info.valid)
 		return -EINVAL;
 
-	/* wmm structure of start command is defined less one byte, due to following
-	 * field country is not used, add byte one to bypass the check.
+	/* wmm structure of start command is defined less one byte,
+	 * due to following field country is not used, add byte one
+	 * to bypass the check.
 	 */
-	if (mwl_vif->beacon_info.ie_wmm_len > (sizeof(pcmd->start_cmd.wmm_param) + 1))
+	if (mwl_vif->beacon_info.ie_wmm_len >
+	    (sizeof(pcmd->start_cmd.wmm_param) + 1))
 		goto ielenerr;
 
 	if (mwl_vif->beacon_info.ie_rsn_len > sizeof(pcmd->start_cmd.rsn_ie))
 		goto ielenerr;
 
-	if (mwl_vif->beacon_info.ie_rsn48_len > sizeof(pcmd->start_cmd.rsn48_ie))
+	if (mwl_vif->beacon_info.ie_rsn48_len >
+	    sizeof(pcmd->start_cmd.rsn48_ie))
 		goto ielenerr;
 
 	pcmd = (struct hostcmd_cmd_ap_beacon *)&priv->pcmd_buf[0];
@@ -3389,7 +3503,7 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vi
 	pcmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
-	memcpy(pcmd->start_cmd.sta_mac_addr, mwl_vif->bssid, ETH_ALEN);
+	ether_addr_copy(pcmd->start_cmd.sta_mac_addr, mwl_vif->bssid);
 	memcpy(pcmd->start_cmd.ssid, bss_conf->ssid, bss_conf->ssid_len);
 	pcmd->start_cmd.bss_type = 1;
 	pcmd->start_cmd.bcn_period  = ENDIAN_SWAP16(bss_conf->beacon_int);
@@ -3412,7 +3526,7 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv, struct mwl_vif *mwl_vi
 	memcpy(&pcmd->start_cmd.rsn48_ie, mwl_vif->beacon_info.ie_rsn48_ptr,
 	       mwl_vif->beacon_info.ie_rsn48_len);
 
-	memcpy(pcmd->start_cmd.bss_basic_rate_set, mwl_vif->beacon_info.bss_basic_rate_set,
+	memcpy(pcmd->start_cmd.b_rate_set, mwl_vif->beacon_info.b_rate_set,
 	       SYSADPT_MAX_DATA_RATES_G);
 
 	memcpy(pcmd->start_cmd.op_rate_set, mwl_vif->beacon_info.op_rate_set,
@@ -3439,7 +3553,8 @@ ielenerr:
 }
 
 static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
-					     u8 *addr, struct ieee80211_key_conf *key)
+					     u8 *addr,
+					     struct ieee80211_key_conf *key)
 {
 	cmd->cmd_hdr.cmd = ENDIAN_SWAP16(HOSTCMD_CMD_UPDATE_ENCRYPTION);
 	cmd->cmd_hdr.len = ENDIAN_SWAP16(sizeof(*cmd));
@@ -3447,28 +3562,32 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 		offsetof(struct hostcmd_cmd_set_key, key_param));
 	cmd->key_param.key_index = ENDIAN_SWAP32(key->keyidx);
 	cmd->key_param.key_len = ENDIAN_SWAP16(key->keylen);
-	memcpy(cmd->key_param.mac_addr, addr, ETH_ALEN);
+	ether_addr_copy(cmd->key_param.mac_addr, addr);
 
 	switch (key->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:
 	case WLAN_CIPHER_SUITE_WEP104:
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_WEP);
 		if (key->keyidx == 0)
-			cmd->key_param.key_info = ENDIAN_SWAP32(ENCR_KEY_FLAG_WEP_TXKEY);
+			cmd->key_param.key_info =
+				ENDIAN_SWAP32(ENCR_KEY_FLAG_WEP_TXKEY);
 		break;
 	case WLAN_CIPHER_SUITE_TKIP:
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_TKIP);
-		cmd->key_param.key_info = (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
-			? ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE)
-			: ENDIAN_SWAP32(ENCR_KEY_FLAG_TXGROUPKEY);
-		cmd->key_param.key_info |= ENDIAN_SWAP32(ENCR_KEY_FLAG_MICKEY_VALID
-			| ENCR_KEY_FLAG_TSC_VALID);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE) :
+			ENDIAN_SWAP32(ENCR_KEY_FLAG_TXGROUPKEY);
+		cmd->key_param.key_info |=
+			ENDIAN_SWAP32(ENCR_KEY_FLAG_MICKEY_VALID |
+				      ENCR_KEY_FLAG_TSC_VALID);
 		break;
 	case WLAN_CIPHER_SUITE_CCMP:
 		cmd->key_param.key_type_id = ENDIAN_SWAP16(KEY_TYPE_ID_AES);
-		cmd->key_param.key_info = (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
-			? ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE)
-			: ENDIAN_SWAP32(ENCR_KEY_FLAG_TXGROUPKEY);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			ENDIAN_SWAP32(ENCR_KEY_FLAG_PAIRWISE) :
+			ENDIAN_SWAP32(ENCR_KEY_FLAG_TXGROUPKEY);
 		break;
 	default:
 		return -ENOTSUPP;

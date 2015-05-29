@@ -30,7 +30,8 @@
 /* CONSTANTS AND MACROS
 */
 
-#define MAX_NUM_RX_RING_BYTES  SYSADPT_MAX_NUM_RX_DESC * sizeof(struct mwl_rx_desc)
+#define MAX_NUM_RX_RING_BYTES  (SYSADPT_MAX_NUM_RX_DESC * \
+				sizeof(struct mwl_rx_desc))
 
 #define FIRST_RXD priv->desc_data[0].prx_ring[0]
 #define CURR_RXD  priv->desc_data[0].prx_ring[curr_desc]
@@ -68,7 +69,8 @@ static void mwl_rx_ring_cleanup(struct mwl_priv *priv);
 static void mwl_rx_ring_free(struct mwl_priv *priv);
 static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 					 struct ieee80211_rx_status *status);
-static inline struct mwl_vif *mwl_rx_find_vif_bss(struct list_head *vif_list, u8 *bssid);
+static inline struct mwl_vif *mwl_rx_find_vif_bss(struct list_head *vif_list,
+						  u8 *bssid);
 static inline void mwl_rx_remove_dma_header(struct sk_buff *skb, u16 qos);
 static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc);
 
@@ -93,7 +95,8 @@ int mwl_rx_init(struct ieee80211_hw *hw)
 		rc = mwl_rx_ring_init(priv);
 		if (rc) {
 			mwl_rx_ring_free(priv);
-			WLDBG_ERROR(DBG_LEVEL_4, "initializing RX ring failed");
+			WLDBG_ERROR(DBG_LEVEL_4,
+				    "initializing RX ring failed");
 		}
 	}
 
@@ -140,7 +143,8 @@ void mwl_rx_recv(unsigned long data)
 	curr_desc = priv->desc_data[0].pnext_rx_desc;
 
 	if (curr_desc == NULL) {
-		status_mask = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+		status_mask = readl(priv->iobase1 +
+				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 		writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
@@ -162,8 +166,9 @@ void mwl_rx_recv(unsigned long data)
 		pkt_len = curr_desc->pkt_len;
 
 		if (skb_tailroom(prx_skb) < pkt_len) {
-			WLDBG_PRINT("Critical error: not enough tail room =%x pkt_len=%x, curr_desc=%x, curr_desc_data=%x",
-				    skb_tailroom(prx_skb), pkt_len, curr_desc, curr_desc->pbuff_data);
+			WLDBG_PRINT("Critical error: %x %x %x %x",
+				    skb_tailroom(prx_skb), pkt_len,
+				    curr_desc, curr_desc->pbuff_data);
 			dev_kfree_skb_any(prx_skb);
 			goto out;
 		}
@@ -209,7 +214,8 @@ void mwl_rx_recv(unsigned long data)
 				if (status.flag & RX_FLAG_MMIC_ERROR) {
 					struct mwl_dma_data *tr;
 
-					tr = (struct mwl_dma_data *)prx_skb->data;
+					tr = (struct mwl_dma_data *)
+					     prx_skb->data;
 					memset((void *)&(tr->data), 0, 4);
 					pkt_len += 4;
 				}
@@ -235,7 +241,8 @@ out:
 
 	priv->desc_data[0].pnext_rx_desc = curr_desc;
 
-	status_mask = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	status_mask = readl(priv->iobase1 +
+			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 	writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
@@ -255,10 +262,11 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	priv->desc_data[0].prx_ring =
-		(struct mwl_rx_desc *)dma_alloc_coherent(&priv->pdev->dev,
-							 MAX_NUM_RX_RING_BYTES,
-							 &priv->desc_data[0].pphys_rx_ring,
-							 GFP_KERNEL);
+		(struct mwl_rx_desc *)
+		dma_alloc_coherent(&priv->pdev->dev,
+				   MAX_NUM_RX_RING_BYTES,
+				   &priv->desc_data[0].pphys_rx_ring,
+				   GFP_KERNEL);
 
 	if (priv->desc_data[0].prx_ring == NULL) {
 		WLDBG_ERROR(DBG_LEVEL_4, "can not alloc mem");
@@ -269,7 +277,8 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 	memset(priv->desc_data[0].prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
 
 	WLDBG_EXIT_INFO(DBG_LEVEL_4, "RX ring vaddr: 0x%x paddr: 0x%x",
-			priv->desc_data[0].prx_ring, priv->desc_data[0].pphys_rx_ring);
+			priv->desc_data[0].prx_ring,
+			priv->desc_data[0].pphys_rx_ring);
 
 	return 0;
 }
@@ -277,23 +286,32 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 static int mwl_rx_ring_init(struct mwl_priv *priv)
 {
 	int curr_desc;
+	struct mwl_desc_data *desc;
 
-	WLDBG_ENTER_INFO(DBG_LEVEL_4,  "initializing %i descriptors", SYSADPT_MAX_NUM_RX_DESC);
+	WLDBG_ENTER_INFO(DBG_LEVEL_4,  "initializing %i descriptors",
+			 SYSADPT_MAX_NUM_RX_DESC);
 
-	if (priv->desc_data[0].prx_ring != NULL) {
-		priv->desc_data[0].rx_buf_size = SYSADPT_MAX_AGGR_SIZE;
+	desc = &priv->desc_data[0];
 
-		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC; curr_desc++) {
-			CURR_RXD.psk_buff = dev_alloc_skb(priv->desc_data[0].rx_buf_size);
+	if (desc->prx_ring != NULL) {
+		desc->rx_buf_size = SYSADPT_MAX_AGGR_SIZE;
+
+		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
+		     curr_desc++) {
+			CURR_RXD.psk_buff =
+				dev_alloc_skb(desc->rx_buf_size);
 
 			if (skb_linearize(CURR_RXD.psk_buff)) {
 				dev_kfree_skb_any(CURR_RXD.psk_buff);
-				WLDBG_ERROR(DBG_LEVEL_4, "need linearize memory");
-				WLDBG_EXIT_INFO(DBG_LEVEL_4, "no suitable memory");
+				WLDBG_ERROR(DBG_LEVEL_4,
+					    "need linearize memory");
+				WLDBG_EXIT_INFO(DBG_LEVEL_4,
+					    "no suitable memory");
 				return -ENOMEM;
 			}
 
-			skb_reserve(CURR_RXD.psk_buff, SYSADPT_MIN_BYTES_HEADROOM);
+			skb_reserve(CURR_RXD.psk_buff,
+				    SYSADPT_MIN_BYTES_HEADROOM);
 			CURR_RXD.rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
 			CURR_RXD.status = EAGLE_RXD_STATUS_OK;
 			CURR_RXD.qos_ctrl = 0x0000;
@@ -301,40 +319,54 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 			CURR_RXD.rssi = 0x00;
 
 			if (CURR_RXD.psk_buff != NULL) {
+				dma_addr_t dma;
+				u32 val;
+
 				CURR_RXD.pkt_len = SYSADPT_MAX_AGGR_SIZE;
 				CURR_RXD.pbuff_data = CURR_RXD.psk_buff->data;
+				dma = pci_map_single(priv->pdev,
+						     CURR_RXD.psk_buff->data,
+						     desc->rx_buf_size,
+						     PCI_DMA_FROMDEVICE);
 				CURR_RXD.pphys_buff_data =
-					ENDIAN_SWAP32(pci_map_single(priv->pdev,
-								     CURR_RXD.psk_buff->data,
-								     priv->desc_data[0].rx_buf_size,
-								     PCI_DMA_FROMDEVICE));
+					ENDIAN_SWAP32(dma);
 				CURR_RXD.pnext = &NEXT_RXD;
+				val = (u32)desc->pphys_rx_ring +
+				      ((curr_desc + 1) *
+				      sizeof(struct mwl_rx_desc));
 				CURR_RXD.pphys_next =
-					ENDIAN_SWAP32((u32)priv->desc_data[0].pphys_rx_ring +
-						      ((curr_desc + 1) * sizeof(struct mwl_rx_desc)));
+					ENDIAN_SWAP32(val);
 				WLDBG_INFO(DBG_LEVEL_4,
-					   "rxdesc: %i status: 0x%x (%i) len: 0x%x (%i)",
-					   curr_desc, EAGLE_TXD_STATUS_IDLE, EAGLE_TXD_STATUS_IDLE,
-					   priv->desc_data[0].rx_buf_size, priv->desc_data[0].rx_buf_size);
+					   "rxdesc:%i 0x%x(%i) 0x%x(%i)",
+					   curr_desc,
+					   EAGLE_TXD_STATUS_IDLE,
+					   EAGLE_TXD_STATUS_IDLE,
+					   desc->rx_buf_size,
+					   desc->rx_buf_size);
 				WLDBG_INFO(DBG_LEVEL_4,
-					   "rxdesc: %i vnext: 0x%p pnext: 0x%x", curr_desc,
-					   CURR_RXD.pnext, ENDIAN_SWAP32(CURR_RXD.pphys_next));
+					   "rxdesc: %i vnext: 0x%p pnext: 0x%x",
+					   curr_desc,
+					   CURR_RXD.pnext,
+					   ENDIAN_SWAP32(CURR_RXD.pphys_next));
 			} else {
 				WLDBG_ERROR(DBG_LEVEL_4,
-					    "rxdesc %i: no skbuff available", curr_desc);
-				WLDBG_EXIT_INFO(DBG_LEVEL_4, "no socket buffer");
+					    "rxdesc %i: no skbuff available",
+					    curr_desc);
+				WLDBG_EXIT_INFO(DBG_LEVEL_4,
+						"no socket buffer");
 				return -ENOMEM;
 			}
 		}
 		LAST_RXD.pphys_next =
-			ENDIAN_SWAP32((u32)priv->desc_data[0].pphys_rx_ring);
+			ENDIAN_SWAP32((u32)desc->pphys_rx_ring);
 		LAST_RXD.pnext = &FIRST_RXD;
 		priv->desc_data[0].pnext_rx_desc = &FIRST_RXD;
 
 		WLDBG_EXIT_INFO(DBG_LEVEL_4,
-				"last rxdesc vnext: 0x%p pnext: 0x%x vfirst 0x%x",
-				LAST_RXD.pnext, ENDIAN_SWAP32(LAST_RXD.pphys_next),
-				priv->desc_data[0].pnext_rx_desc);
+				"last rxdesc vnext:0x%p pnext:0x%x vfirst 0x%x",
+				LAST_RXD.pnext,
+				ENDIAN_SWAP32(LAST_RXD.pphys_next),
+				desc->pnext_rx_desc);
 
 		return 0;
 	}
@@ -354,30 +386,33 @@ static void mwl_rx_ring_cleanup(struct mwl_priv *priv)
 	BUG_ON(!priv);
 
 	if (priv->desc_data[0].prx_ring != NULL) {
-		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC; curr_desc++) {
-			if (CURR_RXD.psk_buff != NULL) {
-				if (skb_shinfo(CURR_RXD.psk_buff)->nr_frags)
-					skb_shinfo(CURR_RXD.psk_buff)->nr_frags = 0;
+		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
+		     curr_desc++) {
+			if (CURR_RXD.psk_buff == NULL)
+				continue;
 
-				if (skb_shinfo(CURR_RXD.psk_buff)->frag_list)
-					skb_shinfo(CURR_RXD.psk_buff)->frag_list = NULL;
+			if (skb_shinfo(CURR_RXD.psk_buff)->nr_frags)
+				skb_shinfo(CURR_RXD.psk_buff)->nr_frags = 0;
 
-				pci_unmap_single(priv->pdev,
-						 ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
-						 priv->desc_data[0].rx_buf_size,
-						 PCI_DMA_FROMDEVICE);
+			if (skb_shinfo(CURR_RXD.psk_buff)->frag_list)
+				skb_shinfo(CURR_RXD.psk_buff)->frag_list = NULL;
 
-				dev_kfree_skb_any(CURR_RXD.psk_buff);
+			pci_unmap_single(priv->pdev,
+					 ENDIAN_SWAP32
+					 (CURR_RXD.pphys_buff_data),
+					 priv->desc_data[0].rx_buf_size,
+					 PCI_DMA_FROMDEVICE);
 
-				WLDBG_INFO(DBG_LEVEL_4,
-					   "unmapped+free'd rxdesc %i vaddr: 0x%p paddr: 0x%x len: %i",
-					   curr_desc, CURR_RXD.pbuff_data,
-					   ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
-					   priv->desc_data[0].rx_buf_size);
+			dev_kfree_skb_any(CURR_RXD.psk_buff);
 
-				CURR_RXD.pbuff_data = NULL;
-				CURR_RXD.psk_buff = NULL;
-			}
+			WLDBG_INFO(DBG_LEVEL_4,
+				   "unmapped+free'd %i 0x%p 0x%x %i",
+				   curr_desc, CURR_RXD.pbuff_data,
+				   ENDIAN_SWAP32(CURR_RXD.pphys_buff_data),
+				   priv->desc_data[0].rx_buf_size);
+
+			CURR_RXD.pbuff_data = NULL;
+			CURR_RXD.psk_buff = NULL;
 		}
 	}
 
@@ -416,7 +451,7 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 
 	memset(status, 0, sizeof(*status));
 
-	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET); 
+	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
 
 	switch (pdesc->rate.format) {
 	case RX_RATE_INFO_FORMAT_11N:
@@ -460,15 +495,18 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 	status->freq = ieee80211_channel_to_frequency(pdesc->channel,
 						      status->band);
 
-	/* check if status has a specific error bit (bit 7)set or indicates a general decrypt error
-	*/
-	if ((pdesc->status == GENERAL_DECRYPT_ERR) || (pdesc->status & DECRYPT_ERR_MASK)) {
+	/* check if status has a specific error bit (bit 7) set or indicates
+	 * a general decrypt error
+	 */
+	if ((pdesc->status == GENERAL_DECRYPT_ERR) ||
+	    (pdesc->status & DECRYPT_ERR_MASK)) {
 		/* check if status is not equal to 0xFF
 		 * the 0xFF check is for backward compatibility
 		 */
 		if (pdesc->status != GENERAL_DECRYPT_ERR) {
-			if (((pdesc->status & (~DECRYPT_ERR_MASK)) & TKIP_DECRYPT_MIC_ERR) &&
-			    !((pdesc->status & (WEP_DECRYPT_ICV_ERR | TKIP_DECRYPT_ICV_ERR)))) {
+			if (((pdesc->status & (~DECRYPT_ERR_MASK)) &
+			    TKIP_DECRYPT_MIC_ERR) && !((pdesc->status &
+			    (WEP_DECRYPT_ICV_ERR | TKIP_DECRYPT_ICV_ERR)))) {
 				status->flag |= RX_FLAG_MMIC_ERROR;
 			}
 		}
@@ -477,7 +515,8 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 	WLDBG_EXIT(DBG_LEVEL_4);
 }
 
-static inline struct mwl_vif *mwl_rx_find_vif_bss(struct list_head *vif_list, u8 *bssid)
+static inline struct mwl_vif *mwl_rx_find_vif_bss(struct list_head *vif_list,
+						  u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
 

@@ -38,10 +38,12 @@
 	DBG_CLASS_ENTER | \
 	DBG_CLASS_EXIT)
 
+#define PRT_8BYTES "0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n"
+
 /* PRIVATE VARIABLES
 */
 
-static u32 dbg_levels = 0;
+static u32 dbg_levels;
 
 /* PUBLIC FUNCTION DEFINITION
 */
@@ -59,12 +61,15 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 			return;
 
 		if ((level & dbg_levels) != level) {
-			if (class != DBG_CLASS_PANIC && class != DBG_CLASS_ERROR)
+			if (class != DBG_CLASS_PANIC &&
+			    class != DBG_CLASS_ERROR)
 				return;
 		}
 	}
 
-	if ((debug_string = kmalloc(1024, GFP_ATOMIC)) == NULL)
+	debug_string = kmalloc(1024, GFP_ATOMIC);
+
+	if (debug_string == NULL)
 		return;
 
 	if (format != NULL) {
@@ -77,19 +82,19 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 
 	switch (class) {
 	case DBG_CLASS_ENTER:
-		printk("Enter %s() ...\n", func);
+		pr_debug("Enter %s() ...\n", func);
 		break;
 	case DBG_CLASS_EXIT:
-		printk("... Exit %s()\n", func);
+		pr_debug("... Exit %s()\n", func);
 		break;
 	case DBG_CLASS_WARNING:
-		printk("WARNING: ");
+		pr_debug("WARNING: ");
 		break;
 	case DBG_CLASS_ERROR:
-		printk("ERROR: ");
+		pr_debug("ERROR: ");
 		break;
 	case DBG_CLASS_PANIC:
-		printk("PANIC: ");
+		pr_debug("PANIC: ");
 		break;
 	default:
 		break;
@@ -98,13 +103,14 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 	if (strlen(debug_string) > 0) {
 		if (debug_string[strlen(debug_string)-1] == '\n')
 			debug_string[strlen(debug_string)-1] = '\0';
-			printk("%s(): %s\n", func, debug_string);
+			pr_debug("%s(): %s\n", func, debug_string);
 	}
 
 	kfree(debug_string);
 }
 
-void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int len, const char *format, ...)
+void mwl_debug_prtdata(u32 classlevel, const char *func,
+		       const void *data, int len, const char *format, ...)
 {
 	unsigned char *dbg_string;
 	unsigned char dbg_data[16] = "";
@@ -122,7 +128,9 @@ void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int l
 	if ((level & dbg_levels) != level)
 		return;
 
-	if ((dbg_string = kmalloc(len + 1024, GFP_ATOMIC)) == NULL)
+	dbg_string = kmalloc(len + 1024, GFP_ATOMIC);
+
+	if (dbg_string == NULL)
 		return;
 
 	if (format != NULL) {
@@ -136,30 +144,32 @@ void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int l
 	if (strlen(dbg_string) > 0) {
 		if (dbg_string[strlen(dbg_string) - 1] == '\n')
 			dbg_string[strlen(dbg_string)-1] = '\0';
-			printk("%s() %s\n", func, dbg_string);
+			pr_debug("%s() %s\n", func, dbg_string);
 	} else {
-		printk("%s()\n", func);
+		pr_debug("%s()\n", func);
 	}
 
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
 		if ((curr_byte + 8) < len) {
-			printk("0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-				*(memptr + curr_byte + 0),
-				*(memptr + curr_byte + 1),
-				*(memptr + curr_byte + 2),
-				*(memptr + curr_byte + 3),
-				*(memptr + curr_byte + 4),
-				*(memptr + curr_byte + 5),
-				*(memptr + curr_byte + 6),
-				*(memptr + curr_byte + 7));
+			pr_debug(PRT_8BYTES,
+			       *(memptr + curr_byte + 0),
+			       *(memptr + curr_byte + 1),
+			       *(memptr + curr_byte + 2),
+			       *(memptr + curr_byte + 3),
+			       *(memptr + curr_byte + 4),
+			       *(memptr + curr_byte + 5),
+			       *(memptr + curr_byte + 6),
+			       *(memptr + curr_byte + 7));
 		} else {
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
-			for (curr_byte = 0; curr_byte < num_bytes; curr_byte++) {
-				sprintf(dbg_data, "0x%02x ", *(memptr + offset + curr_byte));
+			for (curr_byte = 0; curr_byte < num_bytes;
+				curr_byte++) {
+				sprintf(dbg_data, "0x%02x ",
+					*(memptr + offset + curr_byte));
 				strcat(dbg_string, dbg_data);
 			}
-			printk("%s\n", dbg_string);
+			pr_debug("%s\n", dbg_string);
 			break;
 		}
 	}
@@ -174,25 +184,27 @@ void mwl_debug_dumpdata(const void *data, int len, char *marker)
 	int num_bytes = 0;
 	int offset = 0;
 
-	printk("%s\n", marker);
+	pr_debug("%s\n", marker);
 
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
 		if ((curr_byte + 8) < len) {
-			printk("0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-				*(memptr + curr_byte + 0),
-				*(memptr + curr_byte + 1),
-				*(memptr + curr_byte + 2),
-				*(memptr + curr_byte + 3),
-				*(memptr + curr_byte + 4),
-				*(memptr + curr_byte + 5),
-				*(memptr + curr_byte + 6),
-				*(memptr + curr_byte + 7));
+			pr_debug(PRT_8BYTES,
+			       *(memptr + curr_byte + 0),
+			       *(memptr + curr_byte + 1),
+			       *(memptr + curr_byte + 2),
+			       *(memptr + curr_byte + 3),
+			       *(memptr + curr_byte + 4),
+			       *(memptr + curr_byte + 5),
+			       *(memptr + curr_byte + 6),
+			       *(memptr + curr_byte + 7));
 		} else {
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
-			for (curr_byte = 0; curr_byte < num_bytes; curr_byte++)
-				printk("0x%02x ", *(memptr + offset + curr_byte));
-			printk("\n\n");
+			for (curr_byte = 0; curr_byte < num_bytes;
+			     curr_byte++)
+				pr_debug("0x%02x ",
+				       *(memptr + offset + curr_byte));
+			pr_debug("\n\n");
 			break;
 		}
 	}

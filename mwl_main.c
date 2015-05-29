@@ -184,7 +184,7 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 
 static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	static bool printed_version = false;
+	static bool printed_version;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	int rc = 0;
@@ -339,8 +339,10 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	if (flags & 0x04)
 		priv->next_bar_num = 2;	/* 64-bit */
 
-	if (!request_mem_region(phys_addr, pci_resource_len(pdev, 0), MWL_DRV_NAME)) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot reserve PCI memory region 0",
+	if (!request_mem_region(phys_addr, pci_resource_len(pdev, 0),
+				MWL_DRV_NAME)) {
+		WLDBG_ERROR(DBG_LEVEL_0,
+			    "%s: cannot reserve PCI memory region 0",
 			    MWL_DRV_NAME);
 		goto err_reserve_mem_region_bar0;
 	}
@@ -359,13 +361,17 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 
 	phys_addr = pci_resource_start(pdev, priv->next_bar_num);
 
-	if (!request_mem_region(phys_addr, pci_resource_len(pdev, priv->next_bar_num), MWL_DRV_NAME)) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot reserve PCI memory region 1",
+	if (!request_mem_region(phys_addr,
+				pci_resource_len(pdev, priv->next_bar_num),
+				MWL_DRV_NAME)) {
+		WLDBG_ERROR(DBG_LEVEL_0,
+			    "%s: cannot reserve PCI memory region 1",
 			    MWL_DRV_NAME);
 		goto err_iounmap_iobase0;
 	}
 
-	phys_addr2[0] = ioremap(phys_addr, pci_resource_len(pdev, priv->next_bar_num));
+	phys_addr2[0] = ioremap(phys_addr,
+				pci_resource_len(pdev, priv->next_bar_num));
 	phys_addr2[1] = 0;
 	priv->iobase1 = phys_addr2[0];
 
@@ -377,17 +383,22 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 
 	WLDBG_PRINT("priv->iobase1 = %x", (unsigned int)priv->iobase1);
 
-	priv->pcmd_buf = (unsigned short *)
-		dma_alloc_coherent(&priv->pdev->dev, CMD_BUF_SIZE, &priv->pphys_cmd_buf, GFP_KERNEL);
+	priv->pcmd_buf =
+		(unsigned short *) dma_alloc_coherent(&priv->pdev->dev,
+						       CMD_BUF_SIZE,
+						       &priv->pphys_cmd_buf,
+						       GFP_KERNEL);
 
 	if (priv->pcmd_buf == NULL) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot alloc memory for command buffer",
+		WLDBG_ERROR(DBG_LEVEL_0,
+			    "%s: cannot alloc memory for command buffer",
 			    MWL_DRV_NAME);
 		goto err_iounmap_iobase1;
 	}
 
 	WLDBG_PRINT("priv->pcmd_buf = %x  priv->pphys_cmd_buf = %x",
-		    (unsigned int)priv->pcmd_buf, (unsigned int)priv->pphys_cmd_buf);
+		    (unsigned int)priv->pcmd_buf,
+		    (unsigned int)priv->pphys_cmd_buf);
 
 	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
 
@@ -401,7 +412,8 @@ err_iounmap_iobase1:
 
 err_release_mem_region_bar1:
 
-	release_mem_region(pci_resource_start(pdev, 1), pci_resource_len(pdev, 1));
+	release_mem_region(pci_resource_start(pdev, 1),
+			   pci_resource_len(pdev, 1));
 
 err_iounmap_iobase0:
 
@@ -409,7 +421,8 @@ err_iounmap_iobase0:
 
 err_release_mem_region_bar0:
 
-	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
+	release_mem_region(pci_resource_start(pdev, 0),
+			   pci_resource_len(pdev, 0));
 
 err_reserve_mem_region_bar0:
 
@@ -431,9 +444,13 @@ static void mwl_free_pci_resource(struct mwl_priv *priv)
 
 	iounmap(priv->iobase0);
 	iounmap(priv->iobase1);
-	release_mem_region(pci_resource_start(pdev, priv->next_bar_num), pci_resource_len(pdev, priv->next_bar_num));
-	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
-	dma_free_coherent(&priv->pdev->dev, CMD_BUF_SIZE, priv->pcmd_buf, priv->pphys_cmd_buf);
+	release_mem_region(pci_resource_start(pdev, priv->next_bar_num),
+					      pci_resource_len(pdev,
+					      priv->next_bar_num));
+	release_mem_region(pci_resource_start(pdev, 0),
+					      pci_resource_len(pdev, 0));
+	dma_free_coherent(&priv->pdev->dev, CMD_BUF_SIZE,
+			  priv->pcmd_buf, priv->pphys_cmd_buf);
 
 	WLDBG_EXIT(DBG_LEVEL_0);
 }
@@ -458,7 +475,8 @@ static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
 
 	rc = mwl_fwdl_download_firmware(priv->hw);
 	if (rc) {
-		WLDBG_ERROR(DBG_LEVEL_0, "%s: cannot download firmware image <%s>",
+		WLDBG_ERROR(DBG_LEVEL_0,
+			    "%s: cannot download firmware image <%s>",
 			    MWL_DRV_NAME, fw_name);
 		goto err_download_fw;
 	}
@@ -500,13 +518,13 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 
 	if (priv->pwr_node != NULL) {
 		for_each_property_of_node(priv->pwr_node, prop) {
-			if(strcmp(prop->name, "FCC") == 0)
+			if (strcmp(prop->name, "FCC") == 0)
 				fcc_prop = prop;
 			if (strcmp(prop->name, "ETSI") == 0)
 				etsi_prop = prop;
 			if ((prop->name[0] == request->alpha2[0]) &&
 			    (prop->name[1] == request->alpha2[1]))
-			    	specific_prop = prop;
+				specific_prop = prop;
 		}
 
 		prop = NULL;
@@ -526,27 +544,35 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++)
 				memset(&priv->tx_pwr_tbl[i], 0,
 				       sizeof(struct mwl_tx_pwr_tbl));
-			
+
 			/* Load related power table
 			*/
 			i = 0;
 			j = 0;
 			while (i < prop->length) {
-				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				prop_value =
+					be32_to_cpu(*(u32 *)(prop->value + i));
 				priv->tx_pwr_tbl[j].channel = prop_value;
 				i += 4;
-				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				prop_value =
+					be32_to_cpu(*(u32 *)(prop->value + i));
 				priv->tx_pwr_tbl[j].setcap = prop_value;
 				i += 4;
-				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL; k++) {
-					prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
-					priv->tx_pwr_tbl[j].tx_power[k] = prop_value;
+				for (k = 0; k < SYSADPT_TX_POWER_LEVEL_TOTAL;
+				     k++) {
+					prop_value =
+						be32_to_cpu(*(u32 *)
+							    (prop->value + i));
+					priv->tx_pwr_tbl[j].tx_power[k] =
+						prop_value;
 					i += 4;
 				}
-				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				prop_value =
+					be32_to_cpu(*(u32 *)(prop->value + i));
 				priv->tx_pwr_tbl[j].cdd = prop_value;
 				i += 4;
-				prop_value = be32_to_cpu(*(u32 *)(prop->value + i));
+				prop_value =
+					be32_to_cpu(*(u32 *)(prop->value + i));
 				priv->tx_pwr_tbl[j].txantenna2 = prop_value;
 				i += 4;
 				j++;
@@ -554,23 +580,27 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 
 			/* Dump loaded power tabel
 			*/
-			WLDBG_PRINT("%s: %s\n", dev_name(&wiphy->dev), prop->name);
+			WLDBG_PRINT("%s: %s\n", dev_name(&wiphy->dev),
+				    prop->name);
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
+				struct mwl_tx_pwr_tbl *pwr_tbl;
 				char disp_buf[64];
 				char *disp_ptr;
-				
-				if (priv->tx_pwr_tbl[i].channel == 0)
+
+				pwr_tbl = &priv->tx_pwr_tbl[i];
+				if (pwr_tbl->channel == 0)
 					break;
 				WLDBG_PRINT("Channel: %d: 0x%x 0x%x 0x%x",
-					    priv->tx_pwr_tbl[i].channel,
-					    priv->tx_pwr_tbl[i].setcap,
-					    priv->tx_pwr_tbl[i].cdd,
-					    priv->tx_pwr_tbl[i].txantenna2);
+					    pwr_tbl->channel,
+					    pwr_tbl->setcap,
+					    pwr_tbl->cdd,
+					    pwr_tbl->txantenna2);
 				disp_ptr = disp_buf;
-				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL; j++) {
-					disp_ptr += 
+				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL;
+				     j++) {
+					disp_ptr +=
 						sprintf(disp_ptr, "%x ",
-							priv->tx_pwr_tbl[i].tx_power[j]);
+							pwr_tbl->tx_power[j]);
 				}
 				WLDBG_PRINT("%s", disp_buf);
 			}
@@ -601,7 +631,7 @@ static int mwl_process_of_dts(struct mwl_priv *priv)
 		return -EPERM;
 
 	/* look for all matching property names
-	*/	
+	*/
 	for_each_property_of_node(priv->dt_node, prop) {
 		if (strcmp(prop->name, "marvell,2ghz") == 0)
 			priv->disable_2g = true;
@@ -721,8 +751,10 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	/* set up band information for 2.4G
 	*/
 	if (priv->disable_2g == false) {
-		BUILD_BUG_ON(sizeof(priv->channels_24) != sizeof(mwl_channels_24));
-		memcpy(priv->channels_24, mwl_channels_24, sizeof(mwl_channels_24));
+		BUILD_BUG_ON(sizeof(priv->channels_24) !=
+			     sizeof(mwl_channels_24));
+		memcpy(priv->channels_24, mwl_channels_24,
+		       sizeof(mwl_channels_24));
 
 		BUILD_BUG_ON(sizeof(priv->rates_24) != sizeof(mwl_rates_24));
 		memcpy(priv->rates_24, mwl_rates_24, sizeof(mwl_rates_24));
@@ -742,8 +774,10 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	/* set up band information for 5G
 	*/
 	if (priv->disable_5g == false) {
-		BUILD_BUG_ON(sizeof(priv->channels_50) != sizeof(mwl_channels_50));
-		memcpy(priv->channels_50, mwl_channels_50, sizeof(mwl_channels_50));
+		BUILD_BUG_ON(sizeof(priv->channels_50) !=
+			     sizeof(mwl_channels_50));
+		memcpy(priv->channels_50, mwl_channels_50,
+		       sizeof(mwl_channels_50));
 
 		BUILD_BUG_ON(sizeof(priv->rates_50) != sizeof(mwl_rates_50));
 		memcpy(priv->rates_50, mwl_rates_50, sizeof(mwl_rates_50));
@@ -972,16 +1006,19 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 				SPIN_LOCK(&priv->locks.stream_lock);
 			}
 		} else {
-			for (stream_index = 0; stream_index < SYSADPT_TX_AMPDU_QUEUES; stream_index++) {
+			for (stream_index = 0;
+			     stream_index < SYSADPT_TX_AMPDU_QUEUES;
+			     stream_index++) {
 				streams = &priv->ampdu[stream_index];
 
-				if (streams->state == AMPDU_STREAM_ACTIVE) {
-					ieee80211_stop_tx_ba_session(streams->sta,
-								     streams->tid);
-					SPIN_UNLOCK(&priv->locks.stream_lock);
-					mwl_fwcmd_destroy_ba(hw, stream_index);
-					SPIN_LOCK(&priv->locks.stream_lock);
-				}
+				if (streams->state != AMPDU_STREAM_ACTIVE)
+					continue;
+
+				ieee80211_stop_tx_ba_session(streams->sta,
+							     streams->tid);
+				SPIN_UNLOCK(&priv->locks.stream_lock);
+				mwl_fwcmd_destroy_ba(hw, stream_index);
+				SPIN_LOCK(&priv->locks.stream_lock);
 			}
 		}
 	}
@@ -993,20 +1030,21 @@ done:
 	status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 	writel(status | MACREG_A2HRIC_BA_WATCHDOG,
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
-	return;
 }
 
 static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 {
 	struct ieee80211_hw *hw = dev_id;
 	struct mwl_priv *priv;
+	void *int_status_mask;
 	unsigned int int_status, clr_status;
 	u32 status;
 
 	BUG_ON(!hw);
 	priv = hw->priv;
 	BUG_ON(!priv);
+
+	int_status_mask = priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 
 	int_status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
@@ -1022,9 +1060,9 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 			int_status &= ~MACREG_A2HRIC_BIT_TX_DONE;
 
 			if (priv->is_tx_schedule == false) {
-				status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_TX_DONE),
-				       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+				       int_status_mask);
 				tasklet_schedule(&priv->tx_task);
 				priv->is_tx_schedule = true;
 			}
@@ -1034,18 +1072,18 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 			int_status &= ~MACREG_A2HRIC_BIT_RX_RDY;
 
 			if (priv->is_rx_schedule == false) {
-				status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_RX_RDY),
-				       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+				       int_status_mask);
 				tasklet_schedule(&priv->rx_task);
 				priv->is_rx_schedule = true;
 			}
 		}
 
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG) {
-			status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+			status = readl(int_status_mask);
 			writel((status & ~MACREG_A2HRIC_BA_WATCHDOG),
-			       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+			       int_status_mask);
 			int_status &= ~MACREG_A2HRIC_BA_WATCHDOG;
 			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
 		}

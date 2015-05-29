@@ -20,6 +20,8 @@
 *
 */
 
+#include <linux/etherdevice.h>
+
 #include "mwl_sysadpt.h"
 #include "mwl_dev.h"
 #include "mwl_debug.h"
@@ -116,7 +118,7 @@ static struct ieee80211_ops mwl_mac80211_ops = {
 	.ampdu_action       = mwl_mac80211_ampdu_action,
 };
 
-static irqreturn_t (*mwl_mac80211_isr)(int irq, void *dev_id) = NULL;
+static irqreturn_t (*mwl_mac80211_isr)(int irq, void *dev_id);
 
 static const struct ieee80211_rate mwl_rates_24[] = {
 	{ .bitrate = 10, .hw_value = 2, },
@@ -332,7 +334,7 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	mwl_vif->keyidx = 0;
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
-		memcpy(mwl_vif->sta_mac, vif->addr, ETH_ALEN);
+		ether_addr_copy(mwl_vif->sta_mac, vif->addr);
 		mwl_vif->is_sta = true;
 		mwl_fwcmd_bss_start(hw, vif, true);
 		mwl_fwcmd_set_infra_mode(hw, vif);
@@ -340,7 +342,7 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	}
 
 	if (vif->type == NL80211_IFTYPE_AP) {
-		memcpy(mwl_vif->bssid, vif->addr, ETH_ALEN);
+		ether_addr_copy(mwl_vif->bssid, vif->addr);
 		mwl_fwcmd_set_new_stn_add_self(hw, vif);
 	}
 
@@ -391,7 +393,7 @@ static int mwl_mac80211_config(struct ieee80211_hw *hw,
 
 	if (changed & IEEE80211_CONF_CHANGE_CHANNEL) {
 		int rate = 0;
-		
+
 		if (conf->chandef.chan->band == IEEE80211_BAND_2GHZ) {
 			mwl_fwcmd_set_apmode(hw, AP_MODE_2_4GHZ_11AC_MIXED);
 			rate = mwl_rates_24[0].hw_value;
@@ -437,7 +439,8 @@ static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
 {
 	WLDBG_ENTER(DBG_LEVEL_5);
 
-	WLDBG_INFO(DBG_LEVEL_5, "interface: %d, change: 0x%x", vif->type, changed);
+	WLDBG_INFO(DBG_LEVEL_5, "interface: %d, change: 0x%x",
+		   vif->type, changed);
 
 	if (vif->type == NL80211_IFTYPE_STATION)
 		mwl_mac80211_bss_info_changed_sta(hw, vif, info, changed);
@@ -486,7 +489,7 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	} else {
 		addr = sta->addr;
 		if (mwl_vif->is_sta == true)
-			memcpy(mwl_vif->bssid, addr, ETH_ALEN);
+			ether_addr_copy(mwl_vif->bssid, addr);
 	}
 
 	if (cmd_param == SET_KEY) {
@@ -732,7 +735,8 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				SPIN_LOCK(&priv->locks.stream_lock);
 				mwl_fwcmd_remove_stream(hw, stream);
 				SPIN_UNLOCK(&priv->locks.stream_lock);
-				WLDBG_EXIT_INFO(DBG_LEVEL_5, "link is no valid now");
+				WLDBG_EXIT_INFO(DBG_LEVEL_5,
+						"link is no valid now");
 				return -EBUSY;
 			}
 
@@ -867,7 +871,7 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 			dev_kfree_skb_any(skb);
 		}
 
-		if ((info->ssid[0] != '\0') && 
+		if ((info->ssid[0] != '\0') &&
 		    (info->ssid_len != 0) &&
 		    (!info->hidden_ssid))
 			mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);

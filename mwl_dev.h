@@ -62,7 +62,7 @@
 #define MACREG_A2HRIC_BIT_RX_PROBLEM        0x00000010 /* bit 4 */
 #define MACREG_A2HRIC_BIT_RADIO_OFF         0x00000020 /* bit 5 */
 #define MACREG_A2HRIC_BIT_RADIO_ON          0x00000040 /* bit 6 */
-#define MACREG_A2HRIC_BIT_RADAR_DETECT      0x00000080 /* bit 7 - IEEE80211_DH */
+#define MACREG_A2HRIC_BIT_RADAR_DETECT      0x00000080 /* bit 7 */
 #define MACREG_A2HRIC_BIT_ICV_ERROR         0x00000100 /* bit 8 */
 #define MACREG_A2HRIC_BIT_WEAKIV_ERROR      0x00000200 /* bit 9 */
 #define MACREG_A2HRIC_BIT_QUEUE_EMPTY       (1<<10)
@@ -74,18 +74,18 @@
 #define MACREG_A2HRIC_CONSEC_TXFAIL         (1<<17) /* 15 taken by ISR_TXACK */
 
 #define ISR_SRC_BITS        ((MACREG_A2HRIC_BIT_RX_RDY)   | \
-                             (MACREG_A2HRIC_BIT_TX_DONE)  | \
-                             (MACREG_A2HRIC_BIT_OPC_DONE) | \
-                             (MACREG_A2HRIC_BIT_MAC_EVENT)| \
-                             (MACREG_A2HRIC_BIT_WEAKIV_ERROR)| \
-                             (MACREG_A2HRIC_BIT_ICV_ERROR)| \
-                             (MACREG_A2HRIC_BIT_SSU_DONE) | \
-                             (MACREG_A2HRIC_BIT_RADAR_DETECT)| \
-                             (MACREG_A2HRIC_BIT_CHAN_SWITCH)| \
-                             (MACREG_A2HRIC_BIT_TX_WATCHDOG)| \
-                             (MACREG_A2HRIC_BIT_QUEUE_EMPTY)| \
-                             (MACREG_A2HRIC_BA_WATCHDOG)	| \
-                             (MACREG_A2HRIC_CONSEC_TXFAIL))
+			     (MACREG_A2HRIC_BIT_TX_DONE)  | \
+			     (MACREG_A2HRIC_BIT_OPC_DONE) | \
+			     (MACREG_A2HRIC_BIT_MAC_EVENT)| \
+			     (MACREG_A2HRIC_BIT_WEAKIV_ERROR)| \
+			     (MACREG_A2HRIC_BIT_ICV_ERROR)| \
+			     (MACREG_A2HRIC_BIT_SSU_DONE) | \
+			     (MACREG_A2HRIC_BIT_RADAR_DETECT)| \
+			     (MACREG_A2HRIC_BIT_CHAN_SWITCH)| \
+			     (MACREG_A2HRIC_BIT_TX_WATCHDOG)| \
+			     (MACREG_A2HRIC_BIT_QUEUE_EMPTY)| \
+			     (MACREG_A2HRIC_BA_WATCHDOG)	| \
+			     (MACREG_A2HRIC_CONSEC_TXFAIL))
 
 #define MACREG_A2HRIC_BIT_MASK      ISR_SRC_BITS
 
@@ -125,7 +125,7 @@
 #define EAGLE_TXD_XMITCTRL_USE_RATEINFO         0x1
 #define EAGLE_TXD_XMITCTRL_DISABLE_AMPDU        0x2
 #define EAGLE_TXD_XMITCTRL_ENABLE_AMPDU         0x4
-#define EAGLE_TXD_XMITCTRL_USE_MC_RATE          0x8     /* Use multicast data rate */
+#define EAGLE_TXD_XMITCTRL_USE_MC_RATE          0x8
 
 #define NBR_BYTES_FW_RX_PREPEND_LEN             2
 #define NBR_BYTES_FW_TX_PREPEND_LEN             2
@@ -161,12 +161,12 @@
 
 /* vif and station
 */
-#define MAX_WEP_KEY_LEN                     13
-#define NUM_WEP_KEYS                        4
-#define MWL_MAX_TID                         8
-#define MWL_VIF(_vif)                       ((struct mwl_vif *)&((_vif)->drv_priv))
-#define IEEE80211_KEY_CONF(_u8)             ((struct ieee80211_key_conf *)(_u8))
-#define MWL_STA(_sta)                       ((struct mwl_sta *)&((_sta)->drv_priv))
+#define MAX_WEP_KEY_LEN              13
+#define NUM_WEP_KEYS                 4
+#define MWL_MAX_TID                  8
+#define MWL_VIF(_vif)                ((struct mwl_vif *)&((_vif)->drv_priv))
+#define IEEE80211_KEY_CONF(_u8)      ((struct ieee80211_key_conf *)(_u8))
+#define MWL_STA(_sta)                ((struct mwl_sta *)&((_sta)->drv_priv))
 
 /* TYPE DEFINITION
 */
@@ -220,18 +220,18 @@ struct mwl_hw_data {
 };
 
 struct mwl_rate_info {
-	u32 format:2;                /* 0 = Legacy, 1 = 11n, 2 = 11ac */
+	u32 format:2;        /* 0 = Legacy, 1 = 11n, 2 = 11ac */
 	u32 stbc:1;
 	u32 rsvd1:1;
-	u32 bandwidth:2;             /* 0 = 20 MHz, 1 = 40 MHz, 2 = 80 MHz */
-	u32 short_gi:1;              /* 0 = standard guard interval, 1 = short */
+	u32 bandwidth:2;     /* 0 = 20 MHz, 1 = 40 MHz, 2 = 80 MHz */
+	u32 short_gi:1;      /* 0 = standard guard interval, 1 = short */
 	u32 rsvd2:1;
 	u32 rate_id_mcs:7;
-	u32 preamble_type:1;         /* Preambletype 0 = Long, 1 = Short; */
+	u32 preamble_type:1; /* Preambletype 0 = Long, 1 = Short; */
 	u32 power_id:6;
-	u32 adv_coding:1;            /* ldpc */
+	u32 adv_coding:1;    /* ldpc */
 	u32 bf:1;
-	u32 ant_select:8;            /* Bitmap to select one of the transmit antenna */
+	u32 ant_select:8;    /* Bitmap to select one of the transmit antenna */
 } __packed;
 
 struct mwl_tx_desc {
@@ -245,7 +245,7 @@ struct mwl_tx_desc {
 	u32 sap_pkt_info;
 	struct mwl_rate_info rate_info;
 	u8 type;
-	u8 xmit_control;             /* bit 0: use rateinfo, bit 1: disable ampdu */
+	u8 xmit_control;     /* bit 0: use rateinfo, bit 1: disable ampdu */
 	u16 reserved;
 	u32 tcpack_sn;
 	u32 tcpack_src_dst;
@@ -275,12 +275,12 @@ struct mwl_hw_noise_floor_info {
 } __packed;
 
 struct mwl_rxrate_info {
-	u16 format:3;                /* 0: 11a, 1: 11b, 2: 11n, 4: 11ac    */
-	u16 nss:2;                   /* number space spectrum              */
-	u16 bw:2;                    /* 0: ht20, 1: ht40, 2: ht80          */
-	u16 gi:1;                    /* 0: long interval, 1: short interval*/
-	u16 rt:8;                    /* 11a/11b: 1,2,5,11,22,6,9,12,18,24,36,48,54,72*/
-} __packed;                          /* 11n/11ac: MCS                      */
+	u16 format:3;    /* 0: 11a, 1: 11b, 2: 11n, 4: 11ac    */
+	u16 nss:2;       /* number space spectrum              */
+	u16 bw:2;        /* 0: ht20, 1: ht40, 2: ht80          */
+	u16 gi:1;        /* 0: long interval, 1: short interval*/
+	u16 rt:8;        /* 11a/11b: 1,2,5,11,22,6,9,12,18,24,36,48,54,72*/
+} __packed;              /* 11n/11ac: MCS                      */
 
 struct mwl_rx_desc {
 	u16 pkt_len;                 /* total length of received data      */
@@ -297,7 +297,9 @@ struct mwl_rx_desc {
 	u8 status;                   /* status field containing USED bit   */
 	u8 channel;                  /* channel this pkt was received on   */
 	u8 rx_control;               /* the control element of the desc    */
-	/* above are 32bits aligned and is same as FW, RxControl put at end for sync */
+	/* above are 32bits aligned and is same as FW, RxControl put at end
+	 * for sync
+	 */
 	struct sk_buff *psk_buff;    /* associated sk_buff for Linux       */
 	void *pbuff_data;            /* virtual address of payload data    */
 	struct mwl_rx_desc *pnext;   /* virtual address of next RX desc    */
@@ -345,7 +347,7 @@ struct mwl_priv {
 	u16 txantenna2;
 	u8 powinited;
 	u16 max_tx_pow[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* max tx power (dBm) */
-	u16 target_powers[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* target powers (dBm) */
+	u16 target_powers[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* target powers   */
 	u8 cal_tbl[200];
 	struct pci_dev *pdev;
 	void *iobase0;               /* MEM Base Address Register 0  */
@@ -355,12 +357,14 @@ struct mwl_priv {
 	dma_addr_t pphys_cmd_buf;    /* pointer to CmdBuf (physical) */
 	bool in_send_cmd;
 	int irq;
-	struct mwl_hw_data hw_data;  /* Adapter HW specific info	 */
-	struct mwl_desc_data desc_data[SYSADPT_NUM_OF_DESC_DATA]; /* various descriptor data */
+	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
+	/* various descriptor data */
+	struct mwl_desc_data desc_data[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head txq[SYSADPT_NUM_OF_DESC_DATA];
-	struct sk_buff_head delay_freeq;
-	int fw_desc_cnt[SYSADPT_NUM_OF_DESC_DATA]; /* number of descriptors owned by fw at any one time */
-	struct mwl_locks locks;      /* various spinlocks			 */
+	struct sk_buff_head delay_q;
+	/* number of descriptors owned by fw at any one time */
+	int fw_desc_cnt[SYSADPT_NUM_OF_DESC_DATA];
+	struct mwl_locks locks;      /* various spinlocks */
 	struct tasklet_struct tx_task;
 	struct tasklet_struct rx_task;
 	int txq_limit;
@@ -392,7 +396,7 @@ struct mwl_priv {
 struct beacon_info {
 	bool valid;
 	u16 cap_info;
-	u8 bss_basic_rate_set[SYSADPT_MAX_DATA_RATES_G];
+	u8 b_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 op_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 ie_wmm_len;               /* Keep WMM IE */
 	u8 *ie_wmm_ptr;
@@ -411,16 +415,18 @@ struct beacon_info {
 struct mwl_vif {
 	struct list_head list;
 	struct ieee80211_vif *vif;
-	int macid;                   /* Firmware macid for this vif.  */
-	u16 seqno;                   /* Non AMPDU sequence number assigned by driver.  */
-	struct {                     /* Saved WEP keys */
+	int macid;       /* Firmware macid for this vif.  */
+	u16 seqno;       /* Non AMPDU sequence number assigned by driver.  */
+	struct {         /* Saved WEP keys */
 		u8 enabled;
 		u8 key[sizeof(struct ieee80211_key_conf) + MAX_WEP_KEY_LEN];
 	} wep_key_conf[NUM_WEP_KEYS];
 	u8 bssid[ETH_ALEN];          /* BSSID */
 	u8 sta_mac[ETH_ALEN];        /* Station mac address */
-	bool is_hw_crypto_enabled;   /* A flag to indicate is HW crypto is enabled for this bssid */
-	bool is_sta;                 /* Indicate if this is station mode */
+	/* A flag to indicate is HW crypto is enabled for this bssid */
+	bool is_hw_crypto_enabled;
+	/* Indicate if this is station mode */
+	bool is_sta;
 	struct beacon_info beacon_info;
 	u16 iv16;
 	u32 iv32;

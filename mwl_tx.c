@@ -32,7 +32,8 @@
 /* CONSTANTS AND MACROS
 */
 
-#define MAX_NUM_TX_RING_BYTES  (SYSADPT_MAX_NUM_TX_DESC * sizeof(struct mwl_tx_desc))
+#define MAX_NUM_TX_RING_BYTES  (SYSADPT_MAX_NUM_TX_DESC * \
+				sizeof(struct mwl_tx_desc))
 
 #define FIRST_TXD(i) priv->desc_data[i].ptx_ring[0]
 #define CURR_TXD(i)  priv->desc_data[i].ptx_ring[curr_desc]
@@ -48,7 +49,12 @@
 #define MWL_QOS_ACK_POLICY_BLOCKACK        0x0060
 
 #define EXT_IV                             0x20
-#define INCREASE_IV(iv16, iv32)            {(iv16)++; if ((iv16) == 0) (iv32)++; }
+#define INCREASE_IV(iv16, iv32) \
+{ \
+	(iv16)++; \
+	if ((iv16) == 0) \
+		(iv32)++; \
+}
 
 /* Transmit rate information constants
 */
@@ -71,7 +77,9 @@ static int mwl_tx_ring_init(struct mwl_priv *priv);
 static void mwl_tx_ring_cleanup(struct mwl_priv *priv);
 static void mwl_tx_ring_free(struct mwl_priv *priv);
 static inline void mwl_tx_add_dma_header(struct mwl_priv *priv,
-					 struct sk_buff *skb, int head_pad, int tail_pad);
+					 struct sk_buff *skb,
+					 int head_pad,
+					 int tail_pad);
 static inline void mwl_tx_encapsulate_frame(struct mwl_priv *priv,
 					    struct sk_buff *skb, bool *ccmp);
 static inline void mwl_tx_insert_ccmp_hdr(u8 *pccmp_hdr,
@@ -95,7 +103,7 @@ int mwl_tx_init(struct ieee80211_hw *hw)
 	priv = hw->priv;
 	BUG_ON(!priv);
 
-	skb_queue_head_init(&priv->delay_freeq);
+	skb_queue_head_init(&priv->delay_q);
 
 	rc = mwl_tx_ring_alloc(priv);
 	if (rc) {
@@ -123,7 +131,7 @@ void mwl_tx_deinit(struct ieee80211_hw *hw)
 	priv = hw->priv;
 	BUG_ON(!priv);
 
-	skb_queue_purge(&priv->delay_freeq);
+	skb_queue_purge(&priv->delay_q);
 
 	mwl_tx_ring_cleanup(priv);
 	mwl_tx_ring_free(priv);
@@ -150,6 +158,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	struct ieee80211_mgmt *mgmt;
 	bool eapol_frame = false;
 	bool ccmp = false;
+	struct mwl_dma_data *dma_data;
 	struct mwl_tx_ctrl *tx_ctrl;
 
 	WLDBG_ENTER(DBG_LEVEL_3);
@@ -179,7 +188,8 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 	mwl_tx_encapsulate_frame(priv, skb, &ccmp);
 
-	wh = &((struct mwl_dma_data *)skb->data)->wh;
+	dma_data = (struct mwl_dma_data *)skb->data;
+	wh = &dma_data->wh;
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	mwl_vif = MWL_VIF(tx_info->control.vif);
@@ -211,7 +221,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			xmitcontrol |= EAGLE_TXD_XMITCTRL_USE_MC_RATE;
 
 			if (ccmp) {
-				mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
+				mwl_tx_insert_ccmp_hdr(dma_data->data,
 						       mwl_vif->keyidx,
 						       mwl_vif->iv16,
 						       mwl_vif->iv32);
@@ -220,18 +230,21 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		} else {
 			if (ccmp) {
 				if (mwl_vif->is_sta == true) {
-					mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
+					mwl_tx_insert_ccmp_hdr(dma_data->data,
 							       mwl_vif->keyidx,
 							       mwl_vif->iv16,
 							       mwl_vif->iv32);
-					INCREASE_IV(mwl_vif->iv16, mwl_vif->iv32);
+					INCREASE_IV(mwl_vif->iv16,
+						    mwl_vif->iv32);
 				} else {
 					struct mwl_sta *sta_info = MWL_STA(sta);
 
-					mwl_tx_insert_ccmp_hdr(((struct mwl_dma_data *)skb->data)->data,
-							       0, sta_info->iv16,
+					mwl_tx_insert_ccmp_hdr(dma_data->data,
+							       0,
+							       sta_info->iv16,
 							       sta_info->iv32);
-					INCREASE_IV(sta_info->iv16, sta_info->iv32);
+					INCREASE_IV(sta_info->iv16,
+						    sta_info->iv32);
 				}
 			}
 		}
@@ -248,9 +261,11 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	 */
 	if (mgmtframe) {
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
-			mgmt->u.action.category == WLAN_CATEGORY_BACK &&
-			mgmt->u.action.u.addba_req.action_code == WLAN_ACTION_ADDBA_REQ)) {
-			u16 capab = ENDIAN_SWAP16(mgmt->u.action.u.addba_req.capab);
+		    mgmt->u.action.category == WLAN_CATEGORY_BACK &&
+		    mgmt->u.action.u.addba_req.action_code ==
+		    WLAN_ACTION_ADDBA_REQ)) {
+			u16 capab =
+				ENDIAN_SWAP16(mgmt->u.action.u.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			index = mwl_tx_tid_queue_mapping(tid);
 		}
@@ -270,7 +285,8 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
 				WARN_ON(!(qos & MWL_QOS_ACK_POLICY_BLOCKACK));
 
-				txpriority = (SYSADPT_TX_WMM_QUEUES + stream->idx) %
+				txpriority =
+					(SYSADPT_TX_WMM_QUEUES + stream->idx) %
 					SYSADPT_TOTAL_HW_QUEUES;
 			} else if (stream->state == AMPDU_STREAM_NEW) {
 				/* We get here if the driver sends us packets
@@ -294,8 +310,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 				 * case, so this is really just a safety check.
 				 */
 				WLDBG_WARNING(DBG_LEVEL_3,
-					      "cannot send packet while ADDBA "
-					   "dialog is underway.");
+					      "can't send packet during ADDBA");
 				SPIN_UNLOCK(&priv->locks.stream_lock);
 				dev_kfree_skb_any(skb);
 				return;
@@ -357,6 +372,9 @@ void mwl_tx_done(unsigned long data)
 	int num;
 	struct sk_buff *done_skb;
 	struct mwl_rate_info rate_info;
+	struct mwl_dma_data *tr;
+	struct ieee80211_tx_info *info;
+	int hdrlen;
 
 	WLDBG_ENTER(DBG_LEVEL_3);
 
@@ -368,8 +386,10 @@ void mwl_tx_done(unsigned long data)
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
 		while (STALE_TXD(num)
-			&& (STALE_TXD(num)->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_OK))
-			&& (!(STALE_TXD(num)->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED)))) {
+		       && (STALE_TXD(num)->status &
+		       ENDIAN_SWAP32(EAGLE_TXD_STATUS_OK))
+		       && (!(STALE_TXD(num)->status &
+		       ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED)))) {
 			pci_unmap_single(priv->pdev,
 				ENDIAN_SWAP32(STALE_TXD(num)->pkt_ptr),
 				STALE_TXD(num)->psk_buff->len,
@@ -378,69 +398,66 @@ void mwl_tx_done(unsigned long data)
 			rate_info = STALE_TXD(num)->rate_info;
 			STALE_TXD(num)->pkt_len = 0;
 			STALE_TXD(num)->psk_buff = NULL;
-			STALE_TXD(num)->status = ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
+			STALE_TXD(num)->status =
+				ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
 			priv->fw_desc_cnt[num]--;
 			STALE_TXD(num) = STALE_TXD(num)->pnext;
-			wmb();
+			wmb(); /* memory barrier */
 
-			{
-				struct mwl_dma_data *tr;
-				struct ieee80211_tx_info *info;
-				int hdrlen;
+			tr = (struct mwl_dma_data *)done_skb->data;
+			info = IEEE80211_SKB_CB(done_skb);
+			ieee80211_tx_info_clear_status(info);
 
-				tr = (struct mwl_dma_data *)done_skb->data;
-				info = IEEE80211_SKB_CB(done_skb);
-				ieee80211_tx_info_clear_status(info);
+			info->status.rates[0].idx = -1;
 
-				info->status.rates[0].idx = -1;
+			if (ieee80211_is_data(tr->wh.frame_control) ||
+			    ieee80211_is_data_qos(tr->wh.frame_control)) {
+				skb_get(done_skb);
+				skb_queue_tail(&priv->delay_q, done_skb);
 
-				if (ieee80211_is_data(tr->wh.frame_control) ||
-					ieee80211_is_data_qos(tr->wh.frame_control)) {
-					skb_get(done_skb);
-					skb_queue_tail(&priv->delay_freeq, done_skb);
+				if (skb_queue_len(&priv->delay_q) >
+				    SYSADPT_DELAY_FREE_Q_LIMIT)
+					dev_kfree_skb_any(
+						skb_dequeue(&priv->delay_q));
 
-					if (skb_queue_len(&priv->delay_freeq) > SYSADPT_DELAY_FREE_Q_LIMIT)
-						dev_kfree_skb_any(skb_dequeue(&priv->delay_freeq));
-
-					/* Prepare rate information
-					*/
-					info->status.rates[0].idx = rate_info.rate_id_mcs;
-					if (rate_info.format == TX_RATE_FORMAT_LEGACY){
-						if (hw->conf.chandef.chan->hw_value >
-						    BAND_24_CHANNEL_NUM) {
-							info->status.rates[0].idx -= 5;
-						}
-					}
-					if (rate_info.format == TX_RATE_FORMAT_11N)
-						info->status.rates[0].flags |=
-							IEEE80211_TX_RC_MCS;
-					if (rate_info.format == TX_RATE_FORMAT_11AC)
-						info->status.rates[0].flags |=
-							IEEE80211_TX_RC_VHT_MCS;
-					if (rate_info.bandwidth == TX_RATE_BANDWIDTH_40)
-						info->status.rates[0].flags |=
-							IEEE80211_TX_RC_40_MHZ_WIDTH;
-					if (rate_info.bandwidth == TX_RATE_BANDWIDTH_80)
-						info->status.rates[0].flags |=
-							IEEE80211_TX_RC_80_MHZ_WIDTH;
-					if (rate_info.short_gi == TX_RATE_INFO_SHORT_GI)
-						info->status.rates[0].flags |=
-							IEEE80211_TX_RC_SHORT_GI;
-					info->status.rates[0].count = 1;
-					
-					info->status.rates[1].idx = -1;
-				}
-
-				/* Remove H/W dma header
+				/* Prepare rate information
 				*/
-				hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
-				memmove(tr->data - hdrlen, &tr->wh, hdrlen);
-				skb_pull(done_skb, sizeof(*tr) - hdrlen);
+				info->status.rates[0].idx =
+					rate_info.rate_id_mcs;
+				if (rate_info.format == TX_RATE_FORMAT_LEGACY) {
+					if (hw->conf.chandef.chan->hw_value >
+					    BAND_24_CHANNEL_NUM) {
+						info->status.rates[0].idx -= 5;
+					}
+				}
+				if (rate_info.format == TX_RATE_FORMAT_11N)
+					info->status.rates[0].flags |=
+						IEEE80211_TX_RC_MCS;
+				if (rate_info.format == TX_RATE_FORMAT_11AC)
+					info->status.rates[0].flags |=
+						IEEE80211_TX_RC_VHT_MCS;
+				if (rate_info.bandwidth == TX_RATE_BANDWIDTH_40)
+					info->status.rates[0].flags |=
+						IEEE80211_TX_RC_40_MHZ_WIDTH;
+				if (rate_info.bandwidth == TX_RATE_BANDWIDTH_80)
+					info->status.rates[0].flags |=
+						IEEE80211_TX_RC_80_MHZ_WIDTH;
+				if (rate_info.short_gi == TX_RATE_INFO_SHORT_GI)
+					info->status.rates[0].flags |=
+						IEEE80211_TX_RC_SHORT_GI;
+				info->status.rates[0].count = 1;
 
-				info->flags |= IEEE80211_TX_STAT_ACK;
-
-				ieee80211_tx_status(hw, done_skb);
+				info->status.rates[1].idx = -1;
 			}
+
+			/* Remove H/W dma header
+			*/
+			hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
+			memmove(tr->data - hdrlen, &tr->wh, hdrlen);
+			skb_pull(done_skb, sizeof(*tr) - hdrlen);
+
+			info->flags |= IEEE80211_TX_STAT_ACK;
+			ieee80211_tx_status(hw, done_skb);
 		}
 	}
 
@@ -449,7 +466,8 @@ void mwl_tx_done(unsigned long data)
 	if (priv->irq != -1) {
 		u32 status;
 
-		status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+		status = readl(priv->iobase1 +
+			       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 		writel(status | MACREG_A2HRIC_BIT_TX_DONE,
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
@@ -487,16 +505,19 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 		WLDBG_INFO(DBG_LEVEL_3, "allocating %i (0x%x) bytes",
 			   MAX_NUM_TX_RING_BYTES, MAX_NUM_TX_RING_BYTES);
 
-		priv->desc_data[num].ptx_ring =
-			(struct mwl_tx_desc *) (mem + num * MAX_NUM_TX_RING_BYTES);
+		priv->desc_data[num].ptx_ring = (struct mwl_tx_desc *)
+			(mem + num * MAX_NUM_TX_RING_BYTES);
 
-		priv->desc_data[num].pphys_tx_ring =
-			(dma_addr_t)((u32)priv->desc_data[0].pphys_tx_ring + num * MAX_NUM_TX_RING_BYTES);
+		priv->desc_data[num].pphys_tx_ring = (dma_addr_t)
+			((u32)priv->desc_data[0].pphys_tx_ring +
+			num * MAX_NUM_TX_RING_BYTES);
 
-		memset(priv->desc_data[num].ptx_ring, 0x00, MAX_NUM_TX_RING_BYTES);
+		memset(priv->desc_data[num].ptx_ring, 0x00,
+		       MAX_NUM_TX_RING_BYTES);
 
 		WLDBG_INFO(DBG_LEVEL_3, "TX ring vaddr: 0x%x paddr: 0x%x",
-			   priv->desc_data[num].ptx_ring, priv->desc_data[num].pphys_tx_ring);
+			   priv->desc_data[num].ptx_ring,
+			   priv->desc_data[num].pphys_tx_ring);
 	}
 
 	WLDBG_EXIT(DBG_LEVEL_3);
@@ -507,6 +528,7 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 static int mwl_tx_ring_init(struct mwl_priv *priv)
 {
 	int curr_desc;
+	struct mwl_desc_data *desc;
 	int num;
 
 	WLDBG_ENTER(DBG_LEVEL_3);
@@ -517,30 +539,40 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 		skb_queue_head_init(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
 
-		if (priv->desc_data[num].ptx_ring != NULL) {
-			WLDBG_INFO(DBG_LEVEL_3, "initializing %i descriptors", SYSADPT_MAX_NUM_TX_DESC);
+		desc = &priv->desc_data[num];
 
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-				CURR_TXD(num).status = ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
+		if (desc->ptx_ring != NULL) {
+			WLDBG_INFO(DBG_LEVEL_3, "initializing %i descriptors",
+				   SYSADPT_MAX_NUM_TX_DESC);
+
+			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC;
+			     curr_desc++) {
+				CURR_TXD(num).status =
+					ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
 				CURR_TXD(num).pnext = &NEXT_TXD(num);
 				CURR_TXD(num).pphys_next =
-					ENDIAN_SWAP32((u32)priv->desc_data[num].pphys_tx_ring +
-					((curr_desc + 1) * sizeof(struct mwl_tx_desc)));
+					ENDIAN_SWAP32((u32)desc->pphys_tx_ring +
+					((curr_desc + 1) *
+					sizeof(struct mwl_tx_desc)));
 				WLDBG_INFO(DBG_LEVEL_3,
-					   "txdesc: %i status: 0x%x (%i) vnext: 0x%p pnext: 0x%x",
-					curr_desc, EAGLE_TXD_STATUS_IDLE, EAGLE_TXD_STATUS_IDLE,
-					CURR_TXD(num).pnext, ENDIAN_SWAP32(CURR_TXD(num).pphys_next));
+					   "txdesc: %i 0x%x (%i) 0x%p 0x%x",
+					   curr_desc, EAGLE_TXD_STATUS_IDLE,
+					   EAGLE_TXD_STATUS_IDLE,
+					   CURR_TXD(num).pnext,
+					   ENDIAN_SWAP32(
+					   CURR_TXD(num).pphys_next));
 			}
 			LAST_TXD(num).pnext = &FIRST_TXD(num);
 			LAST_TXD(num).pphys_next =
-				ENDIAN_SWAP32((u32)priv->desc_data[num].pphys_tx_ring);
-			priv->desc_data[num].pstale_tx_desc = &FIRST_TXD(num);
-			priv->desc_data[num].pnext_tx_desc  = &FIRST_TXD(num);
+				ENDIAN_SWAP32((u32)desc->pphys_tx_ring);
+			desc->pstale_tx_desc = &FIRST_TXD(num);
+			desc->pnext_tx_desc  = &FIRST_TXD(num);
 
 			WLDBG_INFO(DBG_LEVEL_3,
-				   "last txdesc vnext: 0x%p pnext: 0x%x pstale 0x%x vfirst 0x%x",
-				LAST_TXD(num).pnext, ENDIAN_SWAP32(LAST_TXD(num).pphys_next),
-				priv->desc_data[num].pstale_tx_desc, priv->desc_data[num].pnext_tx_desc);
+				   "last txdesc vnext: 0x%p 0x%x 0x%x 0x%x",
+				   LAST_TXD(num).pnext,
+				   ENDIAN_SWAP32(LAST_TXD(num).pphys_next),
+				   desc->pstale_tx_desc, desc->pnext_tx_desc);
 		} else {
 			WLDBG_ERROR(DBG_LEVEL_3, "no valid TX mem");
 			WLDBG_EXIT_INFO(DBG_LEVEL_3, "no valid memory");
@@ -567,23 +599,29 @@ static void mwl_tx_ring_cleanup(struct mwl_priv *priv)
 		skb_queue_purge(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
 		if (priv->desc_data[num].ptx_ring != NULL) {
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC; curr_desc++) {
-				if (CURR_TXD(num).psk_buff != NULL) {
-					WLDBG_INFO(DBG_LEVEL_3,
-						   "unmapped and free'd txdesc %i vaddr: 0x%p paddr: 0x%x",
-						curr_desc, CURR_TXD(num).psk_buff->data,
-						ENDIAN_SWAP32(CURR_TXD(num).pkt_ptr));
-					pci_unmap_single(priv->pdev,
-							 ENDIAN_SWAP32(CURR_TXD(num).pkt_ptr),
-						CURR_TXD(num).psk_buff->len,
-						PCI_DMA_TODEVICE);
-					dev_kfree_skb_any(CURR_TXD(num).psk_buff);
-					CURR_TXD(num).status    = ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
-					CURR_TXD(num).psk_buff   = NULL;
-					CURR_TXD(num).pkt_ptr    = 0;
-					CURR_TXD(num).pkt_len    = 0;
-					cleaned_tx_desc++;
-				}
+			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC;
+			     curr_desc++) {
+				if (CURR_TXD(num).psk_buff == NULL)
+					continue;
+
+				WLDBG_INFO(DBG_LEVEL_3,
+					   "unmapped and free'd %i 0x%p 0x%x",
+					   curr_desc,
+					   CURR_TXD(num).psk_buff->data,
+					   ENDIAN_SWAP32(
+					   CURR_TXD(num).pkt_ptr));
+				pci_unmap_single(priv->pdev,
+						 ENDIAN_SWAP32(
+						 CURR_TXD(num).pkt_ptr),
+						 CURR_TXD(num).psk_buff->len,
+						 PCI_DMA_TODEVICE);
+				dev_kfree_skb_any(CURR_TXD(num).psk_buff);
+				CURR_TXD(num).status =
+					ENDIAN_SWAP32(EAGLE_TXD_STATUS_IDLE);
+				CURR_TXD(num).psk_buff = NULL;
+				CURR_TXD(num).pkt_ptr = 0;
+				CURR_TXD(num).pkt_len = 0;
+				cleaned_tx_desc++;
 			}
 		}
 	}
@@ -617,7 +655,9 @@ static void mwl_tx_ring_free(struct mwl_priv *priv)
 }
 
 static inline void mwl_tx_add_dma_header(struct mwl_priv *priv,
-					 struct sk_buff *skb, int head_pad, int tail_pad)
+					 struct sk_buff *skb,
+					 int head_pad,
+					 int tail_pad)
 {
 	struct ieee80211_hdr *wh;
 	int hdrlen;
@@ -725,23 +765,20 @@ static inline int mwl_tx_tid_queue_mapping(u8 tid)
 	case 0:
 	case 3:
 		return IEEE80211_AC_BE;
-		break;
 	case 1:
 	case 2:
 		return IEEE80211_AC_BK;
-		break;
 	case 4:
 	case 5:
 		return IEEE80211_AC_VI;
-		break;
 	case 6:
 	case 7:
 		return IEEE80211_AC_VO;
-		break;
 	default:
-		return -1;
 		break;
 	}
+
+	return -1;
 }
 
 static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
@@ -776,6 +813,7 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 	struct mwl_priv *priv;
 	unsigned long flags;
 	int num = SYSADPT_NUM_OF_DESC_DATA;
+	struct mwl_desc_data *desc;
 	struct sk_buff *tx_skb;
 	struct ieee80211_tx_info *tx_info;
 	struct mwl_tx_ctrl *tx_ctrl;
@@ -790,21 +828,29 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 
 	while (num--) {
 		while (skb_queue_len(&priv->txq[num]) > 0) {
-			if (priv->desc_data[num].pnext_tx_desc == NULL)
+			desc = &priv->desc_data[num];
+
+			if (desc->pnext_tx_desc == NULL)
 				break;
 
-			/* Only queue to tx desc when Status is 0 (not when 0x1 or 0x80000000). If we queue even when Status==0x1
-			 * (DMA'd to fw but txdone haven't change Status to 0), mismatch of fwDescCnt with actual number of desc with Status==0
-			 * could happen. E.g fwDescCnt 256 instead of 255 when there is one desc with Status==0. This can cause Tx to stall
-			 * when fwDescCnt==256 and pStaleTxDesc->Status==0.
+			/* Only queue to tx desc when Status is 0 (not when 0x1
+			 * or 0x80000000). If we queue even when Status==0x1
+			 * (DMA'd to fw but txdone haven't change Status to 0),
+			 * mismatch of fwDescCnt with actual number of desc
+			 * with Status==0 could happen. E.g fwDescCnt 256
+			 * instead of 255 when there is one desc with Status==0.
+			 * This can cause Tx to stall when fwDescCnt==256 and
+			 * pStaleTxDesc->Status==0.
 			 */
-			if (priv->desc_data[num].pnext_tx_desc->status != EAGLE_TXD_STATUS_IDLE) {
+			if (desc->pnext_tx_desc->status !=
+			    EAGLE_TXD_STATUS_IDLE) {
 				/* Interrupt F/W anyway
 				*/
-				if (priv->desc_data[num].pnext_tx_desc->status & ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED))
+				if (desc->pnext_tx_desc->status &
+				    ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED))
 					writel(MACREG_H2ARIC_BIT_PPA_READY,
-					       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-
+					       priv->iobase1 +
+					       MACREG_REG_H2A_INTERRUPT_EVENTS);
 				break;
 			}
 
@@ -815,22 +861,29 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 			tx_info = IEEE80211_SKB_CB(tx_skb);
 			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
 
-			priv->desc_data[num].pnext_tx_desc->tx_priority = tx_ctrl->tx_priority;
-			priv->desc_data[num].pnext_tx_desc->qos_ctrl = tx_ctrl->qos_ctrl;
-			priv->desc_data[num].pnext_tx_desc->psk_buff = tx_skb;
-			priv->desc_data[num].pnext_tx_desc->pkt_len = ENDIAN_SWAP16(tx_skb->len);
-			priv->desc_data[num].pnext_tx_desc->packet_info = 0;
-			priv->desc_data[num].pnext_tx_desc->data_rate = 0;
-			priv->desc_data[num].pnext_tx_desc->sta_info = tx_ctrl->sta_info;
-			priv->desc_data[num].pnext_tx_desc->type = tx_ctrl->type;
-			priv->desc_data[num].pnext_tx_desc->xmit_control = tx_ctrl->xmit_control;
-			priv->desc_data[num].pnext_tx_desc->sap_pkt_info = 0;
-			priv->desc_data[num].pnext_tx_desc->pkt_ptr =
-				ENDIAN_SWAP32(pci_map_single(priv->pdev, tx_skb->data,
-							     tx_skb->len, PCI_DMA_TODEVICE));
-			priv->desc_data[num].pnext_tx_desc->status = ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED);
-			priv->desc_data[num].pnext_tx_desc = priv->desc_data[num].pnext_tx_desc->pnext;
-			/* make sure all the memory transactions done by cpu were completed */
+			desc->pnext_tx_desc->tx_priority = tx_ctrl->tx_priority;
+			desc->pnext_tx_desc->qos_ctrl = tx_ctrl->qos_ctrl;
+			desc->pnext_tx_desc->psk_buff = tx_skb;
+			desc->pnext_tx_desc->pkt_len =
+				ENDIAN_SWAP16(tx_skb->len);
+			desc->pnext_tx_desc->packet_info = 0;
+			desc->pnext_tx_desc->data_rate = 0;
+			desc->pnext_tx_desc->sta_info = tx_ctrl->sta_info;
+			desc->pnext_tx_desc->type = tx_ctrl->type;
+			desc->pnext_tx_desc->xmit_control =
+				tx_ctrl->xmit_control;
+			desc->pnext_tx_desc->sap_pkt_info = 0;
+			desc->pnext_tx_desc->pkt_ptr =
+				ENDIAN_SWAP32(pci_map_single(priv->pdev,
+							     tx_skb->data,
+							     tx_skb->len,
+							     PCI_DMA_TODEVICE));
+			desc->pnext_tx_desc->status =
+				ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED);
+			desc->pnext_tx_desc = desc->pnext_tx_desc->pnext;
+			/* make sure all the memory transactions done by cpu
+			 * were completed
+			 */
 			wmb();	/*Data Memory Barrier*/
 			writel(MACREG_H2ARIC_BIT_PPA_READY,
 			       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);

@@ -17,7 +17,7 @@ EXTRA_CFLAGS+= -DMWL_DEBUG
 endif
 
 EXTRA_CFLAGS+= -I${KDIR}
-EXTRA_CFLAGS+= -O2 -funroll-loops
+EXTRA_CFLAGS+= -O2 -funroll-loops -DDEBUG
 
 EXTRA_CFLAGS+= -I${PWD}
 

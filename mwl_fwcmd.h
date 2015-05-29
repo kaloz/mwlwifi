@@ -102,8 +102,8 @@ int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw,
 				int threshold);
 
-int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw,
-			      u8 index, u16 cw_min, u16 cw_max, u8 aifs, u16 txop);
+int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
+			      u16 cw_min, u16 cw_max, u8 aifs, u16 txop);
 
 int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw,
 			   bool enable);
@@ -142,7 +142,8 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode);
 
 int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
-				       struct ieee80211_vif *vif, u8 *addr, u8 encr_type);
+				       struct ieee80211_vif *vif,
+				       u8 *addr, u8 encr_type);
 
 int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 				 struct ieee80211_vif *vif, u8 *addr,
@@ -164,7 +165,8 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 			 u8 idx);
 
 struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
-					      struct ieee80211_sta *sta, u8 tid);
+					      struct ieee80211_sta *sta,
+					      u8 tid);
 
 int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 			   struct mwl_ampdu_stream *stream);

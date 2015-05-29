@@ -63,36 +63,36 @@
 #define DBG_CLASS_15 (1<<31)
 
 #define WLDBG_PRINT(...) \
-	mwl_debug_prt(0, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(0, __func__, __VA_ARGS__)
 
 #ifdef MWL_DEBUG
 
 #define WLDBG_DUMP_DATA(classlevel, data, len) \
-	mwl_debug_prtdata(classlevel|DBG_CLASS_DATA, __FUNCTION__, data, len, NULL)
+	mwl_debug_prtdata(classlevel|DBG_CLASS_DATA, __func__, data, len, NULL)
 
 #define WLDBG_ENTER(classlevel) \
-	mwl_debug_prt(classlevel|DBG_CLASS_ENTER, __FUNCTION__, NULL)
+	mwl_debug_prt(classlevel|DBG_CLASS_ENTER, __func__, NULL)
 
 #define WLDBG_ENTER_INFO(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_ENTER, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_ENTER, __func__, __VA_ARGS__)
 
 #define WLDBG_EXIT(classlevel) \
-	mwl_debug_prt(classlevel|DBG_CLASS_EXIT, __FUNCTION__, NULL)
+	mwl_debug_prt(classlevel|DBG_CLASS_EXIT, __func__, NULL)
 
 #define WLDBG_EXIT_INFO(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_EXIT, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_EXIT, __func__, __VA_ARGS__)
 
 #define WLDBG_INFO(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_INFO, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_INFO, __func__, __VA_ARGS__)
 
 #define WLDBG_WARNING(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_WARNING, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_WARNING, __func__, __VA_ARGS__)
 
 #define WLDBG_ERROR(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_ERROR, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_ERROR, __func__, __VA_ARGS__)
 
 #define WLDBG_PANIC(classlevel, ...) \
-	mwl_debug_prt(classlevel|DBG_CLASS_PANIC, __FUNCTION__, __VA_ARGS__)
+	mwl_debug_prt(classlevel|DBG_CLASS_PANIC, __func__, __VA_ARGS__)
 
 #else
 
@@ -112,7 +112,8 @@
 */
 
 void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...);
-void mwl_debug_prtdata(u32 classlevel, const char *func, const void *data, int len, const char *format, ...);
+void mwl_debug_prtdata(u32 classlevel, const char *func,
+		       const void *data, int len, const char *format, ...);
 void mwl_debug_dumpdata(const void *data, int len, char *marker);
 
 #endif /* _mwl_debug_h_ */
