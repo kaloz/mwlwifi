@@ -38,7 +38,7 @@
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 88W8864 802.11ac Adapter"
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.1"
+#define MWL_DRV_VERSION	 "10.3.0.2"
 
 #define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
