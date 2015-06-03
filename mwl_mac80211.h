@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines mac80211 related functions.
-*
+/* Description:  This file defines mac80211 related functions.
 */
 
 #ifndef _mwl_mac80211_h_

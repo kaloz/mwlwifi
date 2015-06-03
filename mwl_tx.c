@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements transmit related functions.
-*
+/* Description:  This file implements transmit related functions.
 */
 
 #include <linux/etherdevice.h>
@@ -229,7 +226,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			}
 		} else {
 			if (ccmp) {
-				if (mwl_vif->is_sta == true) {
+				if (mwl_vif->is_sta) {
 					mwl_tx_insert_ccmp_hdr(dma_data->data,
 							       mwl_vif->keyidx,
 							       mwl_vif->iv16,
@@ -261,9 +258,9 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	 */
 	if (mgmtframe) {
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
-		    mgmt->u.action.category == WLAN_CATEGORY_BACK &&
-		    mgmt->u.action.u.addba_req.action_code ==
-		    WLAN_ACTION_ADDBA_REQ)) {
+			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
+			     mgmt->u.action.u.addba_req.action_code ==
+			     WLAN_ACTION_ADDBA_REQ)) {
 			u16 capab =
 				ENDIAN_SWAP16(mgmt->u.action.u.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
@@ -281,7 +278,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		SPIN_LOCK(&priv->locks.stream_lock);
 		stream = mwl_fwcmd_lookup_stream(hw, sta->addr, tid);
 
-		if (stream != NULL) {
+		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
 				WARN_ON(!(qos & MWL_QOS_ACK_POLICY_BLOCKACK));
 
@@ -318,13 +315,13 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		} else {
 			/* Defer calling mwl8k_start_stream so that the current
 			 * skb can go out before the ADDBA request.  This
-			 * prevents sequence number mismatch at the recepient
+			 * prevents sequence number mismatch at the recipient
 			 * as described above.
 			 */
 			if (mwl_fwcmd_ampdu_allowed(sta, tid)) {
 				stream = mwl_fwcmd_add_stream(hw, sta, tid);
 
-				if (stream != NULL)
+				if (stream)
 					start_ba_session = true;
 			}
 		}
@@ -385,15 +382,14 @@ void mwl_tx_done(unsigned long data)
 	SPIN_LOCK_IRQSAVE(&priv->locks.xmit_lock, flags);
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		while (STALE_TXD(num)
-		       && (STALE_TXD(num)->status &
-		       ENDIAN_SWAP32(EAGLE_TXD_STATUS_OK))
-		       && (!(STALE_TXD(num)->status &
+		while (STALE_TXD(num) && (STALE_TXD(num)->status &
+		       ENDIAN_SWAP32(EAGLE_TXD_STATUS_OK)) &&
+		       (!(STALE_TXD(num)->status &
 		       ENDIAN_SWAP32(EAGLE_TXD_STATUS_FW_OWNED)))) {
 			pci_unmap_single(priv->pdev,
-				ENDIAN_SWAP32(STALE_TXD(num)->pkt_ptr),
-				STALE_TXD(num)->psk_buff->len,
-				PCI_DMA_TODEVICE);
+					 ENDIAN_SWAP32(STALE_TXD(num)->pkt_ptr),
+					 STALE_TXD(num)->psk_buff->len,
+					 PCI_DMA_TODEVICE);
 			done_skb = STALE_TXD(num)->psk_buff;
 			rate_info = STALE_TXD(num)->rate_info;
 			STALE_TXD(num)->pkt_len = 0;
@@ -495,7 +491,7 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 		MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
 		&priv->desc_data[0].pphys_tx_ring, GFP_KERNEL);
 
-	if (mem == NULL) {
+	if (!mem) {
 		WLDBG_ERROR(DBG_LEVEL_3, "can not alloc mem");
 		WLDBG_EXIT_INFO(DBG_LEVEL_3, "no memory");
 		return -ENOMEM;
@@ -541,7 +537,7 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 
 		desc = &priv->desc_data[num];
 
-		if (desc->ptx_ring != NULL) {
+		if (desc->ptx_ring) {
 			WLDBG_INFO(DBG_LEVEL_3, "initializing %i descriptors",
 				   SYSADPT_MAX_NUM_TX_DESC);
 
@@ -598,10 +594,10 @@ static void mwl_tx_ring_cleanup(struct mwl_priv *priv)
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
 		skb_queue_purge(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
-		if (priv->desc_data[num].ptx_ring != NULL) {
+		if (priv->desc_data[num].ptx_ring) {
 			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC;
 			     curr_desc++) {
-				if (CURR_TXD(num).psk_buff == NULL)
+				if (!CURR_TXD(num).psk_buff)
 					continue;
 
 				WLDBG_INFO(DBG_LEVEL_3,
@@ -637,15 +633,16 @@ static void mwl_tx_ring_free(struct mwl_priv *priv)
 
 	BUG_ON(!priv);
 
-	if (priv->desc_data[0].ptx_ring != NULL) {
+	if (priv->desc_data[0].ptx_ring) {
 		dma_free_coherent(&priv->pdev->dev,
-			MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
-			priv->desc_data[0].ptx_ring,
-			priv->desc_data[0].pphys_tx_ring);
+				  MAX_NUM_TX_RING_BYTES *
+				  SYSADPT_NUM_OF_DESC_DATA,
+				  priv->desc_data[0].ptx_ring,
+				  priv->desc_data[0].pphys_tx_ring);
 	}
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		if (priv->desc_data[num].ptx_ring != NULL)
+		if (priv->desc_data[num].ptx_ring)
 			priv->desc_data[num].ptx_ring = NULL;
 		priv->desc_data[num].pstale_tx_desc = NULL;
 		priv->desc_data[num].pnext_tx_desc  = NULL;
@@ -664,8 +661,7 @@ static inline void mwl_tx_add_dma_header(struct mwl_priv *priv,
 	int reqd_hdrlen;
 	struct mwl_dma_data *tr;
 
-	/*
-	 * Add a firmware DMA header; the firmware requires that we
+	/* Add a firmware DMA header; the firmware requires that we
 	 * present a 2-byte payload length followed by a 4-address
 	 * header (without QoS field), followed (optionally) by any
 	 * WEP/ExtIV header (but only filled in for CCMP).
@@ -690,8 +686,7 @@ static inline void mwl_tx_add_dma_header(struct mwl_priv *priv,
 	if (hdrlen != sizeof(tr->wh))
 		memset(((void *)&tr->wh) + hdrlen, 0, sizeof(tr->wh) - hdrlen);
 
-	/*
-	 * Firmware length is the length of the fully formed "802.11
+	/* Firmware length is the length of the fully formed "802.11
 	 * payload".  That is, everything except for the 802.11 header.
 	 * This includes all crypto material including the MIC.
 	 */
@@ -716,8 +711,7 @@ static inline void mwl_tx_encapsulate_frame(struct mwl_priv *priv,
 	if (ieee80211_is_data(wh->frame_control))
 		key_conf = tx_info->control.hw_key;
 
-	/*
-	 * Make sure the packet header is in the DMA header format (4-address
+	/* Make sure the packet header is in the DMA header format (4-address
 	 * without QoS), and add head & tail padding when HW crypto is enabled.
 	 *
 	 * We have the following trailer padding requirements:
@@ -727,7 +721,7 @@ static inline void mwl_tx_encapsulate_frame(struct mwl_priv *priv,
 	 */
 	data_pad = 0;
 
-	if (key_conf != NULL) {
+	if (key_conf) {
 		head_pad = key_conf->iv_len;
 
 		switch (key_conf->cipher) {
@@ -804,8 +798,9 @@ static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 	if (jiffies - tx_stats->start_time > HZ) {
 		tx_stats->pkts = 0;
 		tx_stats->start_time = 0;
-	} else
+	} else {
 		tx_stats->pkts++;
+	}
 }
 
 static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
@@ -830,7 +825,7 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 		while (skb_queue_len(&priv->txq[num]) > 0) {
 			desc = &priv->desc_data[num];
 
-			if (desc->pnext_tx_desc == NULL)
+			if (!desc->pnext_tx_desc)
 				break;
 
 			/* Only queue to tx desc when Status is 0 (not when 0x1

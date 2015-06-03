@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines system adaptation related information.
-*
+/* Description:  This file defines system adaptation related information.
 */
 
 #ifndef _mwl_sysadpt_h_

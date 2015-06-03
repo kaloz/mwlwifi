@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines receive related functions.
-*
+/* Description:  This file defines receive related functions.
 */
 
 #ifndef _mwl_rx_h_

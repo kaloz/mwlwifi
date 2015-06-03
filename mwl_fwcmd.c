@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements frimware host command related functions.
-*
+/* Description:  This file implements frimware host command related functions.
 */
 
 #include <linux/etherdevice.h>
@@ -32,8 +29,7 @@
 
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS         10000
 
-/*
- *      16 bit host command code
+/* 16 bit host command code
  */
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
 #define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
@@ -64,8 +60,7 @@
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
 
-/*
- *      Define general result code for each command
+/* Define general result code for each command
  */
 #define HOSTCMD_RESULT_OK                       0x0000 /* OK */
 /* Genenral error */
@@ -79,18 +74,17 @@
 /* Data buffer is not big enough */
 #define HOSTCMD_RESULT_PARTIAL_DATA             0x0005
 
-/*
- *      Define channel related constants
+/* Define channel related constants
  */
 #define FREQ_BAND_2DOT4GHZ                      0x1
 #define FREQ_BAND_4DOT9GHZ                      0x2
 #define FREQ_BAND_5GHZ                          0x4
 #define FREQ_BAND_5DOT2GHZ                      0x8
 #define CH_AUTO_WIDTH	                        0
-#define CH_10_MHz_WIDTH                         0x1
-#define CH_20_MHz_WIDTH                         0x2
-#define CH_40_MHz_WIDTH                         0x4
-#define CH_80_MHz_WIDTH                         0x5
+#define CH_10_MHZ_WIDTH                         0x1
+#define CH_20_MHZ_WIDTH                         0x2
+#define CH_40_MHZ_WIDTH                         0x4
+#define CH_80_MHZ_WIDTH                         0x5
 #define EXT_CH_ABOVE_CTRL_CH                    0x1
 #define EXT_CH_AUTO                             0x2
 #define EXT_CH_BELOW_CTRL_CH                    0x3
@@ -113,19 +107,16 @@
 /* active primary 8th 20MHz channel */
 #define ACT_PRIMARY_CHAN_7                      7
 
-/*
- *      Define rate related constants
+/* Define rate related constants
  */
 #define HOSTCMD_ACT_NOT_USE_FIXED_RATE          0x0002
 
-/*
- *      Define station related constants
+/* Define station related constants
  */
 #define HOSTCMD_ACT_STA_ACTION_ADD              0
 #define HOSTCMD_ACT_STA_ACTION_REMOVE           2
 
-/*
- *      Define key related constants
+/* Define key related constants
  */
 #define MAX_ENCR_KEY_LENGTH                     16
 #define MIC_KEY_LENGTH                          8
@@ -148,14 +139,12 @@
 /* Tx/Rx MIC keys are valid */
 #define ENCR_KEY_FLAG_MICKEY_VALID              0x02000000
 
-/*
- *      Define block ack related constants
+/* Define block ack related constants
  */
 #define BASTREAM_FLAG_IMMEDIATE_TYPE            1
 #define BASTREAM_FLAG_DIRECTION_UPSTREAM        0
 
-/*
- *      Define general purpose action
+/* Define general purpose action
  */
 #define HOSTCMD_ACT_GEN_SET                     0x0001
 #define HOSTCMD_ACT_GEN_SET_LIST                0x0002
@@ -215,8 +204,7 @@ enum mac_type {
 	WL_MAC_TYPE_SECONDARY_AP,
 };
 
-/*
- *      General host command header
+/* General host command header
  */
 
 struct hostcmd_header {
@@ -227,8 +215,7 @@ struct hostcmd_header {
 	u16 result;
 } __packed;
 
-/*
- *      HOSTCMD_CMD_GET_HW_SPEC
+/* HOSTCMD_CMD_GET_HW_SPEC
  */
 
 struct hostcmd_cmd_get_hw_spec {
@@ -248,8 +235,7 @@ struct hostcmd_cmd_get_hw_spec {
 	u32 wcb_base[SYSADPT_TOTAL_TX_QUEUES - 1];
 } __packed;
 
-/*
- *      HOSTCMD_CMD_SET_HW_SPEC
+/* HOSTCMD_CMD_SET_HW_SPEC
  */
 
 struct hostcmd_cmd_set_hw_spec {
@@ -300,8 +286,7 @@ struct hostcmd_cmd_set_hw_spec {
 	u32 total_rx_wcb;
 } __packed;
 
-/*
- *      HOSTCMD_CMD_802_11_GET_STAT
+/* HOSTCMD_CMD_802_11_GET_STAT
  */
 
 struct hostcmd_cmd_802_11_get_stat {
@@ -342,8 +327,7 @@ struct hostcmd_cmd_802_11_get_stat {
 	u32 tx_cts_count;
 } __packed;
 
-/*
- *      HOSTCMD_CMD_802_11_RADIO_CONTROL
+/* HOSTCMD_CMD_802_11_RADIO_CONTROL
  */
 
 struct hostcmd_cmd_802_11_radio_control {
@@ -354,8 +338,7 @@ struct hostcmd_cmd_802_11_radio_control {
 	u16 radio_on;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_802_11_TX_POWER
+/* HOSTCMD_CMD_802_11_TX_POWER
  */
 
 struct hostcmd_cmd_802_11_tx_power {
@@ -368,8 +351,7 @@ struct hostcmd_cmd_802_11_tx_power {
 	u16 power_level_list[SYSADPT_TX_POWER_LEVEL_TOTAL];
 } __packed;
 
-/*
- *     HOSTCMD_CMD_802_11_RF_ANTENNA
+/* HOSTCMD_CMD_802_11_RF_ANTENNA
  */
 
 struct hostcmd_cmd_802_11_rf_antenna {
@@ -378,8 +360,7 @@ struct hostcmd_cmd_802_11_rf_antenna {
 	u16 antenna_mode;     /* Number of antennas or 0xffff(diversity) */
 } __packed;
 
-/*
- *     HOSTCMD_CMD_BROADCAST_SSID_ENABLE
+/* HOSTCMD_CMD_BROADCAST_SSID_ENABLE
  */
 
 struct hostcmd_cmd_broadcast_ssid_enable {
@@ -387,8 +368,7 @@ struct hostcmd_cmd_broadcast_ssid_enable {
 	u32 enable;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_RF_CHANNEL
+/* HOSTCMD_CMD_SET_RF_CHANNEL
  */
 
 struct chnl_flags_11ac {
@@ -410,8 +390,7 @@ struct hostcmd_cmd_set_rf_channel {
 	struct chnl_flags_11ac chnl_flags;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_AID
+/* HOSTCMD_CMD_SET_AID
  */
 
 struct hostcmd_cmd_set_aid {
@@ -422,16 +401,14 @@ struct hostcmd_cmd_set_aid {
 	u8 ap_rates[SYSADPT_MAX_DATA_RATES_G];
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_INFRA_MODE
+/* HOSTCMD_CMD_SET_INFRA_MODE
  */
 
 struct hostcmd_cmd_set_infra_mode {
 	struct hostcmd_header cmd_hdr;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_802_11_RTS_THSD
+/* HOSTCMD_CMD_802_11_RTS_THSD
  */
 
 struct hostcmd_cmd_802_11_rts_thsd {
@@ -440,8 +417,7 @@ struct hostcmd_cmd_802_11_rts_thsd {
 	u16	threshold;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_EDCA_PARAMS
+/* HOSTCMD_CMD_SET_EDCA_PARAMS
  */
 
 struct hostcmd_cmd_set_edca_params {
@@ -455,8 +431,7 @@ struct hostcmd_cmd_set_edca_params {
 	u8 txq_num;                  /* Tx Queue number. */
 } __packed;
 
-/*
- *      HOSTCMD_CMD_SET_WMM_MODE
+/* HOSTCMD_CMD_SET_WMM_MODE
  */
 
 struct hostcmd_cmd_set_wmm_mode {
@@ -464,8 +439,7 @@ struct hostcmd_cmd_set_wmm_mode {
 	u16 action;                  /* 0->unset, 1->set */
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_FIXED_RATE
+/* HOSTCMD_CMD_SET_FIXED_RATE
  */
 
 struct fix_rate_flag {           /* lower rate after the retry count */
@@ -497,8 +471,7 @@ struct hostcmd_cmd_set_fixed_rate {
 	u8 management_rate;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_IES
+/* HOSTCMD_CMD_SET_IES
  */
 
 struct hostcmd_cmd_set_ies {
@@ -513,8 +486,7 @@ struct hostcmd_cmd_set_ies {
 	u8 ie_list_proprietary[112];
 } __packed;
 
-/*
- *      HOSTCMD_CMD_SET_RATE_ADAPT_MODE
+/* HOSTCMD_CMD_SET_RATE_ADAPT_MODE
  */
 
 struct hostcmd_cmd_set_rate_adapt_mode {
@@ -523,8 +495,7 @@ struct hostcmd_cmd_set_rate_adapt_mode {
 	u16 rate_adapt_mode;         /* 0:Indoor, 1:Outdoor */
 } __packed;
 
-/*
- *      HOSTCMD_CMD_SET_MAC_ADDR, HOSTCMD_CMD_DEL_MAC_ADDR
+/* HOSTCMD_CMD_SET_MAC_ADDR, HOSTCMD_CMD_DEL_MAC_ADDR
  */
 
 struct hostcmd_cmd_set_mac_addr {
@@ -533,8 +504,7 @@ struct hostcmd_cmd_set_mac_addr {
 	u8 mac_addr[ETH_ALEN];
 } __packed;
 
-/*
- *     HOSTCMD_CMD_GET_WATCHDOG_BITMAP
+/* HOSTCMD_CMD_GET_WATCHDOG_BITMAP
  */
 
 struct hostcmd_cmd_get_watchdog_bitmap {
@@ -542,8 +512,7 @@ struct hostcmd_cmd_get_watchdog_bitmap {
 	u8 watchdog_bitmap;          /* for SW/BA */
 } __packed;
 
-/*
- *     HOSTCMD_CMD_BSS_START
+/* HOSTCMD_CMD_BSS_START
  */
 
 struct hostcmd_cmd_bss_start {
@@ -551,8 +520,7 @@ struct hostcmd_cmd_bss_start {
 	u32 enable;                  /* FALSE: Disable or TRUE: Enable */
 } __packed;
 
-/*
- *     HOSTCMD_CMD_AP_BEACON
+/* HOSTCMD_CMD_AP_BEACON
  */
 
 struct cf_params {
@@ -691,8 +659,7 @@ struct hostcmd_cmd_ap_beacon {
 	struct start_cmd start_cmd;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_NEW_STN
+/* HOSTCMD_CMD_SET_NEW_STN
  */
 
 struct cap_info {
@@ -776,8 +743,7 @@ struct hostcmd_cmd_set_new_stn {
 	u32 fw_sta_ptr;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_APMODE
+/* HOSTCMD_CMD_SET_APMODE
  */
 
 struct hostcmd_cmd_set_apmode {
@@ -785,8 +751,7 @@ struct hostcmd_cmd_set_apmode {
 	u8 apmode;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_UPDATE_ENCRYPTION
+/* HOSTCMD_CMD_UPDATE_ENCRYPTION
  */
 
 struct hostcmd_cmd_update_encryptoin {
@@ -860,8 +825,7 @@ struct hostcmd_cmd_set_key {
 	struct key_param_set key_param;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_BASTREAM
+/* HOSTCMD_CMD_BASTREAM
  */
 
 struct ba_stream_flags {
@@ -940,8 +904,7 @@ struct hostcmd_cmd_bastream {
 	union ba_info ba_info;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_DWDS_ENABLE
+/* HOSTCMD_CMD_DWDS_ENABLE
  */
 
 struct hostcmd_cmd_dwds_enable {
@@ -949,8 +912,7 @@ struct hostcmd_cmd_dwds_enable {
 	u32 enable;                  /* 0 -- Disable. or 1 -- Enable. */
 } __packed;
 
-/*
- *     HOSTCMD_CMD_FW_FLUSH_TIMER
+/* HOSTCMD_CMD_FW_FLUSH_TIMER
  */
 
 struct hostcmd_cmd_fw_flush_timer {
@@ -959,8 +921,7 @@ struct hostcmd_cmd_fw_flush_timer {
 	u32 value;
 } __packed;
 
-/*
- *     HOSTCMD_CMD_SET_CDD
+/* HOSTCMD_CMD_SET_CDD
  */
 
 struct hostcmd_cmd_set_cdd {
@@ -1321,17 +1282,17 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-		width = CH_20_MHz_WIDTH;
+		width = CH_20_MHZ_WIDTH;
 		sub_ch = NO_EXT_CHANNEL;
 
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-		width = CH_40_MHz_WIDTH;
+		width = CH_40_MHZ_WIDTH;
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
 			sub_ch = EXT_CH_BELOW_CTRL_CH;
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-		width = CH_80_MHz_WIDTH;
+		width = CH_80_MHZ_WIDTH;
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
@@ -1410,16 +1371,16 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-		width = CH_20_MHz_WIDTH;
+		width = CH_20_MHZ_WIDTH;
 		sub_ch = NO_EXT_CHANNEL;
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-		width = CH_40_MHz_WIDTH;
+		width = CH_40_MHZ_WIDTH;
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
 			sub_ch = EXT_CH_BELOW_CTRL_CH;
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-		width = CH_80_MHz_WIDTH;
+		width = CH_80_MHZ_WIDTH;
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			sub_ch = EXT_CH_ABOVE_CTRL_CH;
 		else
@@ -1624,16 +1585,16 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	if ((conf->chandef.width == NL80211_CHAN_WIDTH_20_NOHT) ||
 	    (conf->chandef.width == NL80211_CHAN_WIDTH_20)) {
-		pcmd->chnl_flags.chnl_width = CH_20_MHz_WIDTH;
+		pcmd->chnl_flags.chnl_width = CH_20_MHZ_WIDTH;
 		pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_0;
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_40) {
-		pcmd->chnl_flags.chnl_width = CH_40_MHz_WIDTH;
+		pcmd->chnl_flags.chnl_width = CH_40_MHZ_WIDTH;
 		if (conf->chandef.center_freq1 > channel->center_freq)
 			pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_0;
 		else
 			pcmd->chnl_flags.act_primary = ACT_PRIMARY_CHAN_1;
 	} else if (conf->chandef.width == NL80211_CHAN_WIDTH_80) {
-		pcmd->chnl_flags.chnl_width = CH_80_MHz_WIDTH;
+		pcmd->chnl_flags.chnl_width = CH_80_MHZ_WIDTH;
 		pcmd->chnl_flags.act_primary =
 			mwl_fwcmd_get_80m_pri_chnl_offset(pcmd->curr_chnl);
 	}
@@ -2165,7 +2126,7 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = ENDIAN_SWAP16(HOSTCMD_ACT_STA_ACTION_ADD);
-	if (mwl_vif->is_sta == true) {
+	if (mwl_vif->is_sta) {
 		pcmd->aid = 0;
 		pcmd->stn_id = 0;
 	} else {
@@ -2208,7 +2169,7 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		return -EIO;
 	}
 
-	if (mwl_vif->is_sta == true) {
+	if (mwl_vif->is_sta) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
@@ -2302,7 +2263,7 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 		return -EIO;
 	}
 
-	if  (mwl_vif->is_sta == true) {
+	if  (mwl_vif->is_sta) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
@@ -2389,7 +2350,7 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 		return -EIO;
 	}
 
-	if (mwl_vif->is_sta == true) {
+	if (mwl_vif->is_sta) {
 		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
 			ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 		else
@@ -2487,7 +2448,7 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		return -EIO;
 	}
 
-	if (mwl_vif->is_sta == true) {
+	if (mwl_vif->is_sta) {
 		if (memcmp(mwl_vif->bssid, addr, ETH_ALEN) == 0)
 			ether_addr_copy(pcmd->key_param.mac_addr,
 					mwl_vif->sta_mac);
@@ -3374,7 +3335,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		pos += elen;
 	}
 
-	if (elem_parse_failed == false) {
+	if (!elem_parse_failed) {
 		beacon_info->ie_ht_ptr = &beacon_info->ie_list_ht[0];
 		beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 		beacon_info->valid = true;

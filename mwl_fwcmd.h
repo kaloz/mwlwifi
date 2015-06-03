@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines firmware host command related functions.
-*
+/* Description:  This file defines firmware host command related functions.
 */
 
 #ifndef _mwl_fwcmd_h_
@@ -26,8 +23,7 @@
 /* CONSTANTS AND MACROS
 */
 
-/*
- *          Define OpMode for SoftAP/Station mode
+/*  Define OpMode for SoftAP/Station mode
  *
  *  The following mode signature has to be written to PCI scratch register#0
  *  right after successfully downloading the last block of firmware and

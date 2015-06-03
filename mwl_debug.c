@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements debug related functions.
-*
+/* Description:  This file implements debug related functions.
 */
 
 #include <linux/printk.h>
@@ -56,7 +53,6 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 	va_list a_start;
 
 	if (classlevel != 0) {
-
 		if ((class & WLDBG_CLASSES) != class)
 			return;
 
@@ -69,10 +65,10 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 
 	debug_string = kmalloc(1024, GFP_ATOMIC);
 
-	if (debug_string == NULL)
+	if (!debug_string)
 		return;
 
-	if (format != NULL) {
+	if (format) {
 		va_start(a_start, format);
 		vsprintf(debug_string, format, a_start);
 		va_end(a_start);
@@ -101,8 +97,8 @@ void mwl_debug_prt(u32 classlevel, const char *func, const char *format, ...)
 	}
 
 	if (strlen(debug_string) > 0) {
-		if (debug_string[strlen(debug_string)-1] == '\n')
-			debug_string[strlen(debug_string)-1] = '\0';
+		if (debug_string[strlen(debug_string) - 1] == '\n')
+			debug_string[strlen(debug_string) - 1] = '\0';
 			pr_debug("%s(): %s\n", func, debug_string);
 	}
 
@@ -130,10 +126,10 @@ void mwl_debug_prtdata(u32 classlevel, const char *func,
 
 	dbg_string = kmalloc(len + 1024, GFP_ATOMIC);
 
-	if (dbg_string == NULL)
+	if (!dbg_string)
 		return;
 
-	if (format != NULL) {
+	if (format) {
 		va_start(a_start, format);
 		vsprintf(dbg_string, format, a_start);
 		va_end(a_start);
@@ -143,7 +139,7 @@ void mwl_debug_prtdata(u32 classlevel, const char *func,
 
 	if (strlen(dbg_string) > 0) {
 		if (dbg_string[strlen(dbg_string) - 1] == '\n')
-			dbg_string[strlen(dbg_string)-1] = '\0';
+			dbg_string[strlen(dbg_string) - 1] = '\0';
 			pr_debug("%s() %s\n", func, dbg_string);
 	} else {
 		pr_debug("%s()\n", func);
@@ -152,14 +148,14 @@ void mwl_debug_prtdata(u32 classlevel, const char *func,
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
 		if ((curr_byte + 8) < len) {
 			pr_debug(PRT_8BYTES,
-			       *(memptr + curr_byte + 0),
-			       *(memptr + curr_byte + 1),
-			       *(memptr + curr_byte + 2),
-			       *(memptr + curr_byte + 3),
-			       *(memptr + curr_byte + 4),
-			       *(memptr + curr_byte + 5),
-			       *(memptr + curr_byte + 6),
-			       *(memptr + curr_byte + 7));
+				 *(memptr + curr_byte + 0),
+				 *(memptr + curr_byte + 1),
+				 *(memptr + curr_byte + 2),
+				 *(memptr + curr_byte + 3),
+				 *(memptr + curr_byte + 4),
+				 *(memptr + curr_byte + 5),
+				 *(memptr + curr_byte + 6),
+				 *(memptr + curr_byte + 7));
 		} else {
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
@@ -189,21 +185,21 @@ void mwl_debug_dumpdata(const void *data, int len, char *marker)
 	for (curr_byte = 0; curr_byte < len; curr_byte = curr_byte + 8) {
 		if ((curr_byte + 8) < len) {
 			pr_debug(PRT_8BYTES,
-			       *(memptr + curr_byte + 0),
-			       *(memptr + curr_byte + 1),
-			       *(memptr + curr_byte + 2),
-			       *(memptr + curr_byte + 3),
-			       *(memptr + curr_byte + 4),
-			       *(memptr + curr_byte + 5),
-			       *(memptr + curr_byte + 6),
-			       *(memptr + curr_byte + 7));
+				 *(memptr + curr_byte + 0),
+				 *(memptr + curr_byte + 1),
+				 *(memptr + curr_byte + 2),
+				 *(memptr + curr_byte + 3),
+				 *(memptr + curr_byte + 4),
+				 *(memptr + curr_byte + 5),
+				 *(memptr + curr_byte + 6),
+				 *(memptr + curr_byte + 7));
 		} else {
 			num_bytes = len - curr_byte;
 			offset = curr_byte;
 			for (curr_byte = 0; curr_byte < num_bytes;
 			     curr_byte++)
 				pr_debug("0x%02x ",
-				       *(memptr + offset + curr_byte));
+					 *(memptr + offset + curr_byte));
 			pr_debug("\n\n");
 			break;
 		}

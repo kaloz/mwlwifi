@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines firmware download related functions.
-*
+/* Description:  This file defines firmware download related functions.
 */
 
 #ifndef _mwl_fwdl_h_

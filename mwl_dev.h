@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file defines device related information.
-*
+/* Description:  This file defines device related information.
 */
 
 #ifndef _mwl_dev_h_
@@ -27,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/firmware.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 #include <net/mac80211.h>
 
 /* CONSTANTS AND MACROS
@@ -65,26 +63,26 @@
 #define MACREG_A2HRIC_BIT_RADAR_DETECT      0x00000080 /* bit 7 */
 #define MACREG_A2HRIC_BIT_ICV_ERROR         0x00000100 /* bit 8 */
 #define MACREG_A2HRIC_BIT_WEAKIV_ERROR      0x00000200 /* bit 9 */
-#define MACREG_A2HRIC_BIT_QUEUE_EMPTY       (1<<10)
-#define MACREG_A2HRIC_BIT_QUEUE_FULL        (1<<11)
-#define MACREG_A2HRIC_BIT_CHAN_SWITCH       (1<<12) /* IEEE80211_DH */
-#define MACREG_A2HRIC_BIT_TX_WATCHDOG       (1<<13)
-#define MACREG_A2HRIC_BA_WATCHDOG           (1<<14)
-#define MACREG_A2HRIC_BIT_SSU_DONE          (1<<16)
-#define MACREG_A2HRIC_CONSEC_TXFAIL         (1<<17) /* 15 taken by ISR_TXACK */
+#define MACREG_A2HRIC_BIT_QUEUE_EMPTY       BIT(10)
+#define MACREG_A2HRIC_BIT_QUEUE_FULL        BIT(11)
+#define MACREG_A2HRIC_BIT_CHAN_SWITCH       BIT(12) /* IEEE80211_DH */
+#define MACREG_A2HRIC_BIT_TX_WATCHDOG       BIT(13)
+#define MACREG_A2HRIC_BA_WATCHDOG           BIT(14)
+#define MACREG_A2HRIC_BIT_SSU_DONE          BIT(16)
+#define MACREG_A2HRIC_CONSEC_TXFAIL         BIT(17) /* 15 taken by ISR_TXACK */
 
-#define ISR_SRC_BITS        ((MACREG_A2HRIC_BIT_RX_RDY)   | \
-			     (MACREG_A2HRIC_BIT_TX_DONE)  | \
+#define ISR_SRC_BITS        ((MACREG_A2HRIC_BIT_RX_RDY) | \
+			     (MACREG_A2HRIC_BIT_TX_DONE) | \
 			     (MACREG_A2HRIC_BIT_OPC_DONE) | \
-			     (MACREG_A2HRIC_BIT_MAC_EVENT)| \
-			     (MACREG_A2HRIC_BIT_WEAKIV_ERROR)| \
-			     (MACREG_A2HRIC_BIT_ICV_ERROR)| \
+			     (MACREG_A2HRIC_BIT_MAC_EVENT) | \
+			     (MACREG_A2HRIC_BIT_WEAKIV_ERROR) | \
+			     (MACREG_A2HRIC_BIT_ICV_ERROR) | \
 			     (MACREG_A2HRIC_BIT_SSU_DONE) | \
-			     (MACREG_A2HRIC_BIT_RADAR_DETECT)| \
-			     (MACREG_A2HRIC_BIT_CHAN_SWITCH)| \
-			     (MACREG_A2HRIC_BIT_TX_WATCHDOG)| \
-			     (MACREG_A2HRIC_BIT_QUEUE_EMPTY)| \
-			     (MACREG_A2HRIC_BA_WATCHDOG)	| \
+			     (MACREG_A2HRIC_BIT_RADAR_DETECT) | \
+			     (MACREG_A2HRIC_BIT_CHAN_SWITCH) | \
+			     (MACREG_A2HRIC_BIT_TX_WATCHDOG) | \
+			     (MACREG_A2HRIC_BIT_QUEUE_EMPTY) | \
+			     (MACREG_A2HRIC_BA_WATCHDOG) | \
 			     (MACREG_A2HRIC_CONSEC_TXFAIL))
 
 #define MACREG_A2HRIC_BIT_MASK      ISR_SRC_BITS
@@ -95,8 +93,8 @@
 #define MACREG_H2ARIC_BIT_DOOR_BELL         0x00000002 /* bit 1 */
 #define MACREG_H2ARIC_BIT_PS                0x00000004 /* bit 2 */
 #define MACREG_H2ARIC_BIT_PSPOLL            0x00000008 /* bit 3 */
-#define ISR_RESET                           (1<<15)
-#define ISR_RESET_AP33                      (1<<26)
+#define ISR_RESET                           BIT(15)
+#define ISR_RESET_AP33                      BIT(26)
 
 /* Data descriptor related constants
 */

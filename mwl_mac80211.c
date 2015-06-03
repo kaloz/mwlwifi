@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements mac80211 related functions.
-*
+/* Description:  This file implements mac80211 related functions.
 */
 
 #include <linux/etherdevice.h>
@@ -458,8 +455,7 @@ static void mwl_mac80211_configure_filter(struct ieee80211_hw *hw,
 {
 	WLDBG_ENTER(DBG_LEVEL_5);
 
-	/*
-	 * AP firmware doesn't allow fine-grained control over
+	/* AP firmware doesn't allow fine-grained control over
 	 * the receive filter.
 	 */
 	*total_flags &= FIF_ALLMULTI | FIF_BCN_PRBRESP_PROMISC;
@@ -484,11 +480,11 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	BUG_ON(!mwl_vif);
 	BUG_ON(!sta_info);
 
-	if (sta == NULL) {
+	if (!sta) {
 		addr = vif->addr;
 	} else {
 		addr = sta->addr;
-		if (mwl_vif->is_sta == true)
+		if (mwl_vif->is_sta)
 			ether_addr_copy(mwl_vif->bssid, addr);
 	}
 
@@ -498,13 +494,13 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 		if (rc)
 			goto out;
 
-		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40)
-			|| (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
+		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
+		    (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
 			encr_type = ENCR_TYPE_WEP;
 		} else if (key->cipher == WLAN_CIPHER_SUITE_CCMP) {
 			encr_type = ENCR_TYPE_AES;
 			if ((key->flags & IEEE80211_KEY_FLAG_PAIRWISE) == 0) {
-				if (mwl_vif->is_sta == false)
+				if (!mwl_vif->is_sta)
 					mwl_vif->keyidx = key->keyidx;
 			}
 		} else if (key->cipher == WLAN_CIPHER_SUITE_TKIP) {
@@ -569,7 +565,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	if (sta->ht_cap.ht_supported)
 		sta_info->is_ampdu_allowed = true;
 
-	if (mwl_vif->is_sta == true)
+	if (mwl_vif->is_sta)
 		mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
 	rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
@@ -707,7 +703,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		 */
 		*ssn = 0;
 
-		if (stream == NULL) {
+		if (!stream) {
 			/* This means that somebody outside this driver called
 			 * ieee80211_start_tx_ba_session.  This is unexpected
 			 * because we do our own rate control.  Just warn and
@@ -716,7 +712,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			stream = mwl_fwcmd_add_stream(hw, sta, tid);
 		}
 
-		if (stream == NULL) {
+		if (!stream) {
 			WLDBG_EXIT_INFO(DBG_LEVEL_5, "no stream found");
 			rc = -EBUSY;
 			break;
@@ -776,15 +772,15 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
-		BUG_ON(stream == NULL);
+		BUG_ON(!stream);
 		BUG_ON(stream->state != AMPDU_STREAM_IN_PROGRESS);
 		SPIN_UNLOCK(&priv->locks.stream_lock);
 		rc = mwl_fwcmd_create_ba(hw, stream, buf_size, vif);
 		SPIN_LOCK(&priv->locks.stream_lock);
 
-		if (!rc)
+		if (!rc) {
 			stream->state = AMPDU_STREAM_ACTIVE;
-		else {
+		} else {
 			idx = stream->idx;
 			SPIN_UNLOCK(&priv->locks.stream_lock);
 			mwl_fwcmd_destroy_ba(hw, idx);
@@ -823,8 +819,7 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 	}
 
 	if ((changed & BSS_CHANGED_ASSOC) && vif->bss_conf.assoc) {
-
-		mwl_fwcmd_set_aid(hw, vif, (u8 *) vif->bss_conf.bssid,
+		mwl_fwcmd_set_aid(hw, vif, (u8 *)vif->bss_conf.bssid,
 				  vif->bss_conf.aid);
 	}
 }
@@ -843,8 +838,7 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		int idx;
 		int rate;
 
-		/*
-		 * Use lowest supported basic rate for multicasts
+		/* Use lowest supported basic rate for multicasts
 		 * and management frames (such as probe responses --
 		 * beacons will always go out at 1 Mb/s).
 		 */
@@ -865,8 +859,7 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 
 		skb = ieee80211_beacon_get(hw, vif);
 
-		if (skb != NULL) {
-
+		if (skb) {
 			mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
 			dev_kfree_skb_any(skb);
 		}

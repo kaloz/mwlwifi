@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements receive related functions.
-*
+/* Description:  This file implements receive related functions.
 */
 
 #include <linux/skbuff.h>
@@ -142,7 +139,7 @@ void mwl_rx_recv(unsigned long data)
 
 	curr_desc = priv->desc_data[0].pnext_rx_desc;
 
-	if (curr_desc == NULL) {
+	if (!curr_desc) {
 		status_mask = readl(priv->iobase1 +
 				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 		writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
@@ -154,10 +151,10 @@ void mwl_rx_recv(unsigned long data)
 		return;
 	}
 
-	while ((curr_desc->rx_control == EAGLE_RXD_CTRL_DMA_OWN)
-		&& (work_done < priv->recv_limit)) {
+	while ((curr_desc->rx_control == EAGLE_RXD_CTRL_DMA_OWN) &&
+	       (work_done < priv->recv_limit)) {
 		prx_skb = curr_desc->psk_buff;
-		if (prx_skb == NULL)
+		if (!prx_skb)
 			goto out;
 		pci_unmap_single(priv->pdev,
 				 ENDIAN_SWAP32(curr_desc->pphys_buff_data),
@@ -196,10 +193,8 @@ void mwl_rx_recv(unsigned long data)
 				mwl_vif = mwl_rx_find_vif_bss(&priv->vif_list,
 							      wh->addr2);
 
-			if (mwl_vif != NULL &&
-			    mwl_vif->is_hw_crypto_enabled) {
-				/*
-				 * When MMIC ERROR is encountered
+			if (mwl_vif && mwl_vif->is_hw_crypto_enabled) {
+				/* When MMIC ERROR is encountered
 				 * by the firmware, payload is
 				 * dropped and only 32 bytes of
 				 * mwl8k Firmware header is sent
@@ -216,7 +211,7 @@ void mwl_rx_recv(unsigned long data)
 
 					tr = (struct mwl_dma_data *)
 					     prx_skb->data;
-					memset((void *)&(tr->data), 0, 4);
+					memset((void *)&tr->data, 0, 4);
 					pkt_len += 4;
 				}
 
@@ -268,7 +263,7 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 				   &priv->desc_data[0].pphys_rx_ring,
 				   GFP_KERNEL);
 
-	if (priv->desc_data[0].prx_ring == NULL) {
+	if (!priv->desc_data[0].prx_ring) {
 		WLDBG_ERROR(DBG_LEVEL_4, "can not alloc mem");
 		WLDBG_EXIT_INFO(DBG_LEVEL_4, "no memory");
 		return -ENOMEM;
@@ -293,7 +288,7 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 
 	desc = &priv->desc_data[0];
 
-	if (desc->prx_ring != NULL) {
+	if (desc->prx_ring) {
 		desc->rx_buf_size = SYSADPT_MAX_AGGR_SIZE;
 
 		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
@@ -306,7 +301,7 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 				WLDBG_ERROR(DBG_LEVEL_4,
 					    "need linearize memory");
 				WLDBG_EXIT_INFO(DBG_LEVEL_4,
-					    "no suitable memory");
+						"no suitable memory");
 				return -ENOMEM;
 			}
 
@@ -318,7 +313,7 @@ static int mwl_rx_ring_init(struct mwl_priv *priv)
 			CURR_RXD.channel = 0x00;
 			CURR_RXD.rssi = 0x00;
 
-			if (CURR_RXD.psk_buff != NULL) {
+			if (CURR_RXD.psk_buff) {
 				dma_addr_t dma;
 				u32 val;
 
@@ -385,10 +380,10 @@ static void mwl_rx_ring_cleanup(struct mwl_priv *priv)
 
 	BUG_ON(!priv);
 
-	if (priv->desc_data[0].prx_ring != NULL) {
+	if (priv->desc_data[0].prx_ring) {
 		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
 		     curr_desc++) {
-			if (CURR_RXD.psk_buff == NULL)
+			if (!CURR_RXD.psk_buff)
 				continue;
 
 			if (skb_shinfo(CURR_RXD.psk_buff)->nr_frags)
@@ -425,7 +420,7 @@ static void mwl_rx_ring_free(struct mwl_priv *priv)
 
 	BUG_ON(!priv);
 
-	if (priv->desc_data[0].prx_ring != NULL) {
+	if (priv->desc_data[0].prx_ring) {
 		mwl_rx_ring_cleanup(priv);
 
 		dma_free_coherent(&priv->pdev->dev,
@@ -558,7 +553,7 @@ static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc)
 
 	pdesc->psk_buff = dev_alloc_skb(priv->desc_data[0].rx_buf_size);
 
-	if (pdesc->psk_buff == NULL)
+	if (!pdesc->psk_buff)
 		goto nomem;
 
 	if (skb_linearize(pdesc->psk_buff)) {

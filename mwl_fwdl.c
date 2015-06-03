@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements firmware download related functions.
-*
+/* Description:  This file implements firmware download related functions.
 */
 
 #include <linux/io.h>

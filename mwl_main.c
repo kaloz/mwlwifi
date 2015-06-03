@@ -14,10 +14,7 @@
 * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-/*
-*
-*   Description:  This file implements main functions of this module.
-*
+/* Description:  This file implements main functions of this module.
 */
 
 #include <linux/module.h>
@@ -38,13 +35,12 @@
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 88W8864 802.11ac Adapter"
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.2"
+#define MWL_DRV_VERSION	 "10.3.0.2--"
 
 #define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
 
 #define INVALID_WATCHDOG 0xAA
-
 
 /* PRIVATE FUNCTION DECLARATION
 */
@@ -66,7 +62,6 @@ static int mwl_wl_init(struct mwl_priv *priv);
 static void mwl_wl_deinit(struct mwl_priv *priv);
 static void mwl_watchdog_ba_events(struct work_struct *work);
 static irqreturn_t mwl_interrupt(int irq, void *dev_id);
-
 
 /* PRIVATE VARIABLES
 */
@@ -178,7 +173,6 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 	.num_different_channels = 1,
 };
 
-
 /* PRIVATE FUNCTION DEFINITION
 */
 
@@ -217,7 +211,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_set_master(pdev);
 
 	hw = ieee80211_alloc_hw(sizeof(*priv), mwl_mac80211_get_ops());
-	if (hw == NULL) {
+	if (!hw) {
 		WLDBG_PRINT("%s: ieee80211 alloc failed",
 			    MWL_DRV_NAME);
 		rc = -ENOMEM;
@@ -300,7 +294,7 @@ static void mwl_remove(struct pci_dev *pdev)
 
 	WLDBG_ENTER(DBG_LEVEL_0);
 
-	if (hw == NULL) {
+	if (!hw) {
 		WLDBG_EXIT_INFO(DBG_LEVEL_0, "ieee80211 hw is null");
 		return;
 	}
@@ -384,12 +378,12 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	WLDBG_PRINT("priv->iobase1 = %x", (unsigned int)priv->iobase1);
 
 	priv->pcmd_buf =
-		(unsigned short *) dma_alloc_coherent(&priv->pdev->dev,
-						       CMD_BUF_SIZE,
-						       &priv->pphys_cmd_buf,
-						       GFP_KERNEL);
+		(unsigned short *)dma_alloc_coherent(&priv->pdev->dev,
+						     CMD_BUF_SIZE,
+						     &priv->pphys_cmd_buf,
+						     GFP_KERNEL);
 
-	if (priv->pcmd_buf == NULL) {
+	if (!priv->pcmd_buf) {
 		WLDBG_ERROR(DBG_LEVEL_0,
 			    "%s: cannot alloc memory for command buffer",
 			    MWL_DRV_NAME);
@@ -429,7 +423,6 @@ err_reserve_mem_region_bar0:
 	WLDBG_EXIT_INFO(DBG_LEVEL_0, "pci alloc fail");
 
 	return -EIO;
-
 }
 
 static void mwl_free_pci_resource(struct mwl_priv *priv)
@@ -445,10 +438,9 @@ static void mwl_free_pci_resource(struct mwl_priv *priv)
 	iounmap(priv->iobase0);
 	iounmap(priv->iobase1);
 	release_mem_region(pci_resource_start(pdev, priv->next_bar_num),
-					      pci_resource_len(pdev,
-					      priv->next_bar_num));
+			   pci_resource_len(pdev, priv->next_bar_num));
 	release_mem_region(pci_resource_start(pdev, 0),
-					      pci_resource_len(pdev, 0));
+			   pci_resource_len(pdev, 0));
 	dma_free_coherent(&priv->pdev->dev, CMD_BUF_SIZE,
 			  priv->pcmd_buf, priv->pphys_cmd_buf);
 
@@ -511,12 +503,12 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	WLDBG_ENTER(DBG_LEVEL_0);
 
 	BUG_ON(!wiphy);
-	hw = (struct ieee80211_hw *) wiphy_priv(wiphy);
+	hw = (struct ieee80211_hw *)wiphy_priv(wiphy);
 	BUG_ON(!hw);
 	priv = hw->priv;
 	BUG_ON(!priv);
 
-	if (priv->pwr_node != NULL) {
+	if (priv->pwr_node) {
 		for_each_property_of_node(priv->pwr_node, prop) {
 			if (strcmp(prop->name, "FCC") == 0)
 				fcc_prop = prop;
@@ -529,7 +521,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 
 		prop = NULL;
 
-		if (specific_prop != NULL) {
+		if (specific_prop) {
 			prop = specific_prop;
 		} else {
 			if (request->dfs_region == NL80211_DFS_ETSI)
@@ -538,7 +530,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 				prop = fcc_prop;
 		}
 
-		if (prop != NULL) {
+		if (prop) {
 			/* Reset the whole table
 			*/
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++)
@@ -627,7 +619,7 @@ static int mwl_process_of_dts(struct mwl_priv *priv)
 	priv->dt_node =
 		of_find_node_by_name(pci_bus_to_OF_node(priv->pdev->bus),
 				     "mwlwifi");
-	if (priv->dt_node == NULL)
+	if (!priv->dt_node)
 		return -EPERM;
 
 	/* look for all matching property names
@@ -750,7 +742,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 
 	/* set up band information for 2.4G
 	*/
-	if (priv->disable_2g == false) {
+	if (!priv->disable_2g) {
 		BUILD_BUG_ON(sizeof(priv->channels_24) !=
 			     sizeof(mwl_channels_24));
 		memcpy(priv->channels_24, mwl_channels_24,
@@ -773,7 +765,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 
 	/* set up band information for 5G
 	*/
-	if (priv->disable_5g == false) {
+	if (!priv->disable_5g) {
 		BUILD_BUG_ON(sizeof(priv->channels_50) !=
 			     sizeof(mwl_channels_50));
 		memcpy(priv->channels_50, mwl_channels_50,
@@ -809,8 +801,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw = priv->hw;
 	BUG_ON(!hw);
 
-	/*
-	 * Extra headroom is the size of the required DMA header
+	/* Extra headroom is the size of the required DMA header
 	 * minus the size of the smallest 802.11 frame (CTS frame).
 	 */
 	hw->extra_tx_headroom =
@@ -821,8 +812,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	*/
 	hw->flags |= IEEE80211_HW_SIGNAL_DBM | IEEE80211_HW_HAS_RATE_CONTROL;
 
-	/*
-	 * Ask mac80211 to not to trigger PS mode
+	/* Ask mac80211 to not to trigger PS mode
 	 * based on PM bit of incoming frames.
 	 */
 	hw->flags |= IEEE80211_HW_AP_LINK_PS;
@@ -1059,7 +1049,7 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
 			int_status &= ~MACREG_A2HRIC_BIT_TX_DONE;
 
-			if (priv->is_tx_schedule == false) {
+			if (!priv->is_tx_schedule) {
 				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_TX_DONE),
 				       int_status_mask);
@@ -1071,7 +1061,7 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
 			int_status &= ~MACREG_A2HRIC_BIT_RX_RDY;
 
-			if (priv->is_rx_schedule == false) {
+			if (!priv->is_rx_schedule) {
 				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_RX_RDY),
 				       int_status_mask);
@@ -1094,7 +1084,6 @@ static irqreturn_t mwl_interrupt(int irq, void *dev_id)
 
 	return IRQ_HANDLED;
 }
-
 
 module_pci_driver(mwl_pci_driver);
 
