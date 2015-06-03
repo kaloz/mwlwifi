@@ -1,4 +1,4 @@
-obj-$(CPTCFG_MWLWIFI)	+= mwlwifi.o
+obj-$(CONFIG_MWLWIFI)	+= mwlwifi.o
 
 mwlwifi-objs		+= mwl_main.o
 mwlwifi-objs		+= mwl_mac80211.o
