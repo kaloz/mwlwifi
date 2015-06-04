@@ -6,8 +6,8 @@ config MWLWIFI
 	---help---
 	  Select to build the driver supporting the:
 
-	  Marvell Wireless WiFi 88W8864 Chip.
-	  Marvell Wireless WiFi 88W8897 Chip.
+	  Marvell Wireless WiFi 88W8864 modules
+	  Marvell Wireless WiFi 88W8897 modules
 
 	  This driver uses the kernel's mac80211 subsystem.
 
