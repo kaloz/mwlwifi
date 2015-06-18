@@ -1,6 +1,6 @@
 config MWLWIFI
 	tristate "Marvell Wireless WiFi driver (mwlwifi)"
-	depends on PCI && MAC80211
+	depends on PCI && MAC80211 && MWIFIEX_PCIE=n
 	select FW_LOADER
 	select OF
 	---help---

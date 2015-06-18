@@ -1,27 +1,16 @@
 /*
-* Copyright (c) 2006-2015 Marvell International Ltd.
-*
-* Permission to use, copy, modify, and/or distribute this software for any
-* purpose with or without fee is hereby granted, provided that the above
-* copyright notice and this permission notice appear in all copies.
-*
-* THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-* WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-* MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-* SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-* WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-* OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-* CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-*/
+ * Copyright (C) 2006-2015, Marvell International Ltd.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 
 /* Description:  This file defines firmware host command related functions.
-*/
+ */
 
 #ifndef _mwl_fwcmd_h_
 #define _mwl_fwcmd_h_
-
-/* CONSTANTS AND MACROS
-*/
 
 /*  Define OpMode for SoftAP/Station mode
  *
@@ -36,9 +25,6 @@
 #define HOSTCMD_STA_FWRDY_SIGNATURE     0xF0F1F2F4
 #define HOSTCMD_SOFTAP_FWRDY_SIGNATURE  0xF1F2F4A5
 
-/* TYPE DEFINITION
-*/
-
 enum {
 	WL_ANTENNATYPE_RX = 1,
 	WL_ANTENNATYPE_TX = 2,
@@ -51,9 +37,6 @@ enum encr_type {
 	ENCR_TYPE_AES = 6,
 	ENCR_TYPE_MIX = 7,
 };
-
-/* PUBLIC FUNCTION DECLARATION
-*/
 
 void mwl_fwcmd_reset(struct ieee80211_hw *hw);
 

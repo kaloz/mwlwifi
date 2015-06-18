@@ -1,46 +1,45 @@
 /*
-* Copyright (c) 2006-2015 Marvell International Ltd.
-*
-* Permission to use, copy, modify, and/or distribute this software for any
-* purpose with or without fee is hereby granted, provided that the above
-* copyright notice and this permission notice appear in all copies.
-*
-* THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-* WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-* MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-* SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-* WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
-* OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
-* CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-*/
+ * Copyright (C) 2006-2015, Marvell International Ltd.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 
 /* Description:  This file implements firmware download related functions.
-*/
+ */
 
 #include <linux/io.h>
 
-#include "mwl_sysadpt.h"
-#include "mwl_dev.h"
-#include "mwl_debug.h"
-#include "mwl_fwcmd.h"
-#include "mwl_fwdl.h"
-
-/* CONSTANTS AND MACROS
-*/
+#include "sysadpt.h"
+#include "dev.h"
+#include "fwcmd.h"
+#include "fwdl.h"
 
 #define FW_DOWNLOAD_BLOCK_SIZE          256
 #define FW_CHECK_MSECS                  1
 
 #define FW_MAX_NUM_CHECKS               0xffff
 
-/* PRIVATE FUNCTION DECLARATION
-*/
+static void mwl_fwdl_trig_pcicmd(struct mwl_priv *priv)
+{
+	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
 
-static void mwl_fwdl_trig_pcicmd(struct mwl_priv *priv);
-static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv);
+	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
 
-/* PUBLIC FUNCTION DEFINITION
-*/
+	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
+	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+}
+
+static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv)
+{
+	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
+
+	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
+
+	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
+	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+}
 
 int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 {
@@ -51,20 +50,15 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	u32 int_code = 0;
 	u32 len = 0;
 
-	WLDBG_ENTER(DBG_LEVEL_1);
-
-	BUG_ON(!hw);
 	priv = hw->priv;
-	BUG_ON(!priv);
 	fw = priv->fw_ucode;
-	BUG_ON(!fw);
 
 	mwl_fwcmd_reset(hw);
 
 	/* FW before jumping to boot rom, it will enable PCIe transaction retry,
 	 * wait for boot code to stop it.
 	 */
-	WL_MSEC_SLEEP(FW_CHECK_MSECS);
+	mdelay(FW_CHECK_MSECS);
 
 	writel(MACREG_A2HRIC_BIT_MASK,
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
@@ -78,14 +72,12 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	 * reside on its respective blocks such as ITCM, DTCM, SQRAM,
 	 * (or even DDR, AFTER DDR is init'd before fw download
 	 */
-	WLDBG_PRINT("fw download start 88");
+	wiphy_info(hw->wiphy, "fw download start 88");
 
-	/* Disable PFU before FWDL
-	*/
+	/* Disable PFU before FWDL */
 	writel(0x100, priv->iobase1 + 0xE0E4);
 
-	/* make sure SCRATCH2 C40 is clear, in case we are too quick
-	*/
+	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
 	while (readl(priv->iobase1 + 0xc40) == 0)
 		;
 
@@ -99,8 +91,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		memcpy((char *)&priv->pcmd_buf[0],
 		       (fw->data + size_fw_downloaded), len);
 
-		/* this function writes pdata to c10, then write 2 to c18
-		*/
+		/* this function writes pdata to c10, then write 2 to c18 */
 		mwl_fwdl_trig_pcicmd_bootcode(priv);
 
 		/* this is arbitrary per your platform; we use 0xffff */
@@ -134,15 +125,17 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 			 * without locking up your entire system just because fw
 			 * download failed
 			 */
-			WLDBG_PRINT("Exhausted curr_iteration for fw download");
+			wiphy_err(hw->wiphy,
+				  "Exhausted curr_iteration for fw download");
 			goto err_download;
 		}
 
 		size_fw_downloaded += len;
 	}
 
-	WLDBG_PRINT("FwSize = %d downloaded Size = %d curr_iteration %d",
-		    (int)fw->size, size_fw_downloaded, curr_iteration);
+	wiphy_info(hw->wiphy,
+		   "FwSize = %d downloaded Size = %d curr_iteration %d",
+		   (int)fw->size, size_fw_downloaded, curr_iteration);
 
 	/* Now firware is downloaded successfully, so this part is to check
 	 * whether fw can properly execute to an extent that write back
@@ -156,22 +149,21 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	do {
 		curr_iteration--;
 		writel(HOSTCMD_SOFTAP_MODE, priv->iobase1 + MACREG_REG_GEN_PTR);
-		WL_MSEC_SLEEP(FW_CHECK_MSECS);
+		mdelay(FW_CHECK_MSECS);
 		int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
 		if (!(curr_iteration % 0xff))
-			WLDBG_PRINT("%x;", int_code);
+			wiphy_err(hw->wiphy, "%x;", int_code);
 	} while ((curr_iteration) &&
 		 (int_code != HOSTCMD_SOFTAP_FWRDY_SIGNATURE));
 
 	if (curr_iteration == 0) {
-		WLDBG_PRINT("Exhausted curr_iteration for fw signature");
+		wiphy_err(hw->wiphy,
+			  "Exhausted curr_iteration for fw signature");
 		goto err_download;
 	}
 
-	WLDBG_PRINT("complete");
+	wiphy_info(hw->wiphy, "complete");
 	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-
-	WLDBG_EXIT(DBG_LEVEL_1);
 
 	return 0;
 
@@ -180,39 +172,4 @@ err_download:
 	mwl_fwcmd_reset(hw);
 
 	return -EIO;
-}
-
-/* PRIVATE FUNCTION DEFINITION
-*/
-
-static void mwl_fwdl_trig_pcicmd(struct mwl_priv *priv)
-{
-	WLDBG_ENTER(DBG_LEVEL_1);
-
-	BUG_ON(!priv);
-
-	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
-
-	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-
-	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
-	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-
-	WLDBG_EXIT(DBG_LEVEL_1);
-}
-
-static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv)
-{
-	WLDBG_ENTER(DBG_LEVEL_1);
-
-	BUG_ON(!priv);
-
-	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
-
-	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-
-	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
-	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-
-	WLDBG_EXIT(DBG_LEVEL_1);
 }
