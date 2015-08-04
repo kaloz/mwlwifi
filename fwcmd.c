@@ -1194,14 +1194,6 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		beacon_info->ie_ht_ptr = &beacon_info->ie_list_ht[0];
 		beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 		beacon_info->valid = true;
-
-		wiphy_info(priv->hw->wiphy,
-			   "wmm:%d, rsn:%d, rsn48:%d, ht:%d, vht:%d",
-			   beacon_info->ie_wmm_len,
-			   beacon_info->ie_rsn_len,
-			   beacon_info->ie_rsn48_len,
-			   beacon_info->ie_ht_len,
-			   beacon_info->ie_vht_len);
 	}
 }
 

@@ -372,9 +372,6 @@ static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
 					  struct ieee80211_bss_conf *info,
 					  u32 changed)
 {
-	wiphy_debug(hw->wiphy, "interface: %d, change: 0x%x",
-		    vif->type, changed);
-
 	if (vif->type == NL80211_IFTYPE_STATION)
 		mwl_mac80211_bss_info_changed_sta(hw, vif, info, changed);
 
