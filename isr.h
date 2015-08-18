@@ -1,20 +1,26 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file defines interrupt related functions.
- */
+/* Description:  This file defines interrupt related functions. */
 
-#ifndef _mwl_isr_h_
-#define _mwl_isr_h_
+#ifndef _isr_h_
+#define _isr_h_
 
 #include <linux/interrupt.h>
 
 irqreturn_t mwl_isr(int irq, void *dev_id);
 void mwl_watchdog_ba_events(struct work_struct *work);
 
-#endif /* _mwl_isr_h_ */
+#endif /* _isr_h_ */

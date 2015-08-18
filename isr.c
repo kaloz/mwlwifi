@@ -1,13 +1,19 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file implements interrupt related functions.
- */
+/* Description:  This file implements interrupt related functions. */
 
 #include "sysadpt.h"
 #include "dev.h"
@@ -19,12 +25,10 @@
 irqreturn_t mwl_isr(int irq, void *dev_id)
 {
 	struct ieee80211_hw *hw = dev_id;
-	struct mwl_priv *priv;
-	void *int_status_mask;
+	struct mwl_priv *priv = hw->priv;
+	void __iomem *int_status_mask;
 	unsigned int int_status, clr_status;
 	u32 status;
-
-	priv = hw->priv;
 
 	int_status_mask = priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 
@@ -34,7 +38,7 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 		return IRQ_NONE;
 
 	if (int_status == 0xffffffff) {
-		wiphy_warn(hw->wiphy, "card plugged out???");
+		wiphy_warn(hw->wiphy, "card unplugged?\n");
 	} else {
 		clr_status = int_status;
 
@@ -59,6 +63,18 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 				       int_status_mask);
 				tasklet_schedule(&priv->rx_task);
 				priv->is_rx_schedule = true;
+			}
+		}
+
+		if (int_status & MACREG_A2HRIC_BIT_QUEUE_EMPTY) {
+			int_status &= ~MACREG_A2HRIC_BIT_QUEUE_EMPTY;
+
+			if (!priv->is_qe_schedule) {
+				status = readl(int_status_mask);
+				writel((status & ~MACREG_A2HRIC_BIT_QUEUE_EMPTY),
+				       int_status_mask);
+				tasklet_schedule(&priv->qe_task);
+				priv->is_qe_schedule = true;
 			}
 		}
 
@@ -92,7 +108,7 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 	if (rc)
 		goto done;
 
-	spin_lock(&priv->stream_lock);
+	spin_lock_bh(&priv->stream_lock);
 
 	/* the bitmap is the hw queue number.  Map it to the ampdu queue. */
 	if (bitmap != INVALID_WATCHDOG) {
@@ -110,9 +126,9 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 			if (streams->state == AMPDU_STREAM_ACTIVE) {
 				ieee80211_stop_tx_ba_session(streams->sta,
 							     streams->tid);
-				spin_unlock(&priv->stream_lock);
+				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream_index);
-				spin_lock(&priv->stream_lock);
+				spin_lock_bh(&priv->stream_lock);
 			}
 		} else {
 			for (stream_index = 0;
@@ -125,14 +141,14 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 
 				ieee80211_stop_tx_ba_session(streams->sta,
 							     streams->tid);
-				spin_unlock(&priv->stream_lock);
+				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream_index);
-				spin_lock(&priv->stream_lock);
+				spin_lock_bh(&priv->stream_lock);
 			}
 		}
 	}
 
-	spin_unlock(&priv->stream_lock);
+	spin_unlock_bh(&priv->stream_lock);
 
 done:
 

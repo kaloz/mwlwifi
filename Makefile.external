@@ -13,7 +13,7 @@ LD		= $(CROSS_COMPILE)ld
 CC		= $(CROSS_COMPILE)gcc
 
 EXTRA_CFLAGS+= -I${KDIR}
-EXTRA_CFLAGS+= -O2 -funroll-loops
+EXTRA_CFLAGS+= -O2 -funroll-loops -D__CHECK_ENDIAN__
 
 EXTRA_CFLAGS+= -I${PWD}
 

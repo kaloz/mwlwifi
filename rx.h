@@ -1,19 +1,25 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file defines receive related functions.
- */
+/* Description:  This file defines receive related functions. */
 
-#ifndef _mwl_rx_h_
-#define _mwl_rx_h_
+#ifndef _rx_h_
+#define _rx_h_
 
 int mwl_rx_init(struct ieee80211_hw *hw);
 void mwl_rx_deinit(struct ieee80211_hw *hw);
 void mwl_rx_recv(unsigned long data);
 
-#endif /* _mwl_rx_h_ */
+#endif /* _rx_h_ */

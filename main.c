@@ -1,16 +1,24 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file implements main functions of this module.
- */
+/* Description:  This file implements main functions of this module. */
 
 #include <linux/module.h>
-#include <linux/moduleparam.h>
+#ifdef CONFIG_OF
+#include <linux/of.h>
+#endif
 
 #include "sysadpt.h"
 #include "dev.h"
@@ -18,13 +26,12 @@
 #include "fwcmd.h"
 #include "tx.h"
 #include "rx.h"
-#include "mac80211.h"
 #include "isr.h"
 
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 802.11ac Adapter"
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.3"
+#define MWL_DRV_VERSION	 "10.3.0.8"
 
 #define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
@@ -39,10 +46,14 @@ static struct mwl_chip_info mwl_chip_tbl[] = {
 	[MWL8864] = {
 		.part_name	= "88W8864",
 		.fw_image	= "mwlwifi/88W8864.bin",
+		.antenna_tx	= ANTENNA_TX_4_AUTO,
+		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
 	[MWL8897] = {
 		.part_name	= "88W8897",
 		.fw_image	= "mwlwifi/88W8897.bin",
+		.antenna_tx	= ANTENNA_TX_2,
+		.antenna_rx	= ANTENNA_RX_2,
 	},
 };
 
@@ -134,8 +145,8 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	struct pci_dev *pdev;
 	u32 phys_addr = 0;
 	u32 flags;
-	void *phys_addr1[2];
-	void *phys_addr2[2];
+	void __iomem *phys_addr1[2];
+	void __iomem *phys_addr2[2];
 
 	pdev = priv->pdev;
 
@@ -150,24 +161,23 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	if (!request_mem_region(phys_addr, pci_resource_len(pdev, 0),
 				MWL_DRV_NAME)) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 0",
+			  "%s: cannot reserve PCI memory region 0\n",
 			  MWL_DRV_NAME);
 		goto err_reserve_mem_region_bar0;
 	}
 
 	phys_addr1[0] = ioremap(phys_addr, pci_resource_len(pdev, 0));
-	phys_addr1[1] = 0;
+	phys_addr1[1] = NULL;
 
 	priv->iobase0 = phys_addr1[0];
 	if (!priv->iobase0) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot remap PCI memory region 0",
+			  "%s: cannot remap PCI memory region 0\n",
 			  MWL_DRV_NAME);
 		goto err_release_mem_region_bar0;
 	}
 
-	wiphy_info(priv->hw->wiphy, "priv->iobase0 = %x",
-		   (unsigned int)priv->iobase0);
+	wiphy_debug(priv->hw->wiphy, "priv->iobase0 = %p\n", priv->iobase0);
 
 	phys_addr = pci_resource_start(pdev, priv->next_bar_num);
 
@@ -175,25 +185,24 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 				pci_resource_len(pdev, priv->next_bar_num),
 				MWL_DRV_NAME)) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 1",
+			  "%s: cannot reserve PCI memory region 1\n",
 			  MWL_DRV_NAME);
 		goto err_iounmap_iobase0;
 	}
 
 	phys_addr2[0] = ioremap(phys_addr,
 				pci_resource_len(pdev, priv->next_bar_num));
-	phys_addr2[1] = 0;
+	phys_addr2[1] = NULL;
 	priv->iobase1 = phys_addr2[0];
 
 	if (!priv->iobase1) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot remap PCI memory region 1",
+			  "%s: cannot remap PCI memory region 1\n",
 			  MWL_DRV_NAME);
 		goto err_release_mem_region_bar1;
 	}
 
-	wiphy_info(priv->hw->wiphy, "priv->iobase1 = %x",
-		   (unsigned int)priv->iobase1);
+	wiphy_debug(priv->hw->wiphy, "priv->iobase1 = %p\n", priv->iobase1);
 
 	priv->pcmd_buf =
 		(unsigned short *)dma_alloc_coherent(&priv->pdev->dev,
@@ -203,15 +212,15 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 
 	if (!priv->pcmd_buf) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot alloc memory for command buffer",
+			  "%s: cannot alloc memory for command buffer\n",
 			  MWL_DRV_NAME);
 		goto err_iounmap_iobase1;
 	}
 
-	wiphy_info(priv->hw->wiphy,
-		   "priv->pcmd_buf = %x  priv->pphys_cmd_buf = %x",
-		   (unsigned int)priv->pcmd_buf,
-		   (unsigned int)priv->pphys_cmd_buf);
+	wiphy_debug(priv->hw->wiphy,
+		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
+		    priv->pcmd_buf,
+		    (void *)priv->pphys_cmd_buf);
 
 	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
 
@@ -237,7 +246,7 @@ err_release_mem_region_bar0:
 
 err_reserve_mem_region_bar0:
 
-	wiphy_err(priv->hw->wiphy, "pci alloc fail");
+	wiphy_err(priv->hw->wiphy, "pci alloc fail\n");
 
 	return -EIO;
 }
@@ -258,7 +267,7 @@ static void mwl_free_pci_resource(struct mwl_priv *priv)
 			  priv->pcmd_buf, priv->pphys_cmd_buf);
 }
 
-static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
+static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 {
 	struct pci_dev *pdev;
 	int rc = 0;
@@ -268,7 +277,7 @@ static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
 	rc = request_firmware(&priv->fw_ucode, fw_name, &priv->pdev->dev);
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot load firmware image <%s>",
+			  "%s: cannot load firmware image <%s>\n",
 			  MWL_DRV_NAME, fw_name);
 		goto err_load_fw;
 	}
@@ -276,7 +285,7 @@ static int mwl_init_firmware(struct mwl_priv *priv, char *fw_name)
 	rc = mwl_fwdl_download_firmware(priv->hw);
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot download firmware image <%s>",
+			  "%s: cannot download firmware image <%s>\n",
 			  MWL_DRV_NAME, fw_name);
 		goto err_download_fw;
 	}
@@ -289,7 +298,7 @@ err_download_fw:
 
 err_load_fw:
 
-	wiphy_err(priv->hw->wiphy, "firmware init fail");
+	wiphy_err(priv->hw->wiphy, "firmware init fail\n");
 
 	return rc;
 }
@@ -297,6 +306,7 @@ err_load_fw:
 static void mwl_reg_notifier(struct wiphy *wiphy,
 			     struct regulatory_request *request)
 {
+#ifdef CONFIG_OF
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	struct property *prop;
@@ -363,7 +373,8 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 				prop_value =
 					be32_to_cpu(*(__be32 *)
 						    (prop->value + i));
-				priv->tx_pwr_tbl[j].cdd = prop_value;
+				priv->tx_pwr_tbl[j].cdd =
+					(prop_value == 0) ? false : true;
 				i += 4;
 				prop_value =
 					be32_to_cpu(*(__be32 *)
@@ -385,7 +396,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 				if (pwr_tbl->channel == 0)
 					break;
 				wiphy_info(hw->wiphy,
-					   "Channel: %d: 0x%x 0x%x 0x%x",
+					   "Channel: %d: 0x%x 0x%x 0x%x\n",
 					   pwr_tbl->channel,
 					   pwr_tbl->setcap,
 					   pwr_tbl->cdd,
@@ -397,27 +408,24 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 						sprintf(disp_ptr, "%x ",
 							pwr_tbl->tx_power[j]);
 				}
-				wiphy_info(hw->wiphy, "%s", disp_buf);
+				wiphy_info(hw->wiphy, "%s\n", disp_buf);
 			}
 		}
 	}
+#endif
 }
 
-static int mwl_process_of_dts(struct mwl_priv *priv)
+static void mwl_process_of_dts(struct mwl_priv *priv)
 {
+#ifdef CONFIG_OF
 	struct property *prop;
 	u32 prop_value;
-
-	priv->disable_2g = false;
-	priv->disable_5g = false;
-	priv->antenna_tx = ANTENNA_TX_4_AUTO;
-	priv->antenna_rx = ANTENNA_RX_4_AUTO;
 
 	priv->dt_node =
 		of_find_node_by_name(pci_bus_to_OF_node(priv->pdev->bus),
 				     "mwlwifi");
 	if (!priv->dt_node)
-		return -EPERM;
+		return;
 
 	/* look for all matching property names */
 	for_each_property_of_node(priv->dt_node, prop) {
@@ -439,26 +447,7 @@ static int mwl_process_of_dts(struct mwl_priv *priv)
 
 	priv->pwr_node = of_find_node_by_name(priv->dt_node,
 					      "marvell,powertable");
-
-	wiphy_info(priv->hw->wiphy,
-		   "2G: %s\n", priv->disable_2g ? "disable" : "enable");
-	wiphy_info(priv->hw->wiphy,
-		   "5G: %s\n", priv->disable_5g ? "disable" : "enable");
-
-	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
-		wiphy_info(priv->hw->wiphy, "TX: 4 antennas\n");
-	else if (priv->antenna_tx == ANTENNA_TX_2)
-		wiphy_info(priv->hw->wiphy, "TX: 2 antennas\n");
-	else
-		wiphy_info(priv->hw->wiphy, "TX: unknown\n");
-	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
-		wiphy_info(priv->hw->wiphy, "RX: 4 antennas\n");
-	else if (priv->antenna_rx == ANTENNA_RX_2)
-		wiphy_info(priv->hw->wiphy, "RX: 2 antennas\n");
-	else
-		wiphy_info(priv->hw->wiphy, "RX: unknown\n");
-
-	return 0;
+#endif
 }
 
 static void mwl_set_ht_caps(struct mwl_priv *priv,
@@ -608,10 +597,14 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	tasklet_disable(&priv->tx_task);
 	tasklet_init(&priv->rx_task, (void *)mwl_rx_recv, (unsigned long)hw);
 	tasklet_disable(&priv->rx_task);
+	tasklet_init(&priv->qe_task,
+		     (void *)mwl_tx_flush_amsdu, (unsigned long)hw);
+	tasklet_disable(&priv->qe_task);
 	priv->txq_limit = SYSADPT_TX_QUEUE_LIMIT;
 	priv->is_tx_schedule = false;
 	priv->recv_limit = SYSADPT_RECEIVE_LIMIT;
 	priv->is_rx_schedule = false;
+	priv->is_qe_schedule = false;
 
 	spin_lock_init(&priv->tx_desc_lock);
 	spin_lock_init(&priv->fwcmd_lock);
@@ -621,21 +614,21 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_tx_init(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize TX",
+		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
 			  MWL_DRV_NAME);
 		goto err_mwl_tx_init;
 	}
 
 	rc = mwl_rx_init(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize RX",
+		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
 			  MWL_DRV_NAME);
 		goto err_mwl_rx_init;
 	}
 
 	rc = mwl_fwcmd_get_hw_specs(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to get HW specifications",
+		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n",
 			  MWL_DRV_NAME);
 		goto err_get_hw_specs;
 	}
@@ -644,11 +637,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	writel(priv->desc_data[0].pphys_tx_ring,
 	       priv->iobase0 + priv->desc_data[0].wcb_base);
-#if SYSADPT_NUM_OF_DESC_DATA > 3
 	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
 		writel(priv->desc_data[i].pphys_tx_ring,
 		       priv->iobase0 + priv->desc_data[i].wcb_base);
-#endif
 	writel(priv->desc_data[0].pphys_rx_ring,
 	       priv->iobase0 + priv->desc_data[0].rx_desc_read);
 	writel(priv->desc_data[0].pphys_rx_ring,
@@ -656,13 +647,13 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = mwl_fwcmd_set_hw_specs(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to set HW specifications",
+		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
 			  MWL_DRV_NAME);
 		goto err_set_hw_specs;
 	}
 
 	wiphy_info(hw->wiphy,
-		   "firmware version: 0x%x", priv->hw_data.fw_release_num);
+		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
 
 	mwl_fwcmd_radio_disable(hw);
 
@@ -680,13 +671,23 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = ieee80211_register_hw(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to register device",
+		wiphy_err(hw->wiphy, "%s: fail to register device\n",
 			  MWL_DRV_NAME);
 		goto err_register_hw;
 	}
 
+	rc = request_irq(priv->pdev->irq, mwl_isr,
+			 IRQF_SHARED, MWL_DRV_NAME, hw);
+	if (rc) {
+		priv->irq = -1;
+		wiphy_err(hw->wiphy, "fail to register IRQ handler\n");
+		goto err_register_irq;
+	}
+	priv->irq = priv->pdev->irq;
+
 	return rc;
 
+err_register_irq:
 err_register_hw:
 err_set_hw_specs:
 err_get_hw_specs:
@@ -699,7 +700,7 @@ err_mwl_rx_init:
 
 err_mwl_tx_init:
 
-	wiphy_err(hw->wiphy, "init fail");
+	wiphy_err(hw->wiphy, "init fail\n");
 
 	return rc;
 }
@@ -710,11 +711,18 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 
 	hw = priv->hw;
 
+	if (priv->irq != -1) {
+		free_irq(priv->pdev->irq, hw);
+		priv->irq = -1;
+	}
+
 	ieee80211_unregister_hw(hw);
 	mwl_rx_deinit(hw);
 	mwl_tx_deinit(hw);
+	tasklet_kill(&priv->qe_task);
 	tasklet_kill(&priv->rx_task);
 	tasklet_kill(&priv->tx_task);
+	cancel_work_sync(&priv->watchdog_ba_handle);
 	mwl_fwcmd_reset(hw);
 }
 
@@ -741,7 +749,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return rc;
 	}
 
-	rc = pci_set_dma_mask(pdev, 0xffffffff);
+	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (rc) {
 		pr_err("%s: 32-bit PCI DMA not supported",
 		       MWL_DRV_NAME);
@@ -768,6 +776,10 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv->hw = hw;
 	priv->pdev = pdev;
 	priv->chip_type = id->driver_data;
+	priv->disable_2g = false;
+	priv->disable_5g = false;
+	priv->antenna_tx = mwl_chip_tbl[priv->chip_type].antenna_tx;
+	priv->antenna_rx = mwl_chip_tbl[priv->chip_type].antenna_rx;
 
 	rc = mwl_alloc_pci_resource(priv);
 	if (rc)
@@ -775,7 +787,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = mwl_init_firmware(priv, mwl_chip_tbl[priv->chip_type].fw_image);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize firmware",
+		wiphy_err(hw->wiphy, "%s: fail to initialize firmware\n",
 			  MWL_DRV_NAME);
 		goto err_init_firmware;
 	}
@@ -783,24 +795,36 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* firmware is loaded to H/W, it can be released now */
 	release_firmware(priv->fw_ucode);
 
-	rc = mwl_process_of_dts(priv);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to load dts mwlwifi parameters",
-			  MWL_DRV_NAME);
-		goto err_process_of_dts;
-	}
+	mwl_process_of_dts(priv);
 
 	rc = mwl_wl_init(priv);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize wireless lan",
+		wiphy_err(hw->wiphy, "%s: fail to initialize wireless lan\n",
 			  MWL_DRV_NAME);
 		goto err_wl_init;
 	}
 
+	wiphy_info(priv->hw->wiphy,
+		   "2G: %s\n", priv->disable_2g ? "disable" : "enable");
+	wiphy_info(priv->hw->wiphy,
+		   "5G: %s\n", priv->disable_5g ? "disable" : "enable");
+
+	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
+		wiphy_info(priv->hw->wiphy, "TX: 4 antennas\n");
+	else if (priv->antenna_tx == ANTENNA_TX_2)
+		wiphy_info(priv->hw->wiphy, "TX: 2 antennas\n");
+	else
+		wiphy_info(priv->hw->wiphy, "TX: unknown\n");
+	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
+		wiphy_info(priv->hw->wiphy, "RX: 4 antennas\n");
+	else if (priv->antenna_rx == ANTENNA_RX_2)
+		wiphy_info(priv->hw->wiphy, "RX: 2 antennas\n");
+	else
+		wiphy_info(priv->hw->wiphy, "RX: unknown\n");
+
 	return rc;
 
 err_wl_init:
-err_process_of_dts:
 err_init_firmware:
 
 	mwl_fwcmd_reset(hw);

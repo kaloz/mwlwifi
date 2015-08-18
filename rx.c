@@ -1,13 +1,19 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file implements receive related functions.
- */
+/* Description:  This file implements receive related functions. */
 
 #include <linux/skbuff.h>
 
@@ -18,10 +24,8 @@
 #define MAX_NUM_RX_RING_BYTES  (SYSADPT_MAX_NUM_RX_DESC * \
 				sizeof(struct mwl_rx_desc))
 
-#define FIRST_RXD priv->desc_data[0].prx_ring[0]
-#define CURR_RXD  priv->desc_data[0].prx_ring[curr_desc]
-#define NEXT_RXD  priv->desc_data[0].prx_ring[curr_desc + 1]
-#define LAST_RXD  priv->desc_data[0].prx_ring[SYSADPT_MAX_NUM_RX_DESC - 1]
+#define MAX_NUM_RX_HNDL_BYTES  (SYSADPT_MAX_NUM_RX_DESC * \
+				sizeof(struct mwl_rx_hndl))
 
 #define DECRYPT_ERR_MASK        0x80
 #define GENERAL_DECRYPT_ERR     0xFF
@@ -46,142 +50,157 @@
 
 static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 {
-	priv->desc_data[0].prx_ring =
-		(struct mwl_rx_desc *)
+	struct mwl_desc_data *desc;
+
+	desc = &priv->desc_data[0];
+
+	desc->prx_ring = (struct mwl_rx_desc *)
 		dma_alloc_coherent(&priv->pdev->dev,
 				   MAX_NUM_RX_RING_BYTES,
-				   &priv->desc_data[0].pphys_rx_ring,
+				   &desc->pphys_rx_ring,
 				   GFP_KERNEL);
 
-	if (!priv->desc_data[0].prx_ring) {
-		wiphy_err(priv->hw->wiphy, "can not alloc mem");
+	if (!desc->prx_ring) {
+		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
 		return -ENOMEM;
 	}
 
-	memset(priv->desc_data[0].prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
+	memset(desc->prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
+
+	desc->rx_hndl = kmalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
+
+	if (!desc->rx_hndl) {
+		dma_free_coherent(&priv->pdev->dev,
+				  MAX_NUM_RX_RING_BYTES,
+				  desc->prx_ring,
+				  desc->pphys_rx_ring);
+		return -ENOMEM;
+	}
+
+	memset(desc->rx_hndl, 0x00, MAX_NUM_RX_HNDL_BYTES);
 
 	return 0;
 }
 
 static int mwl_rx_ring_init(struct mwl_priv *priv)
 {
-	int curr_desc;
 	struct mwl_desc_data *desc;
+	int i;
+	struct mwl_rx_hndl *rx_hndl;
+	dma_addr_t dma;
+	u32 val;
 
 	desc = &priv->desc_data[0];
 
 	if (desc->prx_ring) {
 		desc->rx_buf_size = SYSADPT_MAX_AGGR_SIZE;
 
-		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
-		     curr_desc++) {
-			CURR_RXD.psk_buff =
+		for (i = 0; i < SYSADPT_MAX_NUM_RX_DESC; i++) {
+			rx_hndl = &desc->rx_hndl[i];
+			rx_hndl->psk_buff =
 				dev_alloc_skb(desc->rx_buf_size);
 
-			if (skb_linearize(CURR_RXD.psk_buff)) {
-				dev_kfree_skb_any(CURR_RXD.psk_buff);
+			if (!rx_hndl->psk_buff) {
 				wiphy_err(priv->hw->wiphy,
-					  "need linearize memory");
+					  "rxdesc %i: no skbuff available\n",
+					  i);
 				return -ENOMEM;
 			}
 
-			skb_reserve(CURR_RXD.psk_buff,
+			skb_reserve(rx_hndl->psk_buff,
 				    SYSADPT_MIN_BYTES_HEADROOM);
-			CURR_RXD.rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
-			CURR_RXD.status = EAGLE_RXD_STATUS_OK;
-			CURR_RXD.qos_ctrl = 0x0000;
-			CURR_RXD.channel = 0x00;
-			CURR_RXD.rssi = 0x00;
-
-			if (CURR_RXD.psk_buff) {
-				dma_addr_t dma;
-				u32 val;
-
-				CURR_RXD.pkt_len =
-					cpu_to_le16(SYSADPT_MAX_AGGR_SIZE);
-				CURR_RXD.pbuff_data = CURR_RXD.psk_buff->data;
-				dma = pci_map_single(priv->pdev,
-						     CURR_RXD.psk_buff->data,
-						     desc->rx_buf_size,
-						     PCI_DMA_FROMDEVICE);
-				CURR_RXD.pphys_buff_data =
-					cpu_to_le32(dma);
-				CURR_RXD.pnext = &NEXT_RXD;
-				val = (u32)desc->pphys_rx_ring +
-				      ((curr_desc + 1) *
-				      sizeof(struct mwl_rx_desc));
-				CURR_RXD.pphys_next =
-					cpu_to_le32(val);
-			} else {
+			desc->prx_ring[i].rx_control =
+				EAGLE_RXD_CTRL_DRIVER_OWN;
+			desc->prx_ring[i].status = EAGLE_RXD_STATUS_OK;
+			desc->prx_ring[i].qos_ctrl = 0x0000;
+			desc->prx_ring[i].channel = 0x00;
+			desc->prx_ring[i].rssi = 0x00;
+			desc->prx_ring[i].pkt_len =
+				cpu_to_le16(SYSADPT_MAX_AGGR_SIZE);
+			dma = pci_map_single(priv->pdev,
+					     rx_hndl->psk_buff->data,
+					     desc->rx_buf_size,
+					     PCI_DMA_FROMDEVICE);
+			if (pci_dma_mapping_error(priv->pdev, dma)) {
 				wiphy_err(priv->hw->wiphy,
-					  "rxdesc %i: no skbuff available",
-					  curr_desc);
+					  "failed to map pci memory!\n");
 				return -ENOMEM;
 			}
+			desc->prx_ring[i].pphys_buff_data = cpu_to_le32(dma);
+			val = (u32)desc->pphys_rx_ring +
+			      ((i + 1) * sizeof(struct mwl_rx_desc));
+			desc->prx_ring[i].pphys_next = cpu_to_le32(val);
+			rx_hndl->pdesc = &desc->prx_ring[i];
+			if (i < (SYSADPT_MAX_NUM_RX_DESC - 1))
+				rx_hndl->pnext = &desc->rx_hndl[i + 1];
 		}
-		LAST_RXD.pphys_next =
+		desc->prx_ring[SYSADPT_MAX_NUM_RX_DESC - 1].pphys_next =
 			cpu_to_le32((u32)desc->pphys_rx_ring);
-		LAST_RXD.pnext = &FIRST_RXD;
-		priv->desc_data[0].pnext_rx_desc = &FIRST_RXD;
+		desc->rx_hndl[SYSADPT_MAX_NUM_RX_DESC - 1].pnext =
+			&desc->rx_hndl[0];
+		desc->pnext_rx_hndl = &desc->rx_hndl[0];
 
 		return 0;
 	}
 
-	wiphy_err(priv->hw->wiphy, "no valid RX mem");
+	wiphy_err(priv->hw->wiphy, "no valid RX mem\n");
 
 	return -ENOMEM;
 }
 
 static void mwl_rx_ring_cleanup(struct mwl_priv *priv)
 {
-	int curr_desc;
+	struct mwl_desc_data *desc;
+	int i;
+	struct mwl_rx_hndl *rx_hndl;
 
-	if (priv->desc_data[0].prx_ring) {
-		for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_RX_DESC;
-		     curr_desc++) {
-			if (!CURR_RXD.psk_buff)
+	desc = &priv->desc_data[0];
+
+	if (desc->prx_ring) {
+		for (i = 0; i < SYSADPT_MAX_NUM_RX_DESC; i++) {
+			rx_hndl = &desc->rx_hndl[i];
+			if (!rx_hndl->psk_buff)
 				continue;
-
-			if (skb_shinfo(CURR_RXD.psk_buff)->nr_frags)
-				skb_shinfo(CURR_RXD.psk_buff)->nr_frags = 0;
-
-			if (skb_shinfo(CURR_RXD.psk_buff)->frag_list)
-				skb_shinfo(CURR_RXD.psk_buff)->frag_list = NULL;
 
 			pci_unmap_single(priv->pdev,
 					 le32_to_cpu
-					 (CURR_RXD.pphys_buff_data),
-					 priv->desc_data[0].rx_buf_size,
+					 (rx_hndl->pdesc->pphys_buff_data),
+					 desc->rx_buf_size,
 					 PCI_DMA_FROMDEVICE);
 
-			dev_kfree_skb_any(CURR_RXD.psk_buff);
+			dev_kfree_skb_any(rx_hndl->psk_buff);
 
 			wiphy_info(priv->hw->wiphy,
-				   "unmapped+free'd %i 0x%p 0x%x %i",
-				   curr_desc, CURR_RXD.pbuff_data,
-				   le32_to_cpu(CURR_RXD.pphys_buff_data),
-				   priv->desc_data[0].rx_buf_size);
+				   "unmapped+free'd %i 0x%p 0x%x %i\n",
+				   i, rx_hndl->psk_buff->data,
+				   le32_to_cpu(rx_hndl->pdesc->pphys_buff_data),
+				   desc->rx_buf_size);
 
-			CURR_RXD.pbuff_data = NULL;
-			CURR_RXD.psk_buff = NULL;
+			rx_hndl->psk_buff = NULL;
 		}
 	}
 }
 
 static void mwl_rx_ring_free(struct mwl_priv *priv)
 {
-	if (priv->desc_data[0].prx_ring) {
+	struct mwl_desc_data *desc;
+
+	desc = &priv->desc_data[0];
+
+	if (desc->prx_ring) {
 		mwl_rx_ring_cleanup(priv);
 
 		dma_free_coherent(&priv->pdev->dev,
 				  MAX_NUM_RX_RING_BYTES,
-				  priv->desc_data[0].prx_ring,
-				  priv->desc_data[0].pphys_rx_ring);
+				  desc->prx_ring,
+				  desc->pphys_rx_ring);
 
-		priv->desc_data[0].prx_ring = NULL;
+		desc->prx_ring = NULL;
 	}
 
-	priv->desc_data[0].pnext_rx_desc = NULL;
+	kfree(desc->rx_hndl);
+
+	desc->pnext_rx_hndl = NULL;
 }
 
 static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
@@ -212,8 +231,10 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 		status->flag |= RX_FLAG_VHT;
 		if (bw == RX_RATE_INFO_HT40)
 			status->flag |= RX_FLAG_40MHZ;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 18, 0)
 		if (bw == RX_RATE_INFO_HT80)
 			status->vht_flag |= RX_VHT_FLAG_80MHZ;
+#endif
 		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
 			status->flag |= RX_FLAG_SHORT_GI;
 		status->vht_nss = (nss + 1);
@@ -264,16 +285,15 @@ static inline struct mwl_vif *mwl_rx_find_vif_bss(struct mwl_priv *priv,
 						  u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
-	unsigned long flags;
 
-	spin_lock_irqsave(&priv->vif_lock, flags);
+	spin_lock_bh(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
 		if (memcmp(bssid, mwl_vif->bssid, ETH_ALEN) == 0) {
-			spin_unlock_irqrestore(&priv->vif_lock, flags);
+			spin_unlock_bh(&priv->vif_lock);
 			return mwl_vif;
 		}
 	}
-	spin_unlock_irqrestore(&priv->vif_lock, flags);
+	spin_unlock_bh(&priv->vif_lock);
 
 	return NULL;
 }
@@ -299,70 +319,67 @@ static inline void mwl_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 		skb_pull(skb, sizeof(*tr) - hdrlen);
 }
 
-static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_desc *pdesc)
+static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_hndl *rx_hndl)
 {
-	pdesc->psk_buff = dev_alloc_skb(priv->desc_data[0].rx_buf_size);
+	struct mwl_desc_data *desc;
+	dma_addr_t dma;
 
-	if (!pdesc->psk_buff)
-		goto nomem;
+	desc = &priv->desc_data[0];
 
-	if (skb_linearize(pdesc->psk_buff)) {
-		dev_kfree_skb_any(pdesc->psk_buff);
-		wiphy_err(priv->hw->wiphy, "need linearize memory");
-		goto nomem;
+	rx_hndl->psk_buff = dev_alloc_skb(desc->rx_buf_size);
+
+	if (!rx_hndl->psk_buff)
+		return -ENOMEM;
+
+	skb_reserve(rx_hndl->psk_buff, SYSADPT_MIN_BYTES_HEADROOM);
+
+	rx_hndl->pdesc->status = EAGLE_RXD_STATUS_OK;
+	rx_hndl->pdesc->qos_ctrl = 0x0000;
+	rx_hndl->pdesc->channel = 0x00;
+	rx_hndl->pdesc->rssi = 0x00;
+	rx_hndl->pdesc->pkt_len = cpu_to_le16(desc->rx_buf_size);
+
+	dma = pci_map_single(priv->pdev,
+			     rx_hndl->psk_buff->data,
+			     desc->rx_buf_size,
+			     PCI_DMA_FROMDEVICE);
+	if (pci_dma_mapping_error(priv->pdev, dma)) {
+		dev_kfree_skb_any(rx_hndl->psk_buff);
+		wiphy_err(priv->hw->wiphy,
+			  "failed to map pci memory!\n");
+		return -ENOMEM;
 	}
 
-	skb_reserve(pdesc->psk_buff, SYSADPT_MIN_BYTES_HEADROOM);
-
-	pdesc->status = EAGLE_RXD_STATUS_OK;
-	pdesc->qos_ctrl = 0x0000;
-	pdesc->channel = 0x00;
-	pdesc->rssi = 0x00;
-
-	pdesc->pkt_len = cpu_to_le16(priv->desc_data[0].rx_buf_size);
-	pdesc->pbuff_data = pdesc->psk_buff->data;
-	pdesc->pphys_buff_data =
-		cpu_to_le32(pci_map_single(priv->pdev,
-					   pdesc->psk_buff->data,
-					   priv->desc_data[0].rx_buf_size,
-					   PCI_DMA_BIDIRECTIONAL));
+	rx_hndl->pdesc->pphys_buff_data = cpu_to_le32(dma);
 
 	return 0;
-
-nomem:
-
-	wiphy_err(priv->hw->wiphy, "no memory");
-
-	return -ENOMEM;
 }
 
 int mwl_rx_init(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
+	struct mwl_priv *priv = hw->priv;
 	int rc;
-
-	priv = hw->priv;
 
 	rc = mwl_rx_ring_alloc(priv);
 	if (rc) {
-		wiphy_err(hw->wiphy, "allocating RX ring failed");
-	} else {
-		rc = mwl_rx_ring_init(priv);
-		if (rc) {
-			mwl_rx_ring_free(priv);
-			wiphy_err(hw->wiphy,
-				  "initializing RX ring failed");
-		}
+		wiphy_err(hw->wiphy, "allocating RX ring failed\n");
+		return rc;
 	}
 
-	return rc;
+	rc = mwl_rx_ring_init(priv);
+	if (rc) {
+		mwl_rx_ring_free(priv);
+		wiphy_err(hw->wiphy,
+			  "initializing RX ring failed\n");
+		return rc;
+	}
+
+	return 0;
 }
 
 void mwl_rx_deinit(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
-
-	priv = hw->priv;
+	struct mwl_priv *priv = hw->priv;
 
 	mwl_rx_ring_cleanup(priv);
 	mwl_rx_ring_free(priv);
@@ -371,8 +388,9 @@ void mwl_rx_deinit(struct ieee80211_hw *hw)
 void mwl_rx_recv(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv;
-	struct mwl_rx_desc *curr_desc;
+	struct mwl_priv *priv = hw->priv;
+	struct mwl_desc_data *desc;
+	struct mwl_rx_hndl *curr_hndl;
 	int work_done = 0;
 	struct sk_buff *prx_skb = NULL;
 	int pkt_len;
@@ -381,11 +399,10 @@ void mwl_rx_recv(unsigned long data)
 	struct ieee80211_hdr *wh;
 	u32 status_mask;
 
-	priv = hw->priv;
+	desc = &priv->desc_data[0];
+	curr_hndl = desc->pnext_rx_hndl;
 
-	curr_desc = priv->desc_data[0].pnext_rx_desc;
-
-	if (!curr_desc) {
+	if (!curr_hndl) {
 		status_mask = readl(priv->iobase1 +
 				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 		writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
@@ -393,34 +410,35 @@ void mwl_rx_recv(unsigned long data)
 
 		priv->is_rx_schedule = false;
 
-		wiphy_warn(hw->wiphy, "busy or no receiving packets");
+		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
 		return;
 	}
 
-	while ((curr_desc->rx_control == EAGLE_RXD_CTRL_DMA_OWN) &&
+	while ((curr_hndl->pdesc->rx_control == EAGLE_RXD_CTRL_DMA_OWN) &&
 	       (work_done < priv->recv_limit)) {
-		prx_skb = curr_desc->psk_buff;
+		prx_skb = curr_hndl->psk_buff;
 		if (!prx_skb)
 			goto out;
 		pci_unmap_single(priv->pdev,
-				 le32_to_cpu(curr_desc->pphys_buff_data),
-				 priv->desc_data[0].rx_buf_size,
+				 le32_to_cpu(curr_hndl->pdesc->pphys_buff_data),
+				 desc->rx_buf_size,
 				 PCI_DMA_FROMDEVICE);
-		pkt_len = le16_to_cpu(curr_desc->pkt_len);
+		pkt_len = le16_to_cpu(curr_hndl->pdesc->pkt_len);
 
 		if (skb_tailroom(prx_skb) < pkt_len) {
 			dev_kfree_skb_any(prx_skb);
 			goto out;
 		}
 
-		if (curr_desc->channel != hw->conf.chandef.chan->hw_value) {
+		if (curr_hndl->pdesc->channel !=
+		    hw->conf.chandef.chan->hw_value) {
 			dev_kfree_skb_any(prx_skb);
 			goto out;
 		}
 
-		mwl_rx_prepare_status(curr_desc, &status);
+		mwl_rx_prepare_status(curr_hndl->pdesc, &status);
 
-		priv->noise = -curr_desc->noise_floor;
+		priv->noise = -curr_hndl->pdesc->noise_floor;
 
 		wh = &((struct mwl_dma_data *)prx_skb->data)->wh;
 
@@ -438,7 +456,7 @@ void mwl_rx_recv(unsigned long data)
 				/* When MMIC ERROR is encountered
 				 * by the firmware, payload is
 				 * dropped and only 32 bytes of
-				 * mwl8k Firmware header is sent
+				 * mwlwifi Firmware header is sent
 				 * to the host.
 				 *
 				 * We need to add four bytes of
@@ -464,18 +482,18 @@ void mwl_rx_recv(unsigned long data)
 		}
 
 		skb_put(prx_skb, pkt_len);
-		mwl_rx_remove_dma_header(prx_skb, curr_desc->qos_ctrl);
+		mwl_rx_remove_dma_header(prx_skb, curr_hndl->pdesc->qos_ctrl);
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
 out:
-		mwl_rx_refill(priv, curr_desc);
-		curr_desc->rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
-		curr_desc->qos_ctrl = 0;
-		curr_desc = curr_desc->pnext;
+		mwl_rx_refill(priv, curr_hndl);
+		curr_hndl->pdesc->rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
+		curr_hndl->pdesc->qos_ctrl = 0;
+		curr_hndl = curr_hndl->pnext;
 		work_done++;
 	}
 
-	priv->desc_data[0].pnext_rx_desc = curr_desc;
+	desc->pnext_rx_hndl = curr_hndl;
 
 	status_mask = readl(priv->iobase1 +
 			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);

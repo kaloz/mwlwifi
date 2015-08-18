@@ -1,12 +1,20 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file implements firmware download related functions.
+/* Description:  This file implements firmware download related
+ * functions.
  */
 
 #include <linux/io.h>
@@ -43,14 +51,13 @@ static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv)
 
 int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
+	struct mwl_priv *priv = hw->priv;
 	const struct firmware *fw;
 	u32 curr_iteration = 0;
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
 	u32 len = 0;
 
-	priv = hw->priv;
 	fw = priv->fw_ucode;
 
 	mwl_fwcmd_reset(hw);
@@ -72,7 +79,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	 * reside on its respective blocks such as ITCM, DTCM, SQRAM,
 	 * (or even DDR, AFTER DDR is init'd before fw download
 	 */
-	wiphy_info(hw->wiphy, "fw download start 88");
+	wiphy_info(hw->wiphy, "fw download start 88\n");
 
 	/* Disable PFU before FWDL */
 	writel(0x100, priv->iobase1 + 0xE0E4);
@@ -126,7 +133,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 			 * download failed
 			 */
 			wiphy_err(hw->wiphy,
-				  "Exhausted curr_iteration for fw download");
+				  "Exhausted curr_iteration for fw download\n");
 			goto err_download;
 		}
 
@@ -134,7 +141,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	}
 
 	wiphy_info(hw->wiphy,
-		   "FwSize = %d downloaded Size = %d curr_iteration %d",
+		   "FwSize = %d downloaded Size = %d curr_iteration %d\n",
 		   (int)fw->size, size_fw_downloaded, curr_iteration);
 
 	/* Now firware is downloaded successfully, so this part is to check
@@ -143,7 +150,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	 * downloaded fw crashes, this signature checking will fail. This
 	 * part is similar as SC1
 	 */
-	writew(0x00, &priv->pcmd_buf[1]);
+	*((u32 *)&priv->pcmd_buf[1]) = 0;
 	mwl_fwdl_trig_pcicmd(priv);
 	curr_iteration = FW_MAX_NUM_CHECKS;
 	do {
@@ -158,11 +165,11 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 
 	if (curr_iteration == 0) {
 		wiphy_err(hw->wiphy,
-			  "Exhausted curr_iteration for fw signature");
+			  "Exhausted curr_iteration for fw signature\n");
 		goto err_download;
 	}
 
-	wiphy_info(hw->wiphy, "complete");
+	wiphy_info(hw->wiphy, "complete\n");
 	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
 
 	return 0;

@@ -1,13 +1,19 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file defines system adaptation related information.
- */
+/* Description:  This file defines system adaptation related information. */
 
 #ifndef _mwl_sysadpt_h_
 #define _mwl_sysadpt_h_
@@ -48,7 +54,11 @@
 
 #define SYSADPT_AMPDU_PACKET_THRESHOLD 64
 
-#define SYSADPT_AMSDU_MAX_SIZE         3300
+#define SYSADPT_AMSDU_FW_MAX_SIZE      3300
+
+#define SYSADPT_AMSDU_4K_MAX_SIZE      SYSADPT_AMSDU_FW_MAX_SIZE
+
+#define SYSADPT_AMSDU_8K_MAX_SIZE      SYSADPT_AMSDU_FW_MAX_SIZE
 
 #define SYSADPT_AMSDU_ALLOW_SIZE       1540
 

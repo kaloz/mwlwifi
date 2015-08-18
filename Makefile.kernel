@@ -7,3 +7,5 @@ mwlwifi-objs		+= fwcmd.o
 mwlwifi-objs		+= tx.o
 mwlwifi-objs		+= rx.o
 mwlwifi-objs		+= isr.o
+
+ccflags-y += -D__CHECK_ENDIAN__

@@ -1,17 +1,24 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file defines device related information.
- */
+/* Description:  This file defines device related information. */
 
-#ifndef _mwl_dev_h_
-#define _mwl_dev_h_
+#ifndef _dev_h_
+#define _dev_h_
 
+#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/firmware.h>
@@ -36,7 +43,7 @@
 #define MACREG_REG_GEN_PTR                  0x00000C10
 #define MACREG_REG_INT_CODE                 0x00000C14
 
-/* Bit definitio for MACREG_REG_A2H_INTERRUPT_CAUSE (A2HRIC) */
+/* Bit definition for MACREG_REG_A2H_INTERRUPT_CAUSE (A2HRIC) */
 #define MACREG_A2HRIC_BIT_TX_DONE           BIT(0)
 #define MACREG_A2HRIC_BIT_RX_RDY            BIT(1)
 #define MACREG_A2HRIC_BIT_OPC_DONE          BIT(2)
@@ -72,7 +79,7 @@
 
 #define MACREG_A2HRIC_BIT_MASK      ISR_SRC_BITS
 
-/* Bit definitio for MACREG_REG_H2A_INTERRUPT_CAUSE (H2ARIC) */
+/* Bit definition for MACREG_REG_H2A_INTERRUPT_CAUSE (H2ARIC) */
 #define MACREG_H2ARIC_BIT_PPA_READY         BIT(0)
 #define MACREG_H2ARIC_BIT_DOOR_BELL         BIT(1)
 #define MACREG_H2ARIC_BIT_PS                BIT(2)
@@ -131,16 +138,18 @@ enum {
 };
 
 struct mwl_chip_info {
-	char *part_name;
-	char *fw_image;
+	const char *part_name;
+	const char *fw_image;
+	int antenna_tx;
+	int antenna_rx;
 };
 
 struct mwl_tx_pwr_tbl {
 	u8 channel;
 	u8 setcap;
-	u16 tx_power[SYSADPT_TX_POWER_LEVEL_TOTAL];
-	u8 cdd;                      /* 0: off, 1: on */
 	u16 txantenna2;
+	u16 tx_power[SYSADPT_TX_POWER_LEVEL_TOTAL];
+	bool cdd;
 };
 
 struct mwl_hw_data {
@@ -177,16 +186,22 @@ struct mwl_tx_desc {
 	__le16 reserved;
 	__le32 tcpack_sn;
 	__le32 tcpack_src_dst;
-	struct sk_buff *psk_buff;
-	struct mwl_tx_desc *pnext;
-	u8 reserved1[2];
+	__le32 reserved1;
+	__le32 reserved2;
+	u8 reserved3[2];
 	u8 packet_info;
 	u8 packet_id;
 	__le16 packet_len_and_retry;
 	__le16 packet_rate_info;
-	u8 *sta_info;
+	__le32 reserved4;
 	__le32 status;
 } __packed;
+
+struct mwl_tx_hndl {
+	struct sk_buff *psk_buff;
+	struct mwl_tx_desc *pdesc;
+	struct mwl_tx_hndl *pnext;
+};
 
 #define MWL_RX_RATE_FORMAT_MASK       0x0007
 #define MWL_RX_RATE_NSS_MASK          0x0018
@@ -213,27 +228,30 @@ struct mwl_rx_desc {
 	u8 status;                   /* status field containing USED bit   */
 	u8 channel;                  /* channel this pkt was received on   */
 	u8 rx_control;               /* the control element of the desc    */
-	/* above are 32bits aligned and is same as FW, RxControl put at end
-	 * for sync
-	 */
-	struct sk_buff *psk_buff;    /* associated sk_buff for Linux       */
-	void *pbuff_data;            /* virtual address of payload data    */
-	struct mwl_rx_desc *pnext;   /* virtual address of next RX desc    */
+	__le32 reserved1[3];
 } __packed;
+
+struct mwl_rx_hndl {
+	struct sk_buff *psk_buff;    /* associated sk_buff for Linux       */
+	struct mwl_rx_desc *pdesc;
+	struct mwl_rx_hndl *pnext;
+};
 
 struct mwl_desc_data {
 	dma_addr_t pphys_tx_ring;          /* ptr to first TX desc (phys.)    */
 	struct mwl_tx_desc *ptx_ring;      /* ptr to first TX desc (virt.)    */
-	struct mwl_tx_desc *pnext_tx_desc; /* next TX desc that can be used   */
-	struct mwl_tx_desc *pstale_tx_desc;/* the staled TX descriptor        */
+	struct mwl_tx_hndl *tx_hndl;
+	struct mwl_tx_hndl *pnext_tx_hndl; /* next TX handle that can be used */
+	struct mwl_tx_hndl *pstale_tx_hndl;/* the staled TX handle            */
 	dma_addr_t pphys_rx_ring;          /* ptr to first RX desc (phys.)    */
 	struct mwl_rx_desc *prx_ring;      /* ptr to first RX desc (virt.)    */
-	struct mwl_rx_desc *pnext_rx_desc; /* next RX desc that can be used   */
-	unsigned int wcb_base;             /* FW base offset for registers    */
-	unsigned int rx_desc_write;        /* FW descriptor write position    */
-	unsigned int rx_desc_read;         /* FW descriptor read position     */
-	unsigned int rx_buf_size;          /* length of the RX buffers        */
-} __packed;
+	struct mwl_rx_hndl *rx_hndl;
+	struct mwl_rx_hndl *pnext_rx_hndl; /* next RX handle that can be used */
+	u32 wcb_base;                      /* FW base offset for registers    */
+	u32 rx_desc_write;                 /* FW descriptor write position    */
+	u32 rx_desc_read;                  /* FW descriptor read position     */
+	u32 rx_buf_size;                   /* length of the RX buffers        */
+};
 
 struct mwl_ampdu_stream {
 	struct ieee80211_sta *sta;
@@ -255,7 +273,7 @@ struct mwl_priv {
 	int antenna_rx;
 
 	struct mwl_tx_pwr_tbl tx_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
-	u32 cdd;                     /* 0: off, 1: on */
+	bool cdd;
 	u16 txantenna2;
 	u8 powinited;
 	u16 max_tx_pow[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* max tx power (dBm) */
@@ -263,8 +281,8 @@ struct mwl_priv {
 	u8 cal_tbl[200];
 
 	struct pci_dev *pdev;
-	void *iobase0;               /* MEM Base Address Register 0  */
-	void *iobase1;               /* MEM Base Address Register 1  */
+	void __iomem *iobase0; /* MEM Base Address Register 0  */
+	void __iomem *iobase1; /* MEM Base Address Register 1  */
 	u32 next_bar_num;
 
 	spinlock_t fwcmd_lock;       /* for firmware command         */
@@ -285,10 +303,12 @@ struct mwl_priv {
 
 	struct tasklet_struct tx_task;
 	struct tasklet_struct rx_task;
+	struct tasklet_struct qe_task;
 	int txq_limit;
 	bool is_tx_schedule;
 	int recv_limit;
 	bool is_rx_schedule;
+	bool is_qe_schedule;
 	s8 noise;                    /* Most recently reported noise in dBm */
 	struct ieee80211_supported_band band_24;
 	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
@@ -324,23 +344,22 @@ struct beacon_info {
 	u16 cap_info;
 	u8 b_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 op_rate_set[SYSADPT_MAX_DATA_RATES_G];
-	u16 ie_wmm_len;               /* Keep WMM IE */
-	u8 *ie_wmm_ptr;
-	u16 ie_rsn_len;               /* Keep WPA IE */
-	u8 *ie_rsn_ptr;
-	u16 ie_rsn48_len;             /* Keep WPA2 IE */
-	u8 *ie_rsn48_ptr;
-	u16 ie_ht_len;                /* Keep HT IE */
-	u8 *ie_ht_ptr;
 	u8 ie_list_ht[148];
-	u16 ie_vht_len;               /* Keep VHT IE */
-	u8 *ie_vht_ptr;
 	u8 ie_list_vht[24];
+	u8 *ie_wmm_ptr;
+	u8 *ie_rsn_ptr;
+	u8 *ie_rsn48_ptr;
+	u8 *ie_ht_ptr;
+	u8 *ie_vht_ptr;
+	u8 ie_wmm_len;
+	u8 ie_rsn_len;
+	u8 ie_rsn48_len;
+	u8 ie_ht_len;
+	u8 ie_vht_len;
 };
 
 struct mwl_vif {
 	struct list_head list;
-	struct ieee80211_vif *vif;
 	int macid;       /* Firmware macid for this vif.  */
 	u16 seqno;       /* Non AMPDU sequence number assigned by driver.  */
 	struct {         /* Saved WEP keys */
@@ -352,7 +371,6 @@ struct mwl_vif {
 	/* A flag to indicate is HW crypto is enabled for this bssid */
 	bool is_hw_crypto_enabled;
 	/* Indicate if this is station mode */
-	bool is_sta;
 	struct beacon_info beacon_info;
 	u16 iv16;
 	u32 iv32;
@@ -360,16 +378,16 @@ struct mwl_vif {
 };
 
 struct mwl_tx_info {
-	u32 start_time;
+	unsigned long start_time;
 	u32 pkts;
 };
 
 struct mwl_amsdu_frag {
 	struct sk_buff *skb;
-	u8 pad;
 	u8 *cur_pos;
+	unsigned long jiffies;
+	u8 pad;
 	u8 num;
-	u32 jiffies;
 };
 
 struct mwl_amsdu_ctrl {
@@ -379,10 +397,10 @@ struct mwl_amsdu_ctrl {
 
 struct mwl_sta {
 	struct list_head list;
-	struct ieee80211_sta *sta;
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];
 	bool is_amsdu_allowed;
+	spinlock_t amsdu_lock;      /* for amsdu aggregation       */
 	struct mwl_amsdu_ctrl amsdu_ctrl;
 	u16 iv16;
 	u32 iv32;
@@ -397,14 +415,14 @@ struct mwl_dma_data {
 
 /* Transmission information to transmit a socket buffer. */
 struct mwl_tx_ctrl {
-	u8 tx_priority;
-	u16 qos_ctrl;
-	u8 type;
-	u8 xmit_control;
 	void *sta;
 	void *vif;
 	void *k_conf;
-} __packed;
+	u8 tx_priority;
+	u8 type;
+	u16 qos_ctrl;
+	u8 xmit_control;
+};
 
 static inline struct mwl_vif *mwl_dev_get_vif(const struct ieee80211_vif *vif)
 {
@@ -416,4 +434,11 @@ static inline struct mwl_sta *mwl_dev_get_sta(const struct ieee80211_sta *sta)
 	return (struct mwl_sta *)&sta->drv_priv;
 }
 
-#endif /* _mwl_dev_h_ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
+#define ether_addr_copy(dst, src) memcpy(dst, src, ETH_ALEN)
+#endif
+
+/* Defined in mac80211.c. */
+extern const struct ieee80211_ops mwl_mac80211_ops;
+
+#endif /* _dev_h_ */

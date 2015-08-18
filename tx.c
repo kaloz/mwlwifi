@@ -1,13 +1,19 @@
 /*
  * Copyright (C) 2006-2015, Marvell International Ltd.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This software file (the "File") is distributed by Marvell International
+ * Ltd. under the terms of the GNU General Public License Version 2, June 1991
+ * (the "License").  You may use, redistribute and/or modify this File in
+ * accordance with the terms and conditions of the License, a copy of which
+ * is available by writing to the Free Software Foundation, Inc.
+ *
+ * THE FILE IS DISTRIBUTED AS-IS, WITHOUT WARRANTY OF ANY KIND, AND THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
+ * ARE EXPRESSLY DISCLAIMED.  The License provides additional details about
+ * this warranty disclaimer.
  */
 
-/* Description:  This file implements transmit related functions.
- */
+/* Description:  This file implements transmit related functions. */
 
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -20,12 +26,8 @@
 #define MAX_NUM_TX_RING_BYTES  (SYSADPT_MAX_NUM_TX_DESC * \
 				sizeof(struct mwl_tx_desc))
 
-#define FIRST_TXD(i) priv->desc_data[i].ptx_ring[0]
-#define CURR_TXD(i)  priv->desc_data[i].ptx_ring[curr_desc]
-#define NEXT_TXD(i)  priv->desc_data[i].ptx_ring[curr_desc + 1]
-#define LAST_TXD(i)  priv->desc_data[i].ptx_ring[SYSADPT_MAX_NUM_TX_DESC - 1]
-
-#define STALE_TXD(i) priv->desc_data[i].pstale_tx_desc
+#define MAX_NUM_TX_HNDL_BYTES   (SYSADPT_MAX_NUM_TX_DESC * \
+				sizeof(struct mwl_tx_hndl))
 
 #define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* Use multicast data rate */
 
@@ -59,30 +61,67 @@ enum {
 	IEEE_TYPE_DATA
 };
 
+struct ccmp_hdr {
+	__le16 iv16;
+	u8 rsvd;
+	u8 key_id;
+	__le32 iv32;
+} __packed;
+
 static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 {
+	struct mwl_desc_data *desc;
 	int num;
 	u8 *mem;
 
-	mem = (u8 *)dma_alloc_coherent(&priv->pdev->dev,
-		MAX_NUM_TX_RING_BYTES * SYSADPT_NUM_OF_DESC_DATA,
-		&priv->desc_data[0].pphys_tx_ring, GFP_KERNEL);
+	desc = &priv->desc_data[0];
+
+	mem = dma_alloc_coherent(&priv->pdev->dev,
+				 MAX_NUM_TX_RING_BYTES *
+				 SYSADPT_NUM_OF_DESC_DATA,
+				 &desc->pphys_tx_ring,
+				 GFP_KERNEL);
 
 	if (!mem) {
-		wiphy_err(priv->hw->wiphy, "can not alloc mem");
+		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
 		return -ENOMEM;
 	}
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		priv->desc_data[num].ptx_ring = (struct mwl_tx_desc *)
+		desc = &priv->desc_data[num];
+
+		desc->ptx_ring = (struct mwl_tx_desc *)
 			(mem + num * MAX_NUM_TX_RING_BYTES);
 
-		priv->desc_data[num].pphys_tx_ring = (dma_addr_t)
+		desc->pphys_tx_ring = (dma_addr_t)
 			((u32)priv->desc_data[0].pphys_tx_ring +
 			num * MAX_NUM_TX_RING_BYTES);
 
-		memset(priv->desc_data[num].ptx_ring, 0x00,
+		memset(desc->ptx_ring, 0x00,
 		       MAX_NUM_TX_RING_BYTES);
+	}
+
+	mem = kmalloc(MAX_NUM_TX_HNDL_BYTES * SYSADPT_NUM_OF_DESC_DATA,
+		      GFP_KERNEL);
+
+	if (!mem) {
+		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
+		dma_free_coherent(&priv->pdev->dev,
+				  MAX_NUM_TX_RING_BYTES *
+				  SYSADPT_NUM_OF_DESC_DATA,
+				  priv->desc_data[0].ptx_ring,
+				  priv->desc_data[0].pphys_tx_ring);
+		return -ENOMEM;
+	}
+
+	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
+		desc = &priv->desc_data[num];
+
+		desc->tx_hndl = (struct mwl_tx_hndl *)
+			(mem + num * MAX_NUM_TX_HNDL_BYTES);
+
+		memset(desc->tx_hndl, 0x00,
+		       MAX_NUM_TX_HNDL_BYTES);
 	}
 
 	return 0;
@@ -90,9 +129,8 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 
 static int mwl_tx_ring_init(struct mwl_priv *priv)
 {
-	int curr_desc;
+	int num, i;
 	struct mwl_desc_data *desc;
-	int num;
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
 		skb_queue_head_init(&priv->txq[num]);
@@ -101,23 +139,27 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 		desc = &priv->desc_data[num];
 
 		if (desc->ptx_ring) {
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC;
-			     curr_desc++) {
-				CURR_TXD(num).status =
+			for (i = 0; i < SYSADPT_MAX_NUM_TX_DESC; i++) {
+				desc->ptx_ring[i].status =
 					cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
-				CURR_TXD(num).pnext = &NEXT_TXD(num);
-				CURR_TXD(num).pphys_next =
+				desc->ptx_ring[i].pphys_next =
 					cpu_to_le32((u32)desc->pphys_tx_ring +
-					((curr_desc + 1) *
-					sizeof(struct mwl_tx_desc)));
+					((i + 1) * sizeof(struct mwl_tx_desc)));
+				desc->tx_hndl[i].pdesc =
+					&desc->ptx_ring[i];
+				if (i < SYSADPT_MAX_NUM_TX_DESC - 1)
+					desc->tx_hndl[i].pnext =
+						&desc->tx_hndl[i + 1];
 			}
-			LAST_TXD(num).pnext = &FIRST_TXD(num);
-			LAST_TXD(num).pphys_next =
+			desc->ptx_ring[SYSADPT_MAX_NUM_TX_DESC - 1].pphys_next =
 				cpu_to_le32((u32)desc->pphys_tx_ring);
-			desc->pstale_tx_desc = &FIRST_TXD(num);
-			desc->pnext_tx_desc  = &FIRST_TXD(num);
+			desc->tx_hndl[SYSADPT_MAX_NUM_TX_DESC - 1].pnext =
+				&desc->tx_hndl[0];
+
+			desc->pstale_tx_hndl = &desc->tx_hndl[0];
+			desc->pnext_tx_hndl  = &desc->tx_hndl[0];
 		} else {
-			wiphy_err(priv->hw->wiphy, "no valid TX mem");
+			wiphy_err(priv->hw->wiphy, "no valid TX mem\n");
 			return -ENOMEM;
 		}
 	}
@@ -128,41 +170,43 @@ static int mwl_tx_ring_init(struct mwl_priv *priv)
 static void mwl_tx_ring_cleanup(struct mwl_priv *priv)
 {
 	int cleaned_tx_desc = 0;
-	int curr_desc;
-	int num;
+	int num, i;
+	struct mwl_desc_data *desc;
 
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
 		skb_queue_purge(&priv->txq[num]);
 		priv->fw_desc_cnt[num] = 0;
-		if (priv->desc_data[num].ptx_ring) {
-			for (curr_desc = 0; curr_desc < SYSADPT_MAX_NUM_TX_DESC;
-			     curr_desc++) {
-				if (!CURR_TXD(num).psk_buff)
+
+		desc = &priv->desc_data[num];
+
+		if (desc->ptx_ring) {
+			for (i = 0; i < SYSADPT_MAX_NUM_TX_DESC; i++) {
+				if (!desc->tx_hndl[i].psk_buff)
 					continue;
 
 				wiphy_info(priv->hw->wiphy,
-					   "unmapped and free'd %i 0x%p 0x%x",
-					   curr_desc,
-					   CURR_TXD(num).psk_buff->data,
+					   "unmapped and free'd %i 0x%p 0x%x\n",
+					   i,
+					   desc->tx_hndl[i].psk_buff->data,
 					   le32_to_cpu(
-					   CURR_TXD(num).pkt_ptr));
+					   desc->ptx_ring[i].pkt_ptr));
 				pci_unmap_single(priv->pdev,
 						 le32_to_cpu(
-						 CURR_TXD(num).pkt_ptr),
-						 CURR_TXD(num).psk_buff->len,
+						 desc->ptx_ring[i].pkt_ptr),
+						 desc->tx_hndl[i].psk_buff->len,
 						 PCI_DMA_TODEVICE);
-				dev_kfree_skb_any(CURR_TXD(num).psk_buff);
-				CURR_TXD(num).status =
+				dev_kfree_skb_any(desc->tx_hndl[i].psk_buff);
+				desc->ptx_ring[i].status =
 					cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
-				CURR_TXD(num).psk_buff = NULL;
-				CURR_TXD(num).pkt_ptr = 0;
-				CURR_TXD(num).pkt_len = 0;
+				desc->ptx_ring[i].pkt_ptr = 0;
+				desc->ptx_ring[i].pkt_len = 0;
+				desc->tx_hndl[i].psk_buff = NULL;
 				cleaned_tx_desc++;
 			}
 		}
 	}
 
-	wiphy_info(priv->hw->wiphy, "cleaned %i TX descr", cleaned_tx_desc);
+	wiphy_info(priv->hw->wiphy, "cleaned %i TX descr\n", cleaned_tx_desc);
 }
 
 static void mwl_tx_ring_free(struct mwl_priv *priv)
@@ -180,9 +224,11 @@ static void mwl_tx_ring_free(struct mwl_priv *priv)
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
 		if (priv->desc_data[num].ptx_ring)
 			priv->desc_data[num].ptx_ring = NULL;
-		priv->desc_data[num].pstale_tx_desc = NULL;
-		priv->desc_data[num].pnext_tx_desc  = NULL;
+		priv->desc_data[num].pstale_tx_hndl = NULL;
+		priv->desc_data[num].pnext_tx_hndl = NULL;
 	}
+
+	kfree(priv->desc_data[0].tx_hndl);
 }
 
 static inline void mwl_tx_add_dma_header(struct mwl_priv *priv,
@@ -268,10 +314,12 @@ static inline void mwl_tx_encapsulate_frame(struct mwl_priv *priv,
 static inline void mwl_tx_insert_ccmp_hdr(u8 *pccmp_hdr,
 					  u8 key_id, u16 iv16, u32 iv32)
 {
-	*((u16 *)pccmp_hdr) = iv16;
-	pccmp_hdr[2] = 0;
-	pccmp_hdr[3] = EXT_IV | (key_id << 6);
-	*((u32 *)&pccmp_hdr[4]) = iv32;
+	struct ccmp_hdr *ccmp_h = (struct ccmp_hdr *)pccmp_hdr;
+
+	ccmp_h->iv16 = cpu_to_le16(iv16);
+	ccmp_h->rsvd = 0;
+	ccmp_h->key_id = EXT_IV | (key_id << 6);
+	ccmp_h->iv32 = cpu_to_le32(iv32);
 }
 
 static inline int mwl_tx_tid_queue_mapping(u8 tid)
@@ -326,13 +374,16 @@ static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 
 static inline bool mwl_tx_available(struct mwl_priv *priv, int desc_num)
 {
-	if (!priv->desc_data[desc_num].pnext_tx_desc)
+	struct mwl_tx_hndl *tx_hndl;
+
+	tx_hndl = priv->desc_data[desc_num].pnext_tx_hndl;
+
+	if (!tx_hndl->pdesc)
 		return false;
 
-	if (priv->desc_data[desc_num].pnext_tx_desc->status !=
-	    EAGLE_TXD_STATUS_IDLE) {
+	if (tx_hndl->pdesc->status != EAGLE_TXD_STATUS_IDLE) {
 		/* Interrupt F/W anyway */
-		if (priv->desc_data[desc_num].pnext_tx_desc->status &
+		if (tx_hndl->pdesc->status &
 		    cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED))
 			writel(MACREG_H2ARIC_BIT_PPA_READY,
 			       priv->iobase1 +
@@ -348,20 +399,24 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 {
 	struct ieee80211_tx_info *tx_info;
 	struct mwl_tx_ctrl *tx_ctrl;
+	struct mwl_tx_hndl *tx_hndl;
 	struct mwl_tx_desc *tx_desc;
 	struct ieee80211_sta *sta;
+	struct ieee80211_vif *vif;
 	struct mwl_vif *mwl_vif;
 	struct ieee80211_key_conf *k_conf;
 	bool ccmp = false;
 	struct mwl_dma_data *dma_data;
 	struct ieee80211_hdr *wh;
+	dma_addr_t dma;
 
 	BUG_ON(!tx_skb);
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
 	sta = (struct ieee80211_sta *)tx_ctrl->sta;
-	mwl_vif = (struct mwl_vif *)tx_ctrl->vif;
+	vif = (struct ieee80211_vif *)tx_ctrl->vif;
+	mwl_vif = mwl_dev_get_vif(vif);
 	k_conf = (struct ieee80211_key_conf *)tx_ctrl->k_conf;
 
 	mwl_tx_encapsulate_frame(priv, tx_skb, k_conf, &ccmp);
@@ -380,7 +435,7 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 			}
 		} else {
 			if (ccmp) {
-				if (mwl_vif->is_sta) {
+				if (vif->type == NL80211_IFTYPE_STATION) {
 					mwl_tx_insert_ccmp_hdr(dma_data->data,
 							       mwl_vif->keyidx,
 							       mwl_vif->iv16,
@@ -403,78 +458,212 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 		}
 	}
 
-	tx_desc = priv->desc_data[desc_num].pnext_tx_desc;
+	tx_hndl = priv->desc_data[desc_num].pnext_tx_hndl;
+	tx_hndl->psk_buff = tx_skb;
+	tx_desc = tx_hndl->pdesc;
 	tx_desc->tx_priority = tx_ctrl->tx_priority;
 	tx_desc->qos_ctrl = cpu_to_le16(tx_ctrl->qos_ctrl);
-	tx_desc->psk_buff = tx_skb;
 	tx_desc->pkt_len = cpu_to_le16(tx_skb->len);
 	tx_desc->packet_info = 0;
 	tx_desc->data_rate = 0;
-	tx_desc->sta_info = tx_ctrl->sta;
 	tx_desc->type = tx_ctrl->type;
 	tx_desc->xmit_control = tx_ctrl->xmit_control;
 	tx_desc->sap_pkt_info = 0;
-	tx_desc->pkt_ptr =
-		cpu_to_le32(pci_map_single(priv->pdev, tx_skb->data,
-					   tx_skb->len, PCI_DMA_TODEVICE));
+	dma = pci_map_single(priv->pdev, tx_skb->data,
+			     tx_skb->len, PCI_DMA_TODEVICE);
+	if (pci_dma_mapping_error(priv->pdev, dma)) {
+		dev_kfree_skb_any(tx_skb);
+		wiphy_err(priv->hw->wiphy,
+			  "failed to map pci memory!\n");
+		return;
+	}
+	tx_desc->pkt_ptr = cpu_to_le32(dma);
 	tx_desc->status = cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED);
-	priv->desc_data[desc_num].pnext_tx_desc = tx_desc->pnext;
 	/* make sure all the memory transactions done by cpu were completed */
 	wmb();	/*Data Memory Barrier*/
 	writel(MACREG_H2ARIC_BIT_PPA_READY,
 	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+	priv->desc_data[desc_num].pnext_tx_hndl = tx_hndl->pnext;
 	priv->fw_desc_cnt[desc_num]++;
+}
+
+static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
+					      int desc_num,
+					      struct sk_buff *tx_skb,
+					      struct mwl_tx_ctrl *tx_ctrl)
+{
+	struct ieee80211_sta *sta;
+	struct mwl_sta *sta_info;
+	struct mwl_amsdu_frag *amsdu;
+	int amsdu_allow_size;
+	struct ieee80211_hdr *wh;
+	int wh_len;
+	u16 len;
+	u8 *data;
+
+	sta = (struct ieee80211_sta *)tx_ctrl->sta;
+	sta_info = mwl_dev_get_sta(sta);
+
+	if (!sta_info->is_amsdu_allowed)
+		return tx_skb;
+
+	if (sta_info->amsdu_ctrl.cap == MWL_AMSDU_SIZE_4K)
+		amsdu_allow_size = SYSADPT_AMSDU_4K_MAX_SIZE;
+	else if (sta_info->amsdu_ctrl.cap == MWL_AMSDU_SIZE_8K)
+		amsdu_allow_size = SYSADPT_AMSDU_8K_MAX_SIZE;
+	else
+		return tx_skb;
+
+	spin_lock_bh(&sta_info->amsdu_lock);
+	amsdu = &sta_info->amsdu_ctrl.frag[desc_num];
+
+	if (tx_skb->len > SYSADPT_AMSDU_ALLOW_SIZE) {
+		if (amsdu->num) {
+			mwl_tx_skb(priv, desc_num, amsdu->skb);
+			amsdu->num = 0;
+			amsdu->cur_pos = NULL;
+
+			if (!mwl_tx_available(priv, desc_num)) {
+				skb_queue_head(&priv->txq[desc_num], tx_skb);
+				spin_unlock_bh(&sta_info->amsdu_lock);
+				return NULL;
+			}
+		}
+		spin_unlock_bh(&sta_info->amsdu_lock);
+		return tx_skb;
+	}
+
+	/* potential amsdu size, should add amsdu header 14 bytes +
+	 * maximum padding 3.
+	 */
+	wh = (struct ieee80211_hdr *)tx_skb->data;
+	wh_len = ieee80211_hdrlen(wh->frame_control);
+	len = tx_skb->len - wh_len + 17;
+
+	if (amsdu->num) {
+		if ((amsdu->skb->len + len) > amsdu_allow_size) {
+			mwl_tx_skb(priv, desc_num, amsdu->skb);
+			amsdu->num = 0;
+			amsdu->cur_pos = NULL;
+		}
+	}
+
+	amsdu->jiffies = jiffies;
+	len = tx_skb->len - wh_len;
+
+	if (amsdu->num == 0) {
+		struct sk_buff *newskb;
+		struct ieee80211_tx_info *tx_info;
+
+		newskb = dev_alloc_skb(amsdu_allow_size +
+				       SYSADPT_MIN_BYTES_HEADROOM);
+
+		if (newskb == NULL) {
+			spin_unlock_bh(&sta_info->amsdu_lock);
+			return tx_skb;
+		}
+
+		data = newskb->data;
+
+		memcpy(data, tx_skb->data, wh_len);
+		ether_addr_copy(data + wh_len, ieee80211_get_DA(wh));
+		ether_addr_copy(data + wh_len + ETH_ALEN, ieee80211_get_SA(wh));
+		*(u8 *)(data + wh_len + ETH_HLEN - 1) = len & 0xff;
+		*(u8 *)(data + wh_len + ETH_HLEN - 2) = (len >> 8) & 0xff;
+		memcpy(data + wh_len + ETH_HLEN, tx_skb->data + wh_len, len);
+
+		skb_put(newskb, tx_skb->len + ETH_HLEN);
+		tx_ctrl->qos_ctrl |= IEEE80211_QOS_CTL_A_MSDU_PRESENT;
+		tx_info = IEEE80211_SKB_CB(newskb);
+		memcpy(&tx_info->status, tx_ctrl, sizeof(*tx_ctrl));
+		amsdu->skb = newskb;
+	} else {
+		amsdu->cur_pos += amsdu->pad;
+		data = amsdu->cur_pos;
+
+		ether_addr_copy(data, ieee80211_get_DA(wh));
+		ether_addr_copy(data + ETH_ALEN, ieee80211_get_SA(wh));
+		*(u8 *)(data + ETH_HLEN - 1) = len & 0xff;
+		*(u8 *)(data + ETH_HLEN - 2) = (len >> 8) & 0xff;
+		memcpy(data + ETH_HLEN, tx_skb->data + wh_len, len);
+
+		skb_put(amsdu->skb, len + ETH_HLEN + amsdu->pad);
+	}
+
+	amsdu->num++;
+	amsdu->pad = ((len + ETH_HLEN) % 4) ? (4 - (len + ETH_HLEN) % 4) : 0;
+	amsdu->cur_pos = amsdu->skb->data + amsdu->skb->len;
+	dev_kfree_skb_any(tx_skb);
+
+	if (amsdu->num > SYSADPT_AMSDU_PACKET_THRESHOLD) {
+		amsdu->num = 0;
+		amsdu->cur_pos = NULL;
+		spin_unlock_bh(&sta_info->amsdu_lock);
+		return amsdu->skb;
+	}
+
+	spin_unlock_bh(&sta_info->amsdu_lock);
+	return NULL;
 }
 
 static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
+	struct mwl_priv *priv = hw->priv;
 	int num = SYSADPT_NUM_OF_DESC_DATA;
 	struct sk_buff *tx_skb;
-	unsigned long flags;
 
-	priv = hw->priv;
-
-	spin_lock_irqsave(&priv->tx_desc_lock, flags);
+	spin_lock_bh(&priv->tx_desc_lock);
 	while (num--) {
 		while (skb_queue_len(&priv->txq[num]) > 0) {
-			if (mwl_tx_available(priv, num) == false)
+			struct ieee80211_tx_info *tx_info;
+			struct mwl_tx_ctrl *tx_ctrl;
+
+			if (!mwl_tx_available(priv, num))
 				break;
+
 			tx_skb = skb_dequeue(&priv->txq[num]);
-			mwl_tx_skb(priv, num, tx_skb);
+			tx_info = IEEE80211_SKB_CB(tx_skb);
+			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+
+			if ((tx_skb->protocol != cpu_to_be16(ETH_P_PAE)) &&
+			    (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)) {
+				tx_skb = mwl_tx_do_amsdu(priv, num,
+							 tx_skb, tx_ctrl);
+			}
+
+			if (tx_skb)
+				mwl_tx_skb(priv, num, tx_skb);
 		}
 	}
-	spin_unlock_irqrestore(&priv->tx_desc_lock, flags);
+	spin_unlock_bh(&priv->tx_desc_lock);
 }
 
 int mwl_tx_init(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
+	struct mwl_priv *priv = hw->priv;
 	int rc;
-
-	priv = hw->priv;
 
 	skb_queue_head_init(&priv->delay_q);
 
 	rc = mwl_tx_ring_alloc(priv);
 	if (rc) {
-		wiphy_err(hw->wiphy, "allocating TX ring failed");
-	} else {
-		rc = mwl_tx_ring_init(priv);
-		if (rc) {
-			mwl_tx_ring_free(priv);
-			wiphy_err(hw->wiphy, "initializing TX ring failed");
-		}
+		wiphy_err(hw->wiphy, "allocating TX ring failed\n");
+		return rc;
 	}
 
-	return rc;
+	rc = mwl_tx_ring_init(priv);
+	if (rc) {
+		mwl_tx_ring_free(priv);
+		wiphy_err(hw->wiphy, "initializing TX ring failed\n");
+		return rc;
+	}
+
+	return 0;
 }
 
 void mwl_tx_deinit(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv;
-
-	priv = hw->priv;
+	struct mwl_priv *priv = hw->priv;
 
 	skb_queue_purge(&priv->delay_q);
 
@@ -486,7 +675,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		 struct ieee80211_tx_control *control,
 		 struct sk_buff *skb)
 {
-	struct mwl_priv *priv;
+	struct mwl_priv *priv = hw->priv;
 	int index;
 	struct ieee80211_sta *sta;
 	struct ieee80211_tx_info *tx_info;
@@ -504,7 +693,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	struct mwl_tx_ctrl *tx_ctrl;
 	struct ieee80211_key_conf *k_conf = NULL;
 
-	priv = hw->priv;
 	index = skb_get_queue_mapping(skb);
 	sta = control->sta;
 
@@ -566,14 +754,24 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	 * been setup.
 	 */
 	if (mgmtframe) {
+		u16 capab;
+		
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
 			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
 			     mgmt->u.action.u.addba_req.action_code ==
 			     WLAN_ACTION_ADDBA_REQ)) {
-			u16 capab =
-				le16_to_cpu(mgmt->u.action.u.addba_req.capab);
+			capab = le16_to_cpu(mgmt->u.action.u.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			index = mwl_tx_tid_queue_mapping(tid);
+		}
+
+		if (unlikely(ieee80211_is_action(wh->frame_control) &&
+			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
+			     mgmt->u.action.u.addba_resp.action_code ==
+			     WLAN_ACTION_ADDBA_RESP)) {
+			capab = le16_to_cpu(mgmt->u.action.u.addba_resp.capab);
+			capab |= 1;
+			mgmt->u.action.u.addba_resp.capab = cpu_to_le16(capab);
 		}
 	}
 
@@ -585,7 +783,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 		tid = qos & 0xf;
 		mwl_tx_count_packet(sta, tid);
 
-		spin_lock(&priv->stream_lock);
+		spin_lock_bh(&priv->stream_lock);
 		stream = mwl_fwcmd_lookup_stream(hw, sta->addr, tid);
 
 		if (stream) {
@@ -617,13 +815,13 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 				 * case, so this is really just a safety check.
 				 */
 				wiphy_warn(hw->wiphy,
-					   "can't send packet during ADDBA");
-				spin_unlock(&priv->stream_lock);
+					   "can't send packet during ADDBA\n");
+				spin_unlock_bh(&priv->stream_lock);
 				dev_kfree_skb_any(skb);
 				return;
 			}
 		} else {
-			/* Defer calling mwl8k_start_stream so that the current
+			/* Defer calling mwl_fwcmd_start_stream so that the current
 			 * skb can go out before the ADDBA request.  This
 			 * prevents sequence number mismatch at the recipient
 			 * as described above.
@@ -636,7 +834,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			}
 		}
 
-		spin_unlock(&priv->stream_lock);
+		spin_unlock_bh(&priv->stream_lock);
 	} else {
 		qos &= ~MWL_QOS_ACK_POLICY_MASK;
 		qos |= MWL_QOS_ACK_POLICY_NORMAL;
@@ -648,7 +846,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	tx_ctrl->type = (mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA);
 	tx_ctrl->xmit_control = xmitcontrol;
 	tx_ctrl->sta = (void *)sta;
-	tx_ctrl->vif = (void *)mwl_vif;
+	tx_ctrl->vif = (void *)tx_info->control.vif;
 	tx_ctrl->k_conf = (void *)k_conf;
 
 	if (skb_queue_len(&priv->txq[index]) > priv->txq_limit)
@@ -660,45 +858,47 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
-		spin_lock(&priv->stream_lock);
+		spin_lock_bh(&priv->stream_lock);
 		if (mwl_fwcmd_start_stream(hw, stream))
 			mwl_fwcmd_remove_stream(hw, stream);
-		spin_unlock(&priv->stream_lock);
+		spin_unlock_bh(&priv->stream_lock);
 	}
 }
 
 void mwl_tx_done(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
-	struct mwl_priv *priv;
-	unsigned long flags;
+	struct mwl_priv *priv = hw->priv;
 	int num;
+	struct mwl_desc_data *desc;
+	struct mwl_tx_hndl *tx_hndl;
+	struct mwl_tx_desc *tx_desc;
 	struct sk_buff *done_skb;
 	u32 rate, format, bandwidth, short_gi, rate_id;
 	struct mwl_dma_data *tr;
 	struct ieee80211_tx_info *info;
 	int hdrlen;
 
-	priv = hw->priv;
-
-	spin_lock_irqsave(&priv->tx_desc_lock, flags);
+	spin_lock_bh(&priv->tx_desc_lock);
 	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		while (STALE_TXD(num) && (STALE_TXD(num)->status &
-		       cpu_to_le32(EAGLE_TXD_STATUS_OK)) &&
-		       (!(STALE_TXD(num)->status &
+		desc = &priv->desc_data[num];
+		tx_hndl = desc->pstale_tx_hndl;
+		tx_desc = tx_hndl->pdesc;
+
+		while (tx_hndl &&
+		       (tx_desc->status & cpu_to_le32(EAGLE_TXD_STATUS_OK)) &&
+		       (!(tx_desc->status &
 		       cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED)))) {
 			pci_unmap_single(priv->pdev,
-					 le32_to_cpu(STALE_TXD(num)->pkt_ptr),
-					 STALE_TXD(num)->psk_buff->len,
+					 le32_to_cpu(tx_desc->pkt_ptr),
+					 le16_to_cpu(tx_desc->pkt_len),
 					 PCI_DMA_TODEVICE);
-			done_skb = STALE_TXD(num)->psk_buff;
-			rate = le32_to_cpu(STALE_TXD(num)->rate_info);
-			STALE_TXD(num)->pkt_len = 0;
-			STALE_TXD(num)->psk_buff = NULL;
-			STALE_TXD(num)->status =
+			done_skb = tx_hndl->psk_buff;
+			rate = le32_to_cpu(tx_desc->rate_info);
+			tx_desc->pkt_len = 0;
+			tx_desc->status =
 				cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
-			priv->fw_desc_cnt[num]--;
-			STALE_TXD(num) = STALE_TXD(num)->pnext;
+			tx_hndl->psk_buff = NULL;
 			wmb(); /* memory barrier */
 
 			tr = (struct mwl_dma_data *)done_skb->data;
@@ -706,6 +906,8 @@ void mwl_tx_done(unsigned long data)
 			ieee80211_tx_info_clear_status(info);
 
 			info->status.rates[0].idx = -1;
+			info->status.rates[0].count = 0;
+			info->status.rates[0].flags = 0;
 
 			if (ieee80211_is_data(tr->wh.frame_control) ||
 			    ieee80211_is_data_qos(tr->wh.frame_control)) {
@@ -761,20 +963,66 @@ void mwl_tx_done(unsigned long data)
 
 			info->flags |= IEEE80211_TX_STAT_ACK;
 			ieee80211_tx_status(hw, done_skb);
+
+			tx_hndl = tx_hndl->pnext;
+			tx_desc = tx_hndl->pdesc;
+			priv->fw_desc_cnt[num]--;
 		}
+
+		desc->pstale_tx_hndl = tx_hndl;
 	}
-	spin_unlock_irqrestore(&priv->tx_desc_lock, flags);
+	spin_unlock_bh(&priv->tx_desc_lock);
 
 	if (priv->irq != -1) {
-		u32 status;
+		u32 status_mask;
 
-		status = readl(priv->iobase1 +
-			       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-		writel(status | MACREG_A2HRIC_BIT_TX_DONE,
+		status_mask = readl(priv->iobase1 +
+				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+		writel(status_mask | MACREG_A2HRIC_BIT_TX_DONE,
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 		mwl_tx_skbs(hw);
 	}
 
 	priv->is_tx_schedule = false;
+}
+
+void mwl_tx_flush_amsdu(unsigned long data)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
+	struct mwl_priv *priv = hw->priv;
+	u32 status_mask;
+	struct mwl_sta *sta_info;
+	int i;
+	struct mwl_amsdu_frag *amsdu_frag;
+
+	spin_lock_bh(&priv->sta_lock);
+
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		spin_lock_bh(&sta_info->amsdu_lock);
+		for (i = 0; i < SYSADPT_TX_WMM_QUEUES; i++) {
+			amsdu_frag = &sta_info->amsdu_ctrl.frag[i];
+			if (amsdu_frag->num) {
+				if (jiffies > (amsdu_frag->jiffies + 1)) {
+					spin_lock_bh(&priv->tx_desc_lock);
+					if (mwl_tx_available(priv, i)) {
+						mwl_tx_skb(priv, i, amsdu_frag->skb);
+						amsdu_frag->num = 0;
+						amsdu_frag->cur_pos = NULL;
+					}
+					spin_unlock_bh(&priv->tx_desc_lock);
+				}
+			}
+		}
+		spin_unlock_bh(&sta_info->amsdu_lock);
+	}
+
+	spin_unlock_bh(&priv->sta_lock);
+
+	status_mask = readl(priv->iobase1 +
+			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	writel(status_mask | MACREG_A2HRIC_BIT_QUEUE_EMPTY,
+	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+
+	priv->is_qe_schedule = false;
 }
