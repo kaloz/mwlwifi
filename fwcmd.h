@@ -33,6 +33,15 @@
 #define HOSTCMD_STA_FWRDY_SIGNATURE     0xF0F1F2F4
 #define HOSTCMD_SOFTAP_FWRDY_SIGNATURE  0xF1F2F4A5
 
+#define GUARD_INTERVAL_STANDARD         1
+#define GUARD_INTERVAL_SHORT            2
+#define GUARD_INTERVAL_AUTO             3
+
+#define	LINK_CS_STATE_CONSERV           0
+#define	LINK_CS_STATE_AGGR              1
+#define	LINK_CS_STATE_AUTO              2
+#define	LINK_CS_STATE_AUTO_DISABLED     3
+
 enum {
 	WL_ANTENNATYPE_RX = 1,
 	WL_ANTENNATYPE_TX = 2,
@@ -59,12 +68,19 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw);
 int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		       struct ieee80211_low_level_stats *stats);
 
+int mwl_fwcmd_reg_bb(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
+
+int mwl_fwcmd_reg_rf(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
+
 int mwl_fwcmd_radio_enable(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_radio_disable(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_set_radio_preamble(struct ieee80211_hw *hw,
 				 bool short_preamble);
+
+int mwl_fwcmd_get_addr_value(struct ieee80211_hw *hw, u32 addr, u32 len,
+			     u32 *val, u16 set);
 
 int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 			   struct ieee80211_conf *conf, u8 fraction);
@@ -92,11 +108,15 @@ int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 			      u16 cw_min, u16 cw_max, u8 aifs, u16 txop);
 
-int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw,
-			   bool enable);
+int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw, bool enable);
+
+int mwl_fwcmd_ht_guard_interval(struct ieee80211_hw *hw, u32 gi_type);
 
 int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw,
 			     int mcast, int mgmt);
+
+int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw,
+				    u16 cs_mode);
 
 int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw,
 				  u16 mode);
@@ -155,6 +175,9 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 					      struct ieee80211_sta *sta,
 					      u8 tid);
 
+void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
+			       struct ieee80211_sta *sta);
+
 int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 			   struct mwl_ampdu_stream *stream);
 
@@ -166,10 +189,14 @@ struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
 
 bool mwl_fwcmd_ampdu_allowed(struct ieee80211_sta *sta, u8 tid);
 
+int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level);
+
 int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 
 int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value);
 
 int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw);
+
+int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
 
 #endif /* _fwcmd_h_ */

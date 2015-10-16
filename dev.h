@@ -26,6 +26,9 @@
 #include <linux/bitops.h>
 #include <net/mac80211.h>
 
+#define MWL_DRV_NAME     KBUILD_MODNAME
+#define MWL_DRV_VERSION	 "10.3.0.10"
+
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
 #define MACREG_REG_H2A_INTERRUPT_CAUSE       0x00000C1C /* (From host to ARM) */
@@ -54,8 +57,8 @@
 #define MACREG_A2HRIC_BIT_RADAR_DETECT      BIT(7)
 #define MACREG_A2HRIC_BIT_ICV_ERROR         BIT(8)
 #define MACREG_A2HRIC_BIT_WEAKIV_ERROR      BIT(9)
-#define MACREG_A2HRIC_BIT_QUEUE_EMPTY       BIT(10)
-#define MACREG_A2HRIC_BIT_QUEUE_FULL        BIT(11)
+#define MACREG_A2HRIC_BIT_QUE_EMPTY         BIT(10)
+#define MACREG_A2HRIC_BIT_QUE_FULL          BIT(11)
 #define MACREG_A2HRIC_BIT_CHAN_SWITCH       BIT(12)
 #define MACREG_A2HRIC_BIT_TX_WATCHDOG       BIT(13)
 #define MACREG_A2HRIC_BA_WATCHDOG           BIT(14)
@@ -73,7 +76,7 @@
 			     MACREG_A2HRIC_BIT_RADAR_DETECT | \
 			     MACREG_A2HRIC_BIT_CHAN_SWITCH | \
 			     MACREG_A2HRIC_BIT_TX_WATCHDOG | \
-			     MACREG_A2HRIC_BIT_QUEUE_EMPTY | \
+			     MACREG_A2HRIC_BIT_QUE_EMPTY | \
 			     MACREG_A2HRIC_BA_WATCHDOG | \
 			     MACREG_A2HRIC_CONSEC_TXFAIL)
 
@@ -260,6 +263,18 @@ struct mwl_ampdu_stream {
 	u8 idx;
 };
 
+#ifdef CONFIG_DEBUG_FS
+#define MAC_REG_ADDR_PCI(offset)      ((priv->iobase1+0xA000) + offset)
+
+#define MWL_ACCESS_MAC                1
+#define MWL_ACCESS_RF                 2
+#define MWL_ACCESS_BBP                3
+#define MWL_ACCESS_CAU                4
+#define MWL_ACCESS_ADDR0              5
+#define MWL_ACCESS_ADDR1              6
+#define MWL_ACCESS_ADDR               7
+#endif
+
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	const struct firmware *fw_ucode;
@@ -295,6 +310,7 @@ struct mwl_priv {
 
 	/* various descriptor data */
 	spinlock_t tx_desc_lock;     /* for tx descriptor data       */
+	spinlock_t rx_desc_lock;     /* for rx descriptor data       */
 	struct mwl_desc_data desc_data[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head txq[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head delay_q;
@@ -337,6 +353,13 @@ struct mwl_priv {
 	spinlock_t stream_lock;      /* for ampdu stream             */
 	struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
 	struct work_struct watchdog_ba_handle;
+
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs_phy;
+	u32 reg_type;
+	u32 reg_offset;
+	u32 reg_value;
+#endif
 };
 
 struct beacon_info {
@@ -415,9 +438,10 @@ struct mwl_dma_data {
 
 /* Transmission information to transmit a socket buffer. */
 struct mwl_tx_ctrl {
-	void *sta;
 	void *vif;
+	void *sta;
 	void *k_conf;
+	void *amsdu_pkts;
 	u8 tx_priority;
 	u8 type;
 	u16 qos_ctrl;

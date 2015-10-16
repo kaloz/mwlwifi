@@ -7,6 +7,7 @@ mwlwifi-objs		+= fwcmd.o
 mwlwifi-objs		+= tx.o
 mwlwifi-objs		+= rx.o
 mwlwifi-objs		+= isr.o
+mwlwifi-$(CONFIG_DEBUG_FS) += debugfs.o
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld

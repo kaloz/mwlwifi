@@ -324,8 +324,6 @@ static inline void mwl_tx_insert_ccmp_hdr(u8 *pccmp_hdr,
 
 static inline int mwl_tx_tid_queue_mapping(u8 tid)
 {
-	BUG_ON(tid > 7);
-
 	switch (tid) {
 	case 0:
 	case 3:
@@ -351,7 +349,8 @@ static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 	struct mwl_sta *sta_info;
 	struct mwl_tx_info *tx_stats;
 
-	BUG_ON(tid >= SYSADPT_MAX_TID);
+	if (WARN_ON(tid >= SYSADPT_MAX_TID))
+		return;
 
 	sta_info = mwl_dev_get_sta(sta);
 
@@ -410,7 +409,8 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 	struct ieee80211_hdr *wh;
 	dma_addr_t dma;
 
-	BUG_ON(!tx_skb);
+	if (WARN_ON(!tx_skb))
+		return;
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
@@ -490,10 +490,13 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 					      int desc_num,
 					      struct sk_buff *tx_skb,
-					      struct mwl_tx_ctrl *tx_ctrl)
+					      struct ieee80211_tx_info *tx_info)
 {
 	struct ieee80211_sta *sta;
 	struct mwl_sta *sta_info;
+	struct mwl_tx_ctrl *tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+	struct ieee80211_tx_info *amsdu_info;
+	struct sk_buff_head *amsdu_pkts;
 	struct mwl_amsdu_frag *amsdu;
 	int amsdu_allow_size;
 	struct ieee80211_hdr *wh;
@@ -553,18 +556,22 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 
 	if (amsdu->num == 0) {
 		struct sk_buff *newskb;
-		struct ieee80211_tx_info *tx_info;
 
+		amsdu_pkts = (struct sk_buff_head *)
+			kmalloc(sizeof(*amsdu_pkts), GFP_KERNEL);
+		if (!amsdu_pkts) {
+			spin_unlock_bh(&sta_info->amsdu_lock);
+			return tx_skb;
+		}
 		newskb = dev_alloc_skb(amsdu_allow_size +
 				       SYSADPT_MIN_BYTES_HEADROOM);
-
-		if (newskb == NULL) {
+		if (!newskb) {
 			spin_unlock_bh(&sta_info->amsdu_lock);
+			kfree(amsdu_pkts);
 			return tx_skb;
 		}
 
 		data = newskb->data;
-
 		memcpy(data, tx_skb->data, wh_len);
 		ether_addr_copy(data + wh_len, ieee80211_get_DA(wh));
 		ether_addr_copy(data + wh_len + ETH_ALEN, ieee80211_get_SA(wh));
@@ -574,8 +581,11 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 
 		skb_put(newskb, tx_skb->len + ETH_HLEN);
 		tx_ctrl->qos_ctrl |= IEEE80211_QOS_CTL_A_MSDU_PRESENT;
-		tx_info = IEEE80211_SKB_CB(newskb);
-		memcpy(&tx_info->status, tx_ctrl, sizeof(*tx_ctrl));
+		amsdu_info = IEEE80211_SKB_CB(newskb);
+		memcpy(amsdu_info, tx_info, sizeof(*tx_info));
+		skb_queue_head_init(amsdu_pkts);
+		((struct mwl_tx_ctrl *)&amsdu_info->status)->amsdu_pkts =
+			(void *)amsdu_pkts;
 		amsdu->skb = newskb;
 	} else {
 		amsdu->cur_pos += amsdu->pad;
@@ -588,12 +598,15 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 		memcpy(data + ETH_HLEN, tx_skb->data + wh_len, len);
 
 		skb_put(amsdu->skb, len + ETH_HLEN + amsdu->pad);
+		amsdu_info = IEEE80211_SKB_CB(amsdu->skb);
+		amsdu_pkts = (struct sk_buff_head *)
+			((struct mwl_tx_ctrl *)&amsdu_info->status)->amsdu_pkts;
 	}
 
 	amsdu->num++;
 	amsdu->pad = ((len + ETH_HLEN) % 4) ? (4 - (len + ETH_HLEN) % 4) : 0;
 	amsdu->cur_pos = amsdu->skb->data + amsdu->skb->len;
-	dev_kfree_skb_any(tx_skb);
+	skb_queue_tail(amsdu_pkts, tx_skb);
 
 	if (amsdu->num > SYSADPT_AMSDU_PACKET_THRESHOLD) {
 		amsdu->num = 0;
@@ -609,7 +622,7 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
-	int num = SYSADPT_NUM_OF_DESC_DATA;
+	int num = SYSADPT_TX_WMM_QUEUES;
 	struct sk_buff *tx_skb;
 
 	spin_lock_bh(&priv->tx_desc_lock);
@@ -628,14 +641,90 @@ static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
 			if ((tx_skb->protocol != cpu_to_be16(ETH_P_PAE)) &&
 			    (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)) {
 				tx_skb = mwl_tx_do_amsdu(priv, num,
-							 tx_skb, tx_ctrl);
+							 tx_skb, tx_info);
 			}
 
 			if (tx_skb)
 				mwl_tx_skb(priv, num, tx_skb);
 		}
+
+		if (skb_queue_len(&priv->txq[num]) <
+		    SYSADPT_TX_WAKE_Q_THRESHOLD) {
+			int queue;
+
+			queue = SYSADPT_TX_WMM_QUEUES - num - 1;
+			if (ieee80211_queue_stopped(hw, queue))
+				ieee80211_wake_queue(hw, queue);
+		}
 	}
 	spin_unlock_bh(&priv->tx_desc_lock);
+}
+
+static inline void mwl_tx_prepare_info(struct ieee80211_hw *hw, u32 rate,
+				       struct ieee80211_tx_info *info)
+{
+	u32 format, bandwidth, short_gi, rate_id;
+
+	ieee80211_tx_info_clear_status(info);
+
+	info->status.rates[0].idx = -1;
+	info->status.rates[0].count = 0;
+	info->status.rates[0].flags = 0;
+
+	if (rate) {
+		/* Prepare rate information */
+		format = rate & MWL_TX_RATE_FORMAT_MASK;
+		bandwidth =
+			(rate & MWL_TX_RATE_BANDWIDTH_MASK) >>
+			MWL_TX_RATE_BANDWIDTH_SHIFT;
+		short_gi = (rate & MWL_TX_RATE_SHORTGI_MASK) >>
+			MWL_TX_RATE_SHORTGI_SHIFT;
+		rate_id = (rate & MWL_TX_RATE_RATEIDMCS_MASK) >>
+			MWL_TX_RATE_RATEIDMCS_SHIFT;
+
+		info->status.rates[0].idx = rate_id;
+		if (format == TX_RATE_FORMAT_LEGACY) {
+			if (hw->conf.chandef.chan->hw_value >
+			    BAND_24_CHANNEL_NUM) {
+				info->status.rates[0].idx -= 5;
+			}
+		}
+		if (format == TX_RATE_FORMAT_11N)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_MCS;
+		if (format == TX_RATE_FORMAT_11AC)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_VHT_MCS;
+		if (bandwidth == TX_RATE_BANDWIDTH_40)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_40_MHZ_WIDTH;
+		if (bandwidth == TX_RATE_BANDWIDTH_80)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_80_MHZ_WIDTH;
+		if (short_gi == TX_RATE_INFO_SHORT_GI)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_SHORT_GI;
+		info->status.rates[0].count = 1;
+		info->status.rates[1].idx = -1;
+	}
+}
+
+static inline void mwl_tx_ack_amsdu_pkts(struct ieee80211_hw *hw, u32 rate,
+					 struct sk_buff_head *amsdu_pkts)
+{
+	struct sk_buff *amsdu_pkt;
+	struct ieee80211_tx_info *info;
+
+	while (skb_queue_len(amsdu_pkts) > 0) {
+		amsdu_pkt = skb_dequeue(amsdu_pkts);
+		info = IEEE80211_SKB_CB(amsdu_pkt);
+		mwl_tx_prepare_info(hw, rate, info);
+		info->flags &= ~IEEE80211_TX_CTL_AMPDU;
+		info->flags |= IEEE80211_TX_STAT_ACK;
+		ieee80211_tx_status(hw, amsdu_pkt);
+	}
+
+	kfree(amsdu_pkts);
 }
 
 int mwl_tx_init(struct ieee80211_hw *hw)
@@ -755,7 +844,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	 */
 	if (mgmtframe) {
 		u16 capab;
-		
+
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&
 			     mgmt->u.action.category == WLAN_CATEGORY_BACK &&
 			     mgmt->u.action.u.addba_req.action_code ==
@@ -788,7 +877,12 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
-				WARN_ON(!(qos & MWL_QOS_ACK_POLICY_BLOCKACK));
+				if (WARN_ON(!(qos &
+					    MWL_QOS_ACK_POLICY_BLOCKACK))) {
+					spin_unlock_bh(&priv->stream_lock);
+					dev_kfree_skb_any(skb);
+					return;
+				}
 
 				txpriority =
 					(SYSADPT_TX_WMM_QUEUES + stream->idx) %
@@ -821,11 +915,6 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 				return;
 			}
 		} else {
-			/* Defer calling mwl_fwcmd_start_stream so that the current
-			 * skb can go out before the ADDBA request.  This
-			 * prevents sequence number mismatch at the recipient
-			 * as described above.
-			 */
 			if (mwl_fwcmd_ampdu_allowed(sta, tid)) {
 				stream = mwl_fwcmd_add_stream(hw, sta, tid);
 
@@ -841,18 +930,19 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	}
 
 	tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
-	tx_ctrl->tx_priority = txpriority;
-	tx_ctrl->qos_ctrl = qos;
-	tx_ctrl->type = (mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA);
-	tx_ctrl->xmit_control = xmitcontrol;
-	tx_ctrl->sta = (void *)sta;
 	tx_ctrl->vif = (void *)tx_info->control.vif;
+	tx_ctrl->sta = (void *)sta;
 	tx_ctrl->k_conf = (void *)k_conf;
+	tx_ctrl->amsdu_pkts = NULL;
+	tx_ctrl->tx_priority = txpriority;
+	tx_ctrl->type = (mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA);
+	tx_ctrl->qos_ctrl = qos;
+	tx_ctrl->xmit_control = xmitcontrol;
 
 	if (skb_queue_len(&priv->txq[index]) > priv->txq_limit)
-		dev_kfree_skb_any(skb);
-	else
-		skb_queue_tail(&priv->txq[index], skb);
+		ieee80211_stop_queue(hw, SYSADPT_TX_WMM_QUEUES - index - 1);
+
+	skb_queue_tail(&priv->txq[index], skb);
 
 	mwl_tx_skbs(hw);
 
@@ -865,6 +955,115 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 	}
 }
 
+void mwl_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
+			     struct ieee80211_vif *vif)
+{
+	struct mwl_priv *priv = hw->priv;
+	int num;
+	struct sk_buff *skb, *tmp;
+	struct ieee80211_tx_info *tx_info;
+	struct mwl_tx_ctrl *tx_ctrl;
+	struct sk_buff_head *amsdu_pkts;
+
+	for (num = 1; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
+		spin_lock_bh(&priv->txq[num].lock);
+		skb_queue_walk_safe(&priv->txq[num], skb, tmp) {
+			tx_info = IEEE80211_SKB_CB(skb);
+			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+			if (tx_ctrl->vif == vif) {
+				amsdu_pkts = (struct sk_buff_head *)
+					tx_ctrl->amsdu_pkts;
+				if (amsdu_pkts) {
+					skb_queue_purge(amsdu_pkts);
+					kfree(amsdu_pkts);
+				}
+				__skb_unlink(skb, &priv->txq[num]);
+				dev_kfree_skb_any(skb);
+			}
+		}
+		spin_unlock_bh(&priv->txq[num].lock);
+	}
+}
+
+void mwl_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
+			     struct ieee80211_sta *sta)
+{
+	struct mwl_priv *priv = hw->priv;
+	int num;
+	struct sk_buff *skb, *tmp;
+	struct ieee80211_tx_info *tx_info;
+	struct mwl_tx_ctrl *tx_ctrl;
+	struct sk_buff_head *amsdu_pkts;
+
+	for (num = 1; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
+		spin_lock_bh(&priv->txq[num].lock);
+		skb_queue_walk_safe(&priv->txq[num], skb, tmp) {
+			tx_info = IEEE80211_SKB_CB(skb);
+			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+			if (tx_ctrl->sta == sta) {
+				amsdu_pkts = (struct sk_buff_head *)
+					tx_ctrl->amsdu_pkts;
+				if (amsdu_pkts) {
+					skb_queue_purge(amsdu_pkts);
+					kfree(amsdu_pkts);
+				}
+				__skb_unlink(skb, &priv->txq[num]);
+				dev_kfree_skb_any(skb);
+			}
+		}
+		spin_unlock_bh(&priv->txq[num].lock);
+	}
+}
+
+void mwl_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
+			   struct ieee80211_sta *sta, u8 tid)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
+	int desc_num = SYSADPT_TX_WMM_QUEUES - tid - 1;
+	struct mwl_amsdu_frag *amsdu_frag;
+	struct sk_buff *skb, *tmp;
+	struct ieee80211_tx_info *tx_info;
+	struct mwl_tx_ctrl *tx_ctrl;
+	struct sk_buff_head *amsdu_pkts;
+
+	spin_lock_bh(&priv->txq[desc_num].lock);
+	skb_queue_walk_safe(&priv->txq[desc_num], skb, tmp) {
+		tx_info = IEEE80211_SKB_CB(skb);
+		tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+		if (tx_ctrl->sta == sta) {
+			amsdu_pkts = (struct sk_buff_head *)
+				tx_ctrl->amsdu_pkts;
+			if (amsdu_pkts) {
+				skb_queue_purge(amsdu_pkts);
+				kfree(amsdu_pkts);
+			}
+			__skb_unlink(skb, &priv->txq[desc_num]);
+			dev_kfree_skb_any(skb);
+		}
+	}
+	spin_unlock_bh(&priv->txq[desc_num].lock);
+
+	spin_lock_bh(&sta_info->amsdu_lock);
+	amsdu_frag = &sta_info->amsdu_ctrl.frag[desc_num];
+	if (amsdu_frag->num) {
+		amsdu_frag->num = 0;
+		amsdu_frag->cur_pos = NULL;
+		if (amsdu_frag->skb) {
+			tx_info = IEEE80211_SKB_CB(amsdu_frag->skb);
+			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+			amsdu_pkts = (struct sk_buff_head *)
+				tx_ctrl->amsdu_pkts;
+			if (amsdu_pkts) {
+				skb_queue_purge(amsdu_pkts);
+				kfree(amsdu_pkts);
+			}
+			dev_kfree_skb_any(amsdu_frag->skb);
+		}
+	}
+	spin_unlock_bh(&sta_info->amsdu_lock);
+}
+
 void mwl_tx_done(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
@@ -874,13 +1073,15 @@ void mwl_tx_done(unsigned long data)
 	struct mwl_tx_hndl *tx_hndl;
 	struct mwl_tx_desc *tx_desc;
 	struct sk_buff *done_skb;
-	u32 rate, format, bandwidth, short_gi, rate_id;
+	u32 rate;
 	struct mwl_dma_data *tr;
 	struct ieee80211_tx_info *info;
+	struct mwl_tx_ctrl *tx_ctrl;
+	struct sk_buff_head *amsdu_pkts;
 	int hdrlen;
 
 	spin_lock_bh(&priv->tx_desc_lock);
-	for (num = 0; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
+	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++) {
 		desc = &priv->desc_data[num];
 		tx_hndl = desc->pstale_tx_hndl;
 		tx_desc = tx_hndl->pdesc;
@@ -901,68 +1102,39 @@ void mwl_tx_done(unsigned long data)
 			tx_hndl->psk_buff = NULL;
 			wmb(); /* memory barrier */
 
+			skb_get(done_skb);
+			skb_queue_tail(&priv->delay_q, done_skb);
+			if (skb_queue_len(&priv->delay_q) >
+			    SYSADPT_DELAY_FREE_Q_LIMIT)
+				dev_kfree_skb_any(skb_dequeue(&priv->delay_q));
+
 			tr = (struct mwl_dma_data *)done_skb->data;
 			info = IEEE80211_SKB_CB(done_skb);
-			ieee80211_tx_info_clear_status(info);
-
-			info->status.rates[0].idx = -1;
-			info->status.rates[0].count = 0;
-			info->status.rates[0].flags = 0;
 
 			if (ieee80211_is_data(tr->wh.frame_control) ||
 			    ieee80211_is_data_qos(tr->wh.frame_control)) {
-				skb_get(done_skb);
-				skb_queue_tail(&priv->delay_q, done_skb);
+				tx_ctrl = (struct mwl_tx_ctrl *)&info->status;
+				amsdu_pkts = (struct sk_buff_head *)
+					tx_ctrl->amsdu_pkts;
+				if (amsdu_pkts) {
+					mwl_tx_ack_amsdu_pkts(hw, rate,
+							      amsdu_pkts);
+					dev_kfree_skb_any(done_skb);
+					done_skb = NULL;
+				} else
+					mwl_tx_prepare_info(hw, rate, info);
+			} else
+				mwl_tx_prepare_info(hw, 0, info);
 
-				if (skb_queue_len(&priv->delay_q) >
-				    SYSADPT_DELAY_FREE_Q_LIMIT)
-					dev_kfree_skb_any(
-						skb_dequeue(&priv->delay_q));
-
-				/* Prepare rate information */
-				format = rate & MWL_TX_RATE_FORMAT_MASK;
-				bandwidth =
-					(rate & MWL_TX_RATE_BANDWIDTH_MASK) >>
-					MWL_TX_RATE_BANDWIDTH_SHIFT;
-				short_gi = (rate & MWL_TX_RATE_SHORTGI_MASK) >>
-					MWL_TX_RATE_SHORTGI_SHIFT;
-				rate_id = (rate & MWL_TX_RATE_RATEIDMCS_MASK) >>
-					MWL_TX_RATE_RATEIDMCS_SHIFT;
-
-				info->status.rates[0].idx = rate_id;
-				if (format == TX_RATE_FORMAT_LEGACY) {
-					if (hw->conf.chandef.chan->hw_value >
-					    BAND_24_CHANNEL_NUM) {
-						info->status.rates[0].idx -= 5;
-					}
-				}
-				if (format == TX_RATE_FORMAT_11N)
-					info->status.rates[0].flags |=
-						IEEE80211_TX_RC_MCS;
-				if (format == TX_RATE_FORMAT_11AC)
-					info->status.rates[0].flags |=
-						IEEE80211_TX_RC_VHT_MCS;
-				if (bandwidth == TX_RATE_BANDWIDTH_40)
-					info->status.rates[0].flags |=
-						IEEE80211_TX_RC_40_MHZ_WIDTH;
-				if (bandwidth == TX_RATE_BANDWIDTH_80)
-					info->status.rates[0].flags |=
-						IEEE80211_TX_RC_80_MHZ_WIDTH;
-				if (short_gi == TX_RATE_INFO_SHORT_GI)
-					info->status.rates[0].flags |=
-						IEEE80211_TX_RC_SHORT_GI;
-				info->status.rates[0].count = 1;
-
-				info->status.rates[1].idx = -1;
+			if (done_skb) {
+				/* Remove H/W dma header */
+				hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
+				memmove(tr->data - hdrlen, &tr->wh, hdrlen);
+				skb_pull(done_skb, sizeof(*tr) - hdrlen);
+				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
+				info->flags |= IEEE80211_TX_STAT_ACK;
+				ieee80211_tx_status(hw, done_skb);
 			}
-
-			/* Remove H/W dma header */
-			hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
-			memmove(tr->data - hdrlen, &tr->wh, hdrlen);
-			skb_pull(done_skb, sizeof(*tr) - hdrlen);
-
-			info->flags |= IEEE80211_TX_STAT_ACK;
-			ieee80211_tx_status(hw, done_skb);
 
 			tx_hndl = tx_hndl->pnext;
 			tx_desc = tx_hndl->pdesc;
@@ -996,33 +1168,65 @@ void mwl_tx_flush_amsdu(unsigned long data)
 	int i;
 	struct mwl_amsdu_frag *amsdu_frag;
 
-	spin_lock_bh(&priv->sta_lock);
-
+	spin_lock(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		spin_lock_bh(&sta_info->amsdu_lock);
+		spin_lock(&priv->tx_desc_lock);
+		spin_lock(&sta_info->amsdu_lock);
 		for (i = 0; i < SYSADPT_TX_WMM_QUEUES; i++) {
 			amsdu_frag = &sta_info->amsdu_ctrl.frag[i];
 			if (amsdu_frag->num) {
-				if (jiffies > (amsdu_frag->jiffies + 1)) {
-					spin_lock_bh(&priv->tx_desc_lock);
+				if (time_after(jiffies,
+					       (amsdu_frag->jiffies + 1))) {
 					if (mwl_tx_available(priv, i)) {
-						mwl_tx_skb(priv, i, amsdu_frag->skb);
+						mwl_tx_skb(priv, i,
+							   amsdu_frag->skb);
 						amsdu_frag->num = 0;
 						amsdu_frag->cur_pos = NULL;
 					}
-					spin_unlock_bh(&priv->tx_desc_lock);
 				}
 			}
 		}
-		spin_unlock_bh(&sta_info->amsdu_lock);
+		spin_unlock(&sta_info->amsdu_lock);
+		spin_unlock(&priv->tx_desc_lock);
 	}
-
-	spin_unlock_bh(&priv->sta_lock);
+	spin_unlock(&priv->sta_lock);
 
 	status_mask = readl(priv->iobase1 +
 			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status_mask | MACREG_A2HRIC_BIT_QUEUE_EMPTY,
+	writel(status_mask | MACREG_A2HRIC_BIT_QUE_EMPTY,
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 	priv->is_qe_schedule = false;
+}
+
+void mwl_tx_del_sta_amsdu_pkts(struct ieee80211_sta *sta)
+{
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
+	int num;
+	struct mwl_amsdu_frag *amsdu_frag;
+	struct ieee80211_tx_info *tx_info;
+	struct mwl_tx_ctrl *tx_ctrl;
+	struct sk_buff_head *amsdu_pkts;
+
+	spin_lock_bh(&sta_info->amsdu_lock);
+	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++) {
+		amsdu_frag = &sta_info->amsdu_ctrl.frag[num];
+		if (amsdu_frag->num) {
+			amsdu_frag->num = 0;
+			amsdu_frag->cur_pos = NULL;
+			if (amsdu_frag->skb) {
+				tx_info = IEEE80211_SKB_CB(amsdu_frag->skb);
+				tx_ctrl = (struct mwl_tx_ctrl *)
+					&tx_info->status;
+				amsdu_pkts = (struct sk_buff_head *)
+					tx_ctrl->amsdu_pkts;
+				if (amsdu_pkts) {
+					skb_queue_purge(amsdu_pkts);
+					kfree(amsdu_pkts);
+				}
+				dev_kfree_skb_any(amsdu_frag->skb);
+			}
+		}
+	}
+	spin_unlock_bh(&sta_info->amsdu_lock);
 }

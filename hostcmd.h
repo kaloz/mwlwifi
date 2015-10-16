@@ -24,7 +24,10 @@
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
 #define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
 #define HOSTCMD_CMD_802_11_GET_STAT             0x0014
+#define HOSTCMD_CMD_BBP_REG_ACCESS              0x001a
+#define HOSTCMD_CMD_RF_REG_ACCESS               0x001b
 #define HOSTCMD_CMD_802_11_RADIO_CONTROL        0x001c
+#define HOSTCMD_CMD_MEM_ADDR_ACCESS             0x001d
 #define HOSTCMD_CMD_802_11_TX_POWER             0x001f
 #define HOSTCMD_CMD_802_11_RF_ANTENNA           0x0020
 #define HOSTCMD_CMD_BROADCAST_SSID_ENABLE       0x0050 /* per-vif */
@@ -34,8 +37,10 @@
 #define HOSTCMD_CMD_802_11_RTS_THSD             0x0113
 #define HOSTCMD_CMD_SET_EDCA_PARAMS             0x0115
 #define HOSTCMD_CMD_SET_WMM_MODE                0x0123
+#define HOSTCMD_CMD_HT_GUARD_INTERVAL           0x0124
 #define HOSTCMD_CMD_SET_FIXED_RATE              0x0126
 #define HOSTCMD_CMD_SET_IES                     0x0127
+#define HOSTCMD_CMD_SET_LINKADAPT_CS_MODE       0x0129
 #define HOSTCMD_CMD_SET_MAC_ADDR                0x0202 /* per-vif */
 #define HOSTCMD_CMD_SET_RATE_ADAPT_MODE         0x0203
 #define HOSTCMD_CMD_GET_WATCHDOG_BITMAP         0x0205
@@ -46,9 +51,11 @@
 #define HOSTCMD_CMD_SET_APMODE                  0x1114
 #define HOSTCMD_CMD_UPDATE_ENCRYPTION           0x1122 /* per-vif */
 #define HOSTCMD_CMD_BASTREAM                    0x1125
+#define HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL      0x1133
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
+#define HOSTCMD_CMD_CAU_REG_ACCESS              0x1157
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -261,6 +268,24 @@ struct hostcmd_cmd_802_11_get_stat {
 	__le32 tx_cts_count;
 } __packed;
 
+/* HOSTCMD_CMD_BBP_REG_ACCESS */
+struct hostcmd_cmd_bbp_reg_access {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 offset;
+	u8 value;
+	u8 reserverd[3];
+} __packed;
+
+/* HOSTCMD_CMD_RF_REG_ACCESS */
+struct hostcmd_cmd_rf_reg_access {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 offset;
+	u8 value;
+	u8 reserverd[3];
+} __packed;
+
 /* HOSTCMD_CMD_802_11_RADIO_CONTROL */
 struct hostcmd_cmd_802_11_radio_control {
 	struct hostcmd_header cmd_hdr;
@@ -268,6 +293,15 @@ struct hostcmd_cmd_802_11_radio_control {
 	/* @bit0: 1/0,on/off, @bit1: 1/0, long/short @bit2: 1/0,auto/fix */
 	__le16 control;
 	__le16 radio_on;
+} __packed;
+
+/* HOSTCMD_CMD_MEM_ADDR_ACCESS */
+struct hostcmd_cmd_mem_addr_access {
+	struct hostcmd_header cmd_hdr;
+	__le32 address;
+	__le16 length;
+	__le16 reserved;
+	__le32 value[64];
 } __packed;
 
 /* HOSTCMD_CMD_802_11_TX_POWER */
@@ -347,6 +381,13 @@ struct hostcmd_cmd_set_wmm_mode {
 	__le16 action;               /* 0->unset, 1->set */
 } __packed;
 
+/* HOSTCMD_CMD_HT_GUARD_INTERVAL */
+struct hostcmd_cmd_ht_guard_interval {
+	struct hostcmd_header cmd_hdr;
+	__le32 action;
+	__le32 gi_type;
+} __packed;
+
 /* HOSTCMD_CMD_SET_FIXED_RATE */
 struct fix_rate_flag {           /* lower rate after the retry count */
 	/* 0: legacy, 1: HT */
@@ -390,11 +431,11 @@ struct hostcmd_cmd_set_ies {
 	u8 ie_list_proprietary[112];
 } __packed;
 
-/* HOSTCMD_CMD_SET_RATE_ADAPT_MODE */
-struct hostcmd_cmd_set_rate_adapt_mode {
+/* HOSTCMD_CMD_SET_LINKADAPT_CS_MODE */
+struct hostcmd_cmd_set_linkadapt_cs_mode {
 	struct hostcmd_header cmd_hdr;
 	__le16 action;
-	__le16 rate_adapt_mode;      /* 0:Indoor, 1:Outdoor */
+	__le16 cs_mode;
 } __packed;
 
 /* HOSTCMD_CMD_SET_MAC_ADDR, HOSTCMD_CMD_DEL_MAC_ADDR */
@@ -402,6 +443,13 @@ struct hostcmd_cmd_set_mac_addr {
 	struct hostcmd_header cmd_hdr;
 	__le16 mac_type;
 	u8 mac_addr[ETH_ALEN];
+} __packed;
+
+/* HOSTCMD_CMD_SET_RATE_ADAPT_MODE */
+struct hostcmd_cmd_set_rate_adapt_mode {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 rate_adapt_mode;      /* 0:Indoor, 1:Outdoor */
 } __packed;
 
 /* HOSTCMD_CMD_GET_WATCHDOG_BITMAP */
@@ -729,6 +777,12 @@ struct hostcmd_cmd_bastream {
 	struct hostcmd_header cmd_hdr;
 	__le32 action_type;
 	union ba_info ba_info;
+} __packed;
+
+/* HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL */
+struct hostcmd_cmd_set_optimization_level {
+	struct hostcmd_header cmd_hdr;
+	u8 opt_level;
 } __packed;
 
 /* HOSTCMD_CMD_DWDS_ENABLE */

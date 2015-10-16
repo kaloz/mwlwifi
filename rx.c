@@ -15,6 +15,7 @@
 
 /* Description:  This file implements receive related functions. */
 
+#include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
 #include "sysadpt.h"
@@ -288,7 +289,7 @@ static inline struct mwl_vif *mwl_rx_find_vif_bss(struct mwl_priv *priv,
 
 	spin_lock_bh(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		if (memcmp(bssid, mwl_vif->bssid, ETH_ALEN) == 0) {
+		if (ether_addr_equal(bssid, mwl_vif->bssid)) {
 			spin_unlock_bh(&priv->vif_lock);
 			return mwl_vif;
 		}
@@ -399,6 +400,7 @@ void mwl_rx_recv(unsigned long data)
 	struct ieee80211_hdr *wh;
 	u32 status_mask;
 
+	spin_lock(&priv->rx_desc_lock);
 	desc = &priv->desc_data[0];
 	curr_hndl = desc->pnext_rx_hndl;
 
@@ -409,8 +411,8 @@ void mwl_rx_recv(unsigned long data)
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 		priv->is_rx_schedule = false;
-
 		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
+		spin_unlock(&priv->rx_desc_lock);
 		return;
 	}
 
@@ -501,4 +503,6 @@ out:
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 	priv->is_rx_schedule = false;
+
+	spin_unlock(&priv->rx_desc_lock);
 }

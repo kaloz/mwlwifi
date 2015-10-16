@@ -66,12 +66,12 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			}
 		}
 
-		if (int_status & MACREG_A2HRIC_BIT_QUEUE_EMPTY) {
-			int_status &= ~MACREG_A2HRIC_BIT_QUEUE_EMPTY;
+		if (int_status & MACREG_A2HRIC_BIT_QUE_EMPTY) {
+			int_status &= ~MACREG_A2HRIC_BIT_QUE_EMPTY;
 
 			if (!priv->is_qe_schedule) {
 				status = readl(int_status_mask);
-				writel((status & ~MACREG_A2HRIC_BIT_QUEUE_EMPTY),
+				writel((status & ~MACREG_A2HRIC_BIT_QUE_EMPTY),
 				       int_status_mask);
 				tasklet_schedule(&priv->qe_task);
 				priv->is_qe_schedule = true;
@@ -100,7 +100,6 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 	struct mwl_ampdu_stream *streams;
 	struct mwl_priv *priv =
 		container_of(work, struct mwl_priv, watchdog_ba_handle);
-	struct ieee80211_hw *hw = priv->hw;
 	u32 status;
 
 	rc = mwl_fwcmd_get_watchdog_bitmap(priv->hw, &bitmap);
@@ -123,13 +122,9 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 			/* Check if the stream is in use before disabling it */
 			streams = &priv->ampdu[stream_index];
 
-			if (streams->state == AMPDU_STREAM_ACTIVE) {
+			if (streams->state == AMPDU_STREAM_ACTIVE)
 				ieee80211_stop_tx_ba_session(streams->sta,
 							     streams->tid);
-				spin_unlock_bh(&priv->stream_lock);
-				mwl_fwcmd_destroy_ba(hw, stream_index);
-				spin_lock_bh(&priv->stream_lock);
-			}
 		} else {
 			for (stream_index = 0;
 			     stream_index < SYSADPT_TX_AMPDU_QUEUES;
@@ -141,9 +136,6 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 
 				ieee80211_stop_tx_ba_session(streams->sta,
 							     streams->tid);
-				spin_unlock_bh(&priv->stream_lock);
-				mwl_fwcmd_destroy_ba(hw, stream_index);
-				spin_lock_bh(&priv->stream_lock);
 			}
 		}
 	}

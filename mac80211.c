@@ -91,10 +91,16 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	rc = mwl_fwcmd_set_wmm_mode(hw, true);
 	if (rc)
 		goto fwcmd_fail;
+	rc = mwl_fwcmd_ht_guard_interval(hw, GUARD_INTERVAL_AUTO);
+	if (rc)
+		goto fwcmd_fail;
 	rc = mwl_fwcmd_set_dwds_stamode(hw, true);
 	if (rc)
 		goto fwcmd_fail;
 	rc = mwl_fwcmd_set_fw_flush_timer(hw, SYSADPT_AMSDU_FLUSH_TIME);
+	if (rc)
+		goto fwcmd_fail;
+	rc = mwl_fwcmd_set_optimization_level(hw, 1);
 	if (rc)
 		goto fwcmd_fail;
 
@@ -194,27 +200,12 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 				    struct ieee80211_vif *vif)
 {
-	int num;
-	struct sk_buff *skb, *tmp;
-	struct ieee80211_tx_info *tx_info;
-	struct mwl_tx_ctrl *tx_ctrl;
 	struct mwl_vif *mwl_vif = mwl_dev_get_vif(vif);
 
 	if (!priv->macids_used)
 		return;
 
-	for (num = 1; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		spin_lock_bh(&priv->txq[num].lock);
-		skb_queue_walk_safe(&priv->txq[num], skb, tmp) {
-			tx_info = IEEE80211_SKB_CB(skb);
-			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
-			if (tx_ctrl->vif == vif) {
-				__skb_unlink(skb, &priv->txq[num]);
-				dev_kfree_skb_any(skb);
-			}
-		}
-		spin_unlock_bh(&priv->txq[num].lock);
-	}
+	mwl_tx_del_pkts_via_vif(priv->hw, vif);
 
 	priv->macids_used &= ~(1 << mwl_vif->macid);
 	spin_lock_bh(&priv->vif_lock);
@@ -262,9 +253,13 @@ static int mwl_mac80211_config(struct ieee80211_hw *hw,
 
 		if (conf->chandef.chan->band == IEEE80211_BAND_2GHZ) {
 			mwl_fwcmd_set_apmode(hw, AP_MODE_2_4GHZ_11AC_MIXED);
+			mwl_fwcmd_set_linkadapt_cs_mode(hw,
+							LINK_CS_STATE_CONSERV);
 			rate = mwl_rates_24[0].hw_value;
 		} else if (conf->chandef.chan->band == IEEE80211_BAND_5GHZ) {
 			mwl_fwcmd_set_apmode(hw, AP_MODE_11AC);
+			mwl_fwcmd_set_linkadapt_cs_mode(hw,
+							LINK_CS_STATE_AUTO);
 			rate = mwl_rates_50[0].hw_value;
 		}
 
@@ -496,34 +491,16 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 				   struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct mwl_sta *sta_info;
-	int num;
-	struct sk_buff *skb, *tmp;
-	struct ieee80211_tx_info *tx_info;
-	struct mwl_tx_ctrl *tx_ctrl;
 	int rc;
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 
-	sta_info = mwl_dev_get_sta(sta);
+	mwl_tx_del_sta_amsdu_pkts(sta);
 
-	for (num = 1; num < SYSADPT_NUM_OF_DESC_DATA; num++) {
-		spin_lock_bh(&priv->txq[num].lock);
-		skb_queue_walk_safe(&priv->txq[num], skb, tmp) {
-			tx_info = IEEE80211_SKB_CB(skb);
-			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
-			if (tx_ctrl->sta == sta) {
-				__skb_unlink(skb, &priv->txq[num]);
-				dev_kfree_skb_any(skb);
-			}
-		}
-		spin_unlock_bh(&priv->txq[num].lock);
-	}
+	spin_lock_bh(&priv->stream_lock);
+	mwl_fwcmd_del_sta_streams(hw, sta);
+	spin_unlock_bh(&priv->stream_lock);
 
-	spin_lock_bh(&sta_info->amsdu_lock);
-	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++) {
-		if (!sta_info->amsdu_ctrl.frag[num].skb)
-			dev_kfree_skb_any(sta_info->amsdu_ctrl.frag[num].skb);
-	}
-	spin_unlock_bh(&sta_info->amsdu_lock);
+	mwl_tx_del_pkts_via_sta(hw, sta);
 
 	rc = mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
@@ -542,7 +519,8 @@ static int mwl_mac80211_conf_tx(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	int rc = 0;
 
-	BUG_ON(queue > SYSADPT_TX_WMM_QUEUES - 1);
+	if (WARN_ON(queue > SYSADPT_TX_WMM_QUEUES - 1))
+		return -EINVAL;
 
 	memcpy(&priv->wmm_params[queue], params, sizeof(*params));
 
@@ -570,7 +548,7 @@ static int mwl_mac80211_get_stats(struct ieee80211_hw *hw,
 
 static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 				   int idx,
-	struct survey_info *survey)
+				   struct survey_info *survey)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct ieee80211_conf *conf = &hw->conf;
@@ -591,7 +569,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_sta *sta,
 				     u16 tid, u16 *ssn, u8 buf_size)
 {
-	int i, rc = 0;
+	int rc = 0;
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
 	u8 *addr = sta->addr, idx;
@@ -639,30 +617,23 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		/* Release the lock before we do the time consuming stuff */
 		spin_unlock_bh(&priv->stream_lock);
 
-		for (i = 0; i < MAX_AMPDU_ATTEMPTS; i++) {
-			/* Check if link is still valid */
-			if (!sta_info->is_ampdu_allowed) {
-				spin_lock_bh(&priv->stream_lock);
-				mwl_fwcmd_remove_stream(hw, stream);
-				spin_unlock_bh(&priv->stream_lock);
-				wiphy_warn(hw->wiphy,
-					   "link is no valid now\n");
-				return -EBUSY;
-			}
-
-			rc = mwl_fwcmd_check_ba(hw, stream, vif);
-
-			if (!rc)
-				break;
-
-			mdelay(1000);
+		/* Check if link is still valid */
+		if (!sta_info->is_ampdu_allowed) {
+			spin_lock_bh(&priv->stream_lock);
+			mwl_fwcmd_remove_stream(hw, stream);
+			spin_unlock_bh(&priv->stream_lock);
+			wiphy_warn(hw->wiphy,
+				   "link is not valid now\n");
+			return -EBUSY;
 		}
+		rc = mwl_fwcmd_check_ba(hw, stream, vif);
 
 		spin_lock_bh(&priv->stream_lock);
 
 		if (rc) {
 			mwl_fwcmd_remove_stream(hw, stream);
-			wiphy_err(hw->wiphy, "error code: %d\n", rc);
+			wiphy_err(hw->wiphy,
+				  "ampdu start error code: %d\n", rc);
 			rc = -EBUSY;
 			break;
 		}
@@ -674,6 +645,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	case IEEE80211_AMPDU_TX_STOP_FLUSH_CONT:
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
+				mwl_tx_del_ampdu_pkts(hw, sta, tid);
 				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, idx);
@@ -686,7 +658,10 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
-		BUG_ON(stream->state != AMPDU_STREAM_IN_PROGRESS);
+		if (WARN_ON(stream->state != AMPDU_STREAM_IN_PROGRESS)) {
+			rc = -EPERM;
+			break;
+		}
 		spin_unlock_bh(&priv->stream_lock);
 		rc = mwl_fwcmd_create_ba(hw, stream, buf_size, vif);
 		spin_lock_bh(&priv->stream_lock);
@@ -699,10 +674,13 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			mwl_fwcmd_destroy_ba(hw, idx);
 			spin_lock_bh(&priv->stream_lock);
 			mwl_fwcmd_remove_stream(hw, stream);
+			wiphy_err(hw->wiphy,
+				  "ampdu operation error code: %d\n", rc);
 		}
 		break;
 	default:
 		rc = -ENOTSUPP;
+		break;
 	}
 
 	spin_unlock_bh(&priv->stream_lock);

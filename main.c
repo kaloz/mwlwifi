@@ -27,11 +27,12 @@
 #include "tx.h"
 #include "rx.h"
 #include "isr.h"
+#ifdef CONFIG_DEBUG_FS
+#include "debugfs.h"
+#endif
 
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 802.11ac Adapter"
-#define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.8"
 
 #define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
@@ -142,129 +143,57 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 
 static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 {
-	struct pci_dev *pdev;
-	u32 phys_addr = 0;
-	u32 flags;
-	void __iomem *phys_addr1[2];
-	void __iomem *phys_addr2[2];
-
-	pdev = priv->pdev;
-
-	phys_addr = pci_resource_start(pdev, 0);
-	flags = pci_resource_flags(pdev, 0);
+	struct pci_dev *pdev = priv->pdev;
+	void __iomem *addr;
 
 	priv->next_bar_num = 1;	/* 32-bit */
-
-	if (flags & 0x04)
+	if (pci_resource_flags(pdev, 0) & 0x04)
 		priv->next_bar_num = 2;	/* 64-bit */
 
-	if (!request_mem_region(phys_addr, pci_resource_len(pdev, 0),
-				MWL_DRV_NAME)) {
+	addr = devm_ioremap_resource(&pdev->dev, &pdev->resource[0]);
+	if (IS_ERR(addr)) {
 		wiphy_err(priv->hw->wiphy,
 			  "%s: cannot reserve PCI memory region 0\n",
 			  MWL_DRV_NAME);
-		goto err_reserve_mem_region_bar0;
+		goto err;
 	}
-
-	phys_addr1[0] = ioremap(phys_addr, pci_resource_len(pdev, 0));
-	phys_addr1[1] = NULL;
-
-	priv->iobase0 = phys_addr1[0];
-	if (!priv->iobase0) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot remap PCI memory region 0\n",
-			  MWL_DRV_NAME);
-		goto err_release_mem_region_bar0;
-	}
-
+	priv->iobase0 = addr;
 	wiphy_debug(priv->hw->wiphy, "priv->iobase0 = %p\n", priv->iobase0);
 
-	phys_addr = pci_resource_start(pdev, priv->next_bar_num);
-
-	if (!request_mem_region(phys_addr,
-				pci_resource_len(pdev, priv->next_bar_num),
-				MWL_DRV_NAME)) {
+	addr = devm_ioremap_resource(&pdev->dev,
+				     &pdev->resource[priv->next_bar_num]);
+	if (IS_ERR(addr)) {
 		wiphy_err(priv->hw->wiphy,
 			  "%s: cannot reserve PCI memory region 1\n",
 			  MWL_DRV_NAME);
-		goto err_iounmap_iobase0;
+		goto err;
 	}
-
-	phys_addr2[0] = ioremap(phys_addr,
-				pci_resource_len(pdev, priv->next_bar_num));
-	phys_addr2[1] = NULL;
-	priv->iobase1 = phys_addr2[0];
-
-	if (!priv->iobase1) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot remap PCI memory region 1\n",
-			  MWL_DRV_NAME);
-		goto err_release_mem_region_bar1;
-	}
-
+	priv->iobase1 = addr;
 	wiphy_debug(priv->hw->wiphy, "priv->iobase1 = %p\n", priv->iobase1);
 
 	priv->pcmd_buf =
-		(unsigned short *)dma_alloc_coherent(&priv->pdev->dev,
-						     CMD_BUF_SIZE,
-						     &priv->pphys_cmd_buf,
-						     GFP_KERNEL);
-
+		(unsigned short *)dmam_alloc_coherent(&priv->pdev->dev,
+						      CMD_BUF_SIZE,
+						      &priv->pphys_cmd_buf,
+						      GFP_KERNEL);
 	if (!priv->pcmd_buf) {
 		wiphy_err(priv->hw->wiphy,
 			  "%s: cannot alloc memory for command buffer\n",
 			  MWL_DRV_NAME);
-		goto err_iounmap_iobase1;
+		goto err;
 	}
-
 	wiphy_debug(priv->hw->wiphy,
 		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
 		    priv->pcmd_buf,
 		    (void *)priv->pphys_cmd_buf);
-
 	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
 
 	return 0;
 
-err_iounmap_iobase1:
-
-	iounmap(priv->iobase1);
-
-err_release_mem_region_bar1:
-
-	release_mem_region(pci_resource_start(pdev, 1),
-			   pci_resource_len(pdev, 1));
-
-err_iounmap_iobase0:
-
-	iounmap(priv->iobase0);
-
-err_release_mem_region_bar0:
-
-	release_mem_region(pci_resource_start(pdev, 0),
-			   pci_resource_len(pdev, 0));
-
-err_reserve_mem_region_bar0:
-
+err:
 	wiphy_err(priv->hw->wiphy, "pci alloc fail\n");
 
 	return -EIO;
-}
-
-static void mwl_free_pci_resource(struct mwl_priv *priv)
-{
-	struct pci_dev *pdev;
-
-	pdev = priv->pdev;
-
-	iounmap(priv->iobase0);
-	iounmap(priv->iobase1);
-	release_mem_region(pci_resource_start(pdev, priv->next_bar_num),
-			   pci_resource_len(pdev, priv->next_bar_num));
-	release_mem_region(pci_resource_start(pdev, 0),
-			   pci_resource_len(pdev, 0));
-	dma_free_coherent(&priv->pdev->dev, CMD_BUF_SIZE,
-			  priv->pcmd_buf, priv->pphys_cmd_buf);
 }
 
 static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
@@ -465,7 +394,11 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SGI_20;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SGI_40;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
 	hw->flags |= IEEE80211_HW_AMPDU_AGGREGATION;
+#else
+	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
+#endif
 	band->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 	band->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
 
@@ -567,12 +500,21 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->queues = SYSADPT_TX_WMM_QUEUES;
 
 	/* Set rssi values to dBm */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
 	hw->flags |= IEEE80211_HW_SIGNAL_DBM | IEEE80211_HW_HAS_RATE_CONTROL;
+#else
+	ieee80211_hw_set(hw, SIGNAL_DBM);
+	ieee80211_hw_set(hw, HAS_RATE_CONTROL);
+#endif
 
-	/* Ask mac80211 to not to trigger PS mode
+	/* Ask mac80211 not to trigger PS mode
 	 * based on PM bit of incoming frames.
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
 	hw->flags |= IEEE80211_HW_AP_LINK_PS;
+#else
+	ieee80211_hw_set(hw, AP_LINK_PS);
+#endif
 
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
@@ -607,6 +549,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->is_qe_schedule = false;
 
 	spin_lock_init(&priv->tx_desc_lock);
+	spin_lock_init(&priv->rx_desc_lock);
 	spin_lock_init(&priv->fwcmd_lock);
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
@@ -822,6 +765,10 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	else
 		wiphy_info(priv->hw->wiphy, "RX: unknown\n");
 
+#ifdef CONFIG_DEBUG_FS
+	mwl_debugfs_init(hw);
+#endif
+
 	return rc;
 
 err_wl_init:
@@ -852,10 +799,13 @@ static void mwl_remove(struct pci_dev *pdev)
 	priv = hw->priv;
 
 	mwl_wl_deinit(priv);
-	mwl_free_pci_resource(priv);
 	pci_set_drvdata(pdev, NULL);
 	ieee80211_free_hw(hw);
 	pci_disable_device(pdev);
+
+#ifdef CONFIG_DEBUG_FS
+	mwl_debugfs_remove(hw);
+#endif
 }
 
 static struct pci_driver mwl_pci_driver = {
