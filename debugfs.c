@@ -48,19 +48,6 @@ static const struct file_operations mwl_debugfs_##name##_fops = { \
 	.open = simple_open, \
 }
 
-static int print_mac_addr(char *p, u8 *mac_addr)
-{
-	int i;
-	char *str = p;
-
-	str += sprintf(str, "mac address: %02x", mac_addr[0]);
-	for (i = 1; i < ETH_ALEN; i++)
-		str += sprintf(str, ":%02x", mac_addr[i]);
-	str += sprintf(str, "\n");
-
-	return str-p;
-}
-
 static int dump_data(char *p, u8 *data, int len, char *title)
 {
 	char *str = p;
@@ -105,7 +92,7 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	p += sprintf(p, "driver version: %s\n", MWL_DRV_VERSION);
 	p += sprintf(p, "firmware version: 0x%08x\n",
 		     priv->hw_data.fw_release_num);
-	p += print_mac_addr(p, priv->hw_data.mac_addr);
+	p += sprintf(p, "mac address: %pM\n", priv->hw_data.mac_addr);
 	p += sprintf(p, "2g: %s\n", priv->disable_2g ? "disable" : "enable");
 	p += sprintf(p, "5g: %s\n", priv->disable_5g ? "disable" : "enable");
 	p += sprintf(p, "antenna: %d %d\n",
@@ -158,15 +145,15 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			       vif->bss_conf.ssid_len);
 			ssid[vif->bss_conf.ssid_len] = 0;
 			p += sprintf(p, "ssid: %s\n", ssid);
-			p += print_mac_addr(p, mwl_vif->bssid);
+			p += sprintf(p, "mac address: %pM\n", mwl_vif->bssid);
 			break;
 		case NL80211_IFTYPE_MESH_POINT:
 			p += sprintf(p, "type: mesh\n");
-			p += print_mac_addr(p, mwl_vif->bssid);
+			p += sprintf(p, "mac address: %pM\n", mwl_vif->bssid);
 			break;
 		case NL80211_IFTYPE_STATION:
 			p += sprintf(p, "type: sta\n");
-			p += print_mac_addr(p, mwl_vif->sta_mac);
+			p += sprintf(p, "mac address: %pM\n", mwl_vif->sta_mac);
 			break;
 		default:
 			p += sprintf(p, "type: unknown\n");
@@ -215,7 +202,7 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((char *)sta_info, struct ieee80211_sta,
 				   drv_priv[0]);
-		p += print_mac_addr(p, sta->addr);
+		p += sprintf(p, "mac address: %pM\n", sta->addr);
 		p += sprintf(p, "aid: %u\n", sta->aid);
 		p += sprintf(p, "ampdu: %s\n",
 			     sta_info->is_ampdu_allowed ? "true" : "false");
@@ -259,7 +246,7 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 		p += sprintf(p, "idx: %u\n", stream->idx);
 		p += sprintf(p, "state: %u\n", stream->state);
 		if (stream->sta) {
-			p += print_mac_addr(p, stream->sta->addr);
+			p += sprintf(p, "mac address: %pM\n", stream->sta->addr);
 			p += sprintf(p, "tid: %u\n", stream->tid);
 		}
 	}
