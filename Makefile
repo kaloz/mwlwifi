@@ -8,6 +8,9 @@ mwlwifi-objs		+= tx.o
 mwlwifi-objs		+= rx.o
 mwlwifi-objs		+= isr.o
 mwlwifi-$(CONFIG_DEBUG_FS) += debugfs.o
+ifeq (1, $(BUILD_MFG))
+mwlwifi-objs += mfg.o
+endif
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
@@ -15,6 +18,10 @@ CC		= $(CROSS_COMPILE)gcc
 
 EXTRA_CFLAGS+= -I${KDIR}
 EXTRA_CFLAGS+= -O2 -funroll-loops -D__CHECK_ENDIAN__
+
+ifeq (1, $(BUILD_MFG))
+EXTRA_CFLAGS+= -DCONFIG_SUPPORT_MFG
+endif
 
 EXTRA_CFLAGS+= -I${PWD}
 

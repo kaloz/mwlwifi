@@ -121,6 +121,7 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	p += sprintf(p, "sta macid support: %08x\n",
 		     priv->sta_macids_supported);
 	p += sprintf(p, "macid used: %08x\n", priv->macids_used);
+	p += sprintf(p, "mfg mode: %s\n", priv->mfg_mode ? "true" : "false");
 	p += sprintf(p, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, (char *) page,
@@ -157,6 +158,10 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			       vif->bss_conf.ssid_len);
 			ssid[vif->bss_conf.ssid_len] = 0;
 			p += sprintf(p, "ssid: %s\n", ssid);
+			p += print_mac_addr(p, mwl_vif->bssid);
+			break;
+		case NL80211_IFTYPE_MESH_POINT:
+			p += sprintf(p, "type: mesh\n");
 			p += print_mac_addr(p, mwl_vif->bssid);
 			break;
 		case NL80211_IFTYPE_STATION:

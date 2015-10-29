@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.10"
+#define MWL_DRV_VERSION	 "10.3.0.12"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -143,6 +143,7 @@ enum {
 struct mwl_chip_info {
 	const char *part_name;
 	const char *fw_image;
+	const char *mfg_fw_image;
 	int antenna_tx;
 	int antenna_rx;
 };
@@ -277,7 +278,7 @@ struct mwl_ampdu_stream {
 
 struct mwl_priv {
 	struct ieee80211_hw *hw;
-	const struct firmware *fw_ucode;
+	struct firmware *fw_ucode;
 	int chip_type;
 
 	struct device_node *dt_node;
@@ -354,6 +355,8 @@ struct mwl_priv {
 	struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
 	struct work_struct watchdog_ba_handle;
 
+	bool mfg_mode;
+
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_phy;
 	u32 reg_type;
@@ -374,11 +377,21 @@ struct beacon_info {
 	u8 *ie_rsn48_ptr;
 	u8 *ie_ht_ptr;
 	u8 *ie_vht_ptr;
+#ifdef CONFIG_MAC80211_MESH
+	u8 *ie_meshid_ptr;
+	u8 *ie_meshcfg_ptr;
+	u8 *ie_meshchsw_ptr;
+#endif
 	u8 ie_wmm_len;
 	u8 ie_rsn_len;
 	u8 ie_rsn48_len;
 	u8 ie_ht_len;
 	u8 ie_vht_len;
+#ifdef CONFIG_MAC80211_MESH
+	u8 ie_meshid_len;
+	u8 ie_meshcfg_len;
+	u8 ie_meshchsw_len;
+#endif
 };
 
 struct mwl_vif {

@@ -27,6 +27,11 @@
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS         2000
 #define MAX_WAIT_GET_HW_SPECS_ITERATONS         3
 
+struct cmd_header {
+	__le16 command;
+	__le16 len;
+} __packed;
+
 static bool mwl_fwcmd_chk_adapter(struct mwl_priv *priv)
 {
 	u32 regval;
@@ -43,6 +48,16 @@ static bool mwl_fwcmd_chk_adapter(struct mwl_priv *priv)
 
 static void mwl_fwcmd_send_cmd(struct mwl_priv *priv)
 {
+	if (priv->mfg_mode) {
+		struct cmd_header *cmd_hdr =
+			(struct cmd_header *)&priv->pcmd_buf[2];
+		u16 len = le16_to_cpu(cmd_hdr->len);
+
+		writel(priv->pphys_cmd_buf, priv->iobase1 + 0xcd0);
+		writel(0x00, priv->iobase1 + 0xcd4);
+		writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
+		writel(len + 4, priv->iobase1 + 0xc40);
+	}
 	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
 	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
@@ -109,7 +124,10 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	unsigned short int_code = 0;
 
 	do {
-		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
+		if (priv->mfg_mode)
+			int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[2]));
+		else
+			int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
 		mdelay(1);
 	} while ((int_code != cmd) && (--curr_iteration));
 
@@ -437,6 +455,20 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_ht_ptr += elen;
 			}
 			break;
+#ifdef CONFIG_MAC80211_MESH
+		case WLAN_EID_MESH_CONFIG:
+			beacon_info->ie_meshcfg_len = (elen + 2);
+			beacon_info->ie_meshcfg_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MESH_ID:
+			beacon_info->ie_meshid_len = (elen + 2);
+			beacon_info->ie_meshid_ptr = (pos - 2);
+			break;
+		case WLAN_EID_CHAN_SWITCH_PARAM:
+			beacon_info->ie_meshchsw_len = (elen + 2);
+			beacon_info->ie_meshchsw_ptr = (pos - 2);
+			break;
+#endif
 		case WLAN_EID_VHT_CAPABILITY:
 		case WLAN_EID_VHT_OPERATION:
 		case WLAN_EID_OPMODE_NOTIF:
@@ -483,14 +515,15 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 {
 	struct hostcmd_cmd_set_ies *pcmd;
+	struct beacon_info *beacon = &mwl_vif->beacon_info;
 
-	if (!mwl_vif->beacon_info.valid)
+	if (!beacon->valid)
 		return -EINVAL;
 
-	if (mwl_vif->beacon_info.ie_ht_len > sizeof(pcmd->ie_list_ht))
+	if (beacon->ie_ht_len > sizeof(pcmd->ie_list_ht))
 		goto einval;
 
-	if (mwl_vif->beacon_info.ie_vht_len > sizeof(pcmd->ie_list_vht))
+	if (beacon->ie_vht_len > sizeof(pcmd->ie_list_vht))
 		goto einval;
 
 	pcmd = (struct hostcmd_cmd_set_ies *)&priv->pcmd_buf[0];
@@ -504,20 +537,30 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 
-	pcmd->ie_list_len_ht = cpu_to_le16(mwl_vif->beacon_info.ie_ht_len);
-	memcpy(pcmd->ie_list_ht, mwl_vif->beacon_info.ie_ht_ptr,
-	       mwl_vif->beacon_info.ie_ht_len);
+	memcpy(pcmd->ie_list_ht, beacon->ie_ht_ptr, beacon->ie_ht_len);
+	pcmd->ie_list_len_ht = cpu_to_le16(beacon->ie_ht_len);
 
-	pcmd->ie_list_len_vht = cpu_to_le16(mwl_vif->beacon_info.ie_vht_len);
-	memcpy(pcmd->ie_list_vht, mwl_vif->beacon_info.ie_vht_ptr,
-	       mwl_vif->beacon_info.ie_vht_len);
+	memcpy(pcmd->ie_list_vht, beacon->ie_vht_ptr, beacon->ie_vht_len);
+	pcmd->ie_list_len_vht = cpu_to_le16(beacon->ie_vht_len);
+
+#ifdef CONFIG_MAC80211_MESH
+	memcpy(pcmd->ie_list_proprietary, beacon->ie_meshid_ptr,
+	       beacon->ie_meshid_len);
+	pcmd->ie_list_len_proprietary = cpu_to_le16(beacon->ie_meshid_len);
+	memcpy(pcmd->ie_list_proprietary + pcmd->ie_list_len_proprietary,
+	       beacon->ie_meshcfg_ptr, beacon->ie_meshcfg_len);
+	pcmd->ie_list_len_proprietary += cpu_to_le16(beacon->ie_meshcfg_len);
+	memcpy(pcmd->ie_list_proprietary + pcmd->ie_list_len_proprietary,
+	       beacon->ie_meshchsw_ptr, beacon->ie_meshchsw_len);
+	pcmd->ie_list_len_proprietary += cpu_to_le16(beacon->ie_meshchsw_len);
+#endif
 
 	if (priv->chip_type == MWL8897) {
-		pcmd->ie_list_len_proprietary =
+		memcpy(pcmd->ie_list_proprietary +
+		       pcmd->ie_list_len_proprietary,
+		       beacon->ie_wmm_ptr, beacon->ie_wmm_len);
+		pcmd->ie_list_len_proprietary +=
 			cpu_to_le16(mwl_vif->beacon_info.ie_wmm_len);
-		memcpy(pcmd->ie_list_proprietary,
-		       mwl_vif->beacon_info.ie_wmm_ptr,
-		       mwl_vif->beacon_info.ie_wmm_len);
 	}
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_IES)) {
@@ -698,6 +741,9 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 	int retry;
 	int i;
 
+	if (priv->mfg_mode)
+		return 0;
+
 	pcmd = (struct hostcmd_cmd_get_hw_spec *)&priv->pcmd_buf[0];
 
 	spin_lock_bh(&priv->fwcmd_lock);
@@ -750,6 +796,9 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_hw_spec *pcmd;
 	int i;
+
+	if (priv->mfg_mode)
+		return 0;
 
 	pcmd = (struct hostcmd_cmd_set_hw_spec *)&priv->pcmd_buf[0];
 
@@ -885,6 +934,9 @@ int mwl_fwcmd_set_radio_preamble(struct ieee80211_hw *hw, bool short_preamble)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
+
+	if (priv->mfg_mode)
+		return 0;
 
 	priv->radio_short_preamble = short_preamble;
 	rc = mwl_fwcmd_802_11_radio_control(priv, true, true);
@@ -1145,6 +1197,9 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_802_11_rf_antenna *pcmd;
+
+	if (priv->mfg_mode)
+		return 0;
 
 	pcmd = (struct hostcmd_cmd_802_11_rf_antenna *)&priv->pcmd_buf[0];
 
@@ -2421,6 +2476,34 @@ int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
 
 	*val = pcmd->value;
 
+	spin_unlock_bh(&priv->fwcmd_lock);
+
+	return 0;
+}
+
+int mwl_fwcmd_send_mfg_cmd(struct mwl_priv *priv, char *mfgcmd)
+{
+	struct hostcmd_header *pcmd;
+	struct cmd_header *cmd_hd = (struct cmd_header *)(mfgcmd+4);
+	u16 len;
+	u16 cmd;
+
+	pcmd = (struct hostcmd_header *)&priv->pcmd_buf[0];
+
+	spin_lock_bh(&priv->fwcmd_lock);
+
+	len = le16_to_cpu(cmd_hd->len);
+	memset(pcmd, 0x00, len+4);
+	memcpy((char *)pcmd, mfgcmd, len+4);
+	cmd = le16_to_cpu(cmd_hd->command);
+	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
+		spin_unlock_bh(&priv->fwcmd_lock);
+		wiphy_err(priv->hw->wiphy, "failed execution");
+		return -EIO;
+	}
+	cmd_hd = (struct cmd_header *)&priv->pcmd_buf[2];
+	len = le16_to_cpu(cmd_hd->len);
+	memcpy(mfgcmd, (char *)&priv->pcmd_buf[2], len);
 	spin_unlock_bh(&priv->fwcmd_lock);
 
 	return 0;

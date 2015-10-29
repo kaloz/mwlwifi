@@ -22,10 +22,13 @@
 #include "sysadpt.h"
 #include "dev.h"
 #include "fwcmd.h"
+#ifdef CONFIG_SUPPORT_MFG
+#include "mfg.h"
+#endif
 #include "fwdl.h"
 
 #define FW_DOWNLOAD_BLOCK_SIZE          256
-#define FW_CHECK_MSECS                  1
+#define FW_CHECK_MSECS                  3
 
 #define FW_MAX_NUM_CHECKS               0xffff
 
@@ -57,6 +60,12 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
 	u32 len = 0;
+#ifdef CONFIG_SUPPORT_MFG
+	u32 fwreadysignature = priv->mfg_mode ?
+		MFG_FW_READY_SIGNATURE : HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
+#else
+	u32 fwreadysignature = HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
+#endif
 
 	fw = priv->fw_ucode;
 
@@ -153,15 +162,23 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	*((u32 *)&priv->pcmd_buf[1]) = 0;
 	mwl_fwdl_trig_pcicmd(priv);
 	curr_iteration = FW_MAX_NUM_CHECKS;
+	if (priv->mfg_mode)
+		writel(fwreadysignature, priv->iobase1 + 0xcf0);
 	do {
 		curr_iteration--;
-		writel(HOSTCMD_SOFTAP_MODE, priv->iobase1 + MACREG_REG_GEN_PTR);
-		mdelay(FW_CHECK_MSECS);
-		int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
+		if (!priv->mfg_mode) {
+			writel(HOSTCMD_SOFTAP_MODE,
+			       priv->iobase1 + MACREG_REG_GEN_PTR);
+			mdelay(FW_CHECK_MSECS);
+			int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
+		} else {
+			mdelay(FW_CHECK_MSECS);
+			int_code = readl(priv->iobase1 + 0xc44);
+		}
 		if (!(curr_iteration % 0xff))
 			wiphy_err(hw->wiphy, "%x;", int_code);
 	} while ((curr_iteration) &&
-		 (int_code != HOSTCMD_SOFTAP_FWRDY_SIGNATURE));
+		 (int_code != fwreadysignature));
 
 	if (curr_iteration == 0) {
 		wiphy_err(hw->wiphy,

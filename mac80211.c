@@ -146,6 +146,7 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
 		macids_supported = priv->ap_macids_supported;
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -176,6 +177,10 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+		ether_addr_copy(mwl_vif->bssid, vif->addr);
+		mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		break;
+	case NL80211_IFTYPE_MESH_POINT:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
 		mwl_fwcmd_set_new_stn_add_self(hw, vif);
 		break;
@@ -220,6 +225,7 @@ static void mwl_mac80211_remove_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
 		mwl_fwcmd_set_new_stn_del(hw, vif, vif->addr);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -355,6 +361,7 @@ static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
 {
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
 		mwl_mac80211_bss_info_changed_ap(hw, vif, info, changed);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -458,7 +465,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	memset(sta_info, 0, sizeof(*sta_info));
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;
-		sta_info->is_amsdu_allowed = true;
+		sta_info->is_amsdu_allowed = false;
 		if (sta->ht_cap.cap & IEEE80211_HT_CAP_MAX_AMSDU)
 			sta_info->amsdu_ctrl.cap = MWL_AMSDU_SIZE_8K;
 		else

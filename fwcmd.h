@@ -199,4 +199,6 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
 
+int mwl_fwcmd_send_mfg_cmd(struct mwl_priv *priv, char *mfgcmd);
+
 #endif /* _fwcmd_h_ */

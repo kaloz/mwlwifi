@@ -852,6 +852,8 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			capab = le16_to_cpu(mgmt->u.action.u.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			index = mwl_tx_tid_queue_mapping(tid);
+			capab |= 1;
+			mgmt->u.action.u.addba_req.capab = cpu_to_le16(capab);
 		}
 
 		if (unlikely(ieee80211_is_action(wh->frame_control) &&

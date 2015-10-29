@@ -27,6 +27,9 @@
 #include "tx.h"
 #include "rx.h"
 #include "isr.h"
+#ifdef CONFIG_SUPPORT_MFG
+#include "mfg.h"
+#endif
 #ifdef CONFIG_DEBUG_FS
 #include "debugfs.h"
 #endif
@@ -47,12 +50,14 @@ static struct mwl_chip_info mwl_chip_tbl[] = {
 	[MWL8864] = {
 		.part_name	= "88W8864",
 		.fw_image	= "mwlwifi/88W8864.bin",
+		.mfg_fw_image	= "./88W8864-MFG.bin",
 		.antenna_tx	= ANTENNA_TX_4_AUTO,
 		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
 	[MWL8897] = {
 		.part_name	= "88W8897",
 		.fw_image	= "mwlwifi/88W8897.bin",
+		.mfg_fw_image	= "./88W8897-MFG.bin",
 		.antenna_tx	= ANTENNA_TX_2,
 		.antenna_rx	= ANTENNA_RX_2,
 	},
@@ -131,6 +136,9 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 
 static const struct ieee80211_iface_limit ap_if_limits[] = {
 	{ .max = SYSADPT_NUM_OF_AP,	.types = BIT(NL80211_IFTYPE_AP) },
+#ifdef CONFIG_MAC80211_MESH
+	{ .max = 1,	.types = BIT(NL80211_IFTYPE_MESH_POINT) },
+#endif
 	{ .max = 1,	.types = BIT(NL80211_IFTYPE_STATION) },
 };
 
@@ -203,7 +211,14 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 	pdev = priv->pdev;
 
-	rc = request_firmware(&priv->fw_ucode, fw_name, &priv->pdev->dev);
+#ifdef CONFIG_SUPPORT_MFG
+	if (priv->mfg_mode)
+		rc = mwl_mfg_request_firmware(priv, fw_name);
+	else
+#endif
+		rc = request_firmware((const struct firmware **)&priv->fw_ucode,
+				      fw_name, &priv->pdev->dev);
+
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
 			  "%s: cannot load firmware image <%s>\n",
@@ -223,7 +238,12 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 err_download_fw:
 
-	release_firmware(priv->fw_ucode);
+#ifdef CONFIG_SUPPORT_MFG
+	if (priv->mfg_mode)
+		mwl_mfg_release_firmware(priv);
+	else
+#endif
+		release_firmware(priv->fw_ucode);
 
 err_load_fw:
 
@@ -606,6 +626,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	hw->wiphy->interface_modes = 0;
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP);
+#ifdef CONFIG_MAC80211_MESH
+	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_MESH_POINT);
+#endif
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_STATION);
 	hw->wiphy->iface_combinations = &ap_if_comb;
 	hw->wiphy->n_iface_combinations = 1;
@@ -674,6 +697,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	static bool printed_version;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
+	const char *fw_name;
 	int rc = 0;
 
 	if (id->driver_data >= MWLUNKNOWN)
@@ -728,7 +752,17 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (rc)
 		goto err_alloc_pci_resource;
 
-	rc = mwl_init_firmware(priv, mwl_chip_tbl[priv->chip_type].fw_image);
+	fw_name = mwl_chip_tbl[priv->chip_type].fw_image;
+
+#ifdef CONFIG_SUPPORT_MFG
+	if (mfg_mode) {
+		mwl_mfg_handler_init(priv);
+		fw_name = mwl_chip_tbl[priv->chip_type].mfg_fw_image;
+	}		
+#endif
+
+	rc = mwl_init_firmware(priv, fw_name);
+
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to initialize firmware\n",
 			  MWL_DRV_NAME);
@@ -736,7 +770,12 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* firmware is loaded to H/W, it can be released now */
-	release_firmware(priv->fw_ucode);
+#ifdef CONFIG_SUPPORT_MFG
+	if (priv->mfg_mode)
+		mwl_mfg_release_firmware(priv);
+	else
+#endif
+		release_firmware(priv->fw_ucode);
 
 	mwl_process_of_dts(priv);
 
