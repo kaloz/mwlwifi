@@ -660,6 +660,8 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			}
 
 			mwl_fwcmd_remove_stream(hw, stream);
+			/* re-enable A-MSDU. See below */
+			sta_info->is_amsdu_allowed = true;
 		}
 
 		ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
@@ -675,6 +677,12 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 
 		if (!rc) {
 			stream->state = AMPDU_STREAM_ACTIVE;
+			/*  Support for A-MSDU within A-MPDU is
+			 *  optional.  Simply disable A-MSDU until we
+			 *  have a new API with the peer support
+			 *  status.
+			 */
+			sta_info->is_amsdu_allowed = false;
 		} else {
 			idx = stream->idx;
 			spin_unlock_bh(&priv->stream_lock);
