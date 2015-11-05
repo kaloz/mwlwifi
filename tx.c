@@ -510,6 +510,10 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 	if (!sta_info->is_amsdu_allowed)
 		return tx_skb;
 
+	wh = (struct ieee80211_hdr *)tx_skb->data;
+	if (sta_info->is_mesh_node && is_multicast_ether_addr(wh->addr3))
+		return tx_skb;
+
 	if (sta_info->amsdu_ctrl.cap == MWL_AMSDU_SIZE_4K)
 		amsdu_allow_size = SYSADPT_AMSDU_4K_MAX_SIZE;
 	else if (sta_info->amsdu_ctrl.cap == MWL_AMSDU_SIZE_8K)
@@ -539,7 +543,6 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 	/* potential amsdu size, should add amsdu header 14 bytes +
 	 * maximum padding 3.
 	 */
-	wh = (struct ieee80211_hdr *)tx_skb->data;
 	wh_len = ieee80211_hdrlen(wh->frame_control);
 	len = tx_skb->len - wh_len + 17;
 
@@ -573,8 +576,15 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 
 		data = newskb->data;
 		memcpy(data, tx_skb->data, wh_len);
-		ether_addr_copy(data + wh_len, ieee80211_get_DA(wh));
-		ether_addr_copy(data + wh_len + ETH_ALEN, ieee80211_get_SA(wh));
+		if (sta_info->is_mesh_node) {
+			ether_addr_copy(data + wh_len, wh->addr3);
+			ether_addr_copy(data + wh_len + ETH_ALEN, wh->addr4);
+		} else {
+			ether_addr_copy(data + wh_len,
+					ieee80211_get_DA(wh));
+			ether_addr_copy(data + wh_len + ETH_ALEN,
+					ieee80211_get_SA(wh));
+		}
 		*(u8 *)(data + wh_len + ETH_HLEN - 1) = len & 0xff;
 		*(u8 *)(data + wh_len + ETH_HLEN - 2) = (len >> 8) & 0xff;
 		memcpy(data + wh_len + ETH_HLEN, tx_skb->data + wh_len, len);
@@ -591,8 +601,13 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 		amsdu->cur_pos += amsdu->pad;
 		data = amsdu->cur_pos;
 
-		ether_addr_copy(data, ieee80211_get_DA(wh));
-		ether_addr_copy(data + ETH_ALEN, ieee80211_get_SA(wh));
+		if (sta_info->is_mesh_node) {
+			ether_addr_copy(data, wh->addr3);
+			ether_addr_copy(data + ETH_ALEN, wh->addr4);
+		} else {
+			ether_addr_copy(data, ieee80211_get_DA(wh));
+			ether_addr_copy(data + ETH_ALEN, ieee80211_get_SA(wh));
+		}
 		*(u8 *)(data + ETH_HLEN - 1) = len & 0xff;
 		*(u8 *)(data + ETH_HLEN - 2) = (len >> 8) & 0xff;
 		memcpy(data + ETH_HLEN, tx_skb->data + wh_len, len);
@@ -1165,7 +1180,6 @@ void mwl_tx_flush_amsdu(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
-	u32 status_mask;
 	struct mwl_sta *sta_info;
 	int i;
 	struct mwl_amsdu_frag *amsdu_frag;
@@ -1192,13 +1206,6 @@ void mwl_tx_flush_amsdu(unsigned long data)
 		spin_unlock(&priv->tx_desc_lock);
 	}
 	spin_unlock(&priv->sta_lock);
-
-	status_mask = readl(priv->iobase1 +
-			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status_mask | MACREG_A2HRIC_BIT_QUE_EMPTY,
-	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
-	priv->is_qe_schedule = false;
 }
 
 void mwl_tx_del_sta_amsdu_pkts(struct ieee80211_sta *sta)

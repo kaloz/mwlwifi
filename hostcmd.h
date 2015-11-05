@@ -44,7 +44,7 @@
 #define HOSTCMD_CMD_SET_MAC_ADDR                0x0202 /* per-vif */
 #define HOSTCMD_CMD_SET_RATE_ADAPT_MODE         0x0203
 #define HOSTCMD_CMD_GET_WATCHDOG_BITMAP         0x0205
-#define HOSTCMD_CMD_DEL_MAC_ADDR                0x0206 /* pre-vif */
+#define HOSTCMD_CMD_DEL_MAC_ADDR                0x0206 /* per-vif */
 #define HOSTCMD_CMD_BSS_START                   0x1100 /* per-vif */
 #define HOSTCMD_CMD_AP_BEACON                   0x1101 /* per-vif */
 #define HOSTCMD_CMD_SET_NEW_STN                 0x1111 /* per-vif */

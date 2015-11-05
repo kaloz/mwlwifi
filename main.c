@@ -149,109 +149,6 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 	.num_different_channels = 1,
 };
 
-static int mwl_alloc_pci_resource(struct mwl_priv *priv)
-{
-	struct pci_dev *pdev = priv->pdev;
-	void __iomem *addr;
-
-	priv->next_bar_num = 1;	/* 32-bit */
-	if (pci_resource_flags(pdev, 0) & 0x04)
-		priv->next_bar_num = 2;	/* 64-bit */
-
-	addr = devm_ioremap_resource(&pdev->dev, &pdev->resource[0]);
-	if (IS_ERR(addr)) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 0\n",
-			  MWL_DRV_NAME);
-		goto err;
-	}
-	priv->iobase0 = addr;
-	wiphy_debug(priv->hw->wiphy, "priv->iobase0 = %p\n", priv->iobase0);
-
-	addr = devm_ioremap_resource(&pdev->dev,
-				     &pdev->resource[priv->next_bar_num]);
-	if (IS_ERR(addr)) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 1\n",
-			  MWL_DRV_NAME);
-		goto err;
-	}
-	priv->iobase1 = addr;
-	wiphy_debug(priv->hw->wiphy, "priv->iobase1 = %p\n", priv->iobase1);
-
-	priv->pcmd_buf =
-		(unsigned short *)dmam_alloc_coherent(&priv->pdev->dev,
-						      CMD_BUF_SIZE,
-						      &priv->pphys_cmd_buf,
-						      GFP_KERNEL);
-	if (!priv->pcmd_buf) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot alloc memory for command buffer\n",
-			  MWL_DRV_NAME);
-		goto err;
-	}
-	wiphy_debug(priv->hw->wiphy,
-		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
-		    priv->pcmd_buf,
-		    (void *)priv->pphys_cmd_buf);
-	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
-
-	return 0;
-
-err:
-	wiphy_err(priv->hw->wiphy, "pci alloc fail\n");
-
-	return -EIO;
-}
-
-static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
-{
-	struct pci_dev *pdev;
-	int rc = 0;
-
-	pdev = priv->pdev;
-
-#ifdef CONFIG_SUPPORT_MFG
-	if (priv->mfg_mode)
-		rc = mwl_mfg_request_firmware(priv, fw_name);
-	else
-#endif
-		rc = request_firmware((const struct firmware **)&priv->fw_ucode,
-				      fw_name, &priv->pdev->dev);
-
-	if (rc) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot load firmware image <%s>\n",
-			  MWL_DRV_NAME, fw_name);
-		goto err_load_fw;
-	}
-
-	rc = mwl_fwdl_download_firmware(priv->hw);
-	if (rc) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot download firmware image <%s>\n",
-			  MWL_DRV_NAME, fw_name);
-		goto err_download_fw;
-	}
-
-	return rc;
-
-err_download_fw:
-
-#ifdef CONFIG_SUPPORT_MFG
-	if (priv->mfg_mode)
-		mwl_mfg_release_firmware(priv);
-	else
-#endif
-		release_firmware(priv->fw_ucode);
-
-err_load_fw:
-
-	wiphy_err(priv->hw->wiphy, "firmware init fail\n");
-
-	return rc;
-}
-
 static void mwl_reg_notifier(struct wiphy *wiphy,
 			     struct regulatory_request *request)
 {
@@ -364,6 +261,109 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 #endif
 }
 
+static int mwl_alloc_pci_resource(struct mwl_priv *priv)
+{
+	struct pci_dev *pdev = priv->pdev;
+	void __iomem *addr;
+
+	priv->next_bar_num = 1;	/* 32-bit */
+	if (pci_resource_flags(pdev, 0) & 0x04)
+		priv->next_bar_num = 2;	/* 64-bit */
+
+	addr = devm_ioremap_resource(&pdev->dev, &pdev->resource[0]);
+	if (IS_ERR(addr)) {
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot reserve PCI memory region 0\n",
+			  MWL_DRV_NAME);
+		goto err;
+	}
+	priv->iobase0 = addr;
+	wiphy_debug(priv->hw->wiphy, "priv->iobase0 = %p\n", priv->iobase0);
+
+	addr = devm_ioremap_resource(&pdev->dev,
+				     &pdev->resource[priv->next_bar_num]);
+	if (IS_ERR(addr)) {
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot reserve PCI memory region 1\n",
+			  MWL_DRV_NAME);
+		goto err;
+	}
+	priv->iobase1 = addr;
+	wiphy_debug(priv->hw->wiphy, "priv->iobase1 = %p\n", priv->iobase1);
+
+	priv->pcmd_buf =
+		(unsigned short *)dmam_alloc_coherent(&priv->pdev->dev,
+						      CMD_BUF_SIZE,
+						      &priv->pphys_cmd_buf,
+						      GFP_KERNEL);
+	if (!priv->pcmd_buf) {
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot alloc memory for command buffer\n",
+			  MWL_DRV_NAME);
+		goto err;
+	}
+	wiphy_debug(priv->hw->wiphy,
+		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
+		    priv->pcmd_buf,
+		    (void *)priv->pphys_cmd_buf);
+	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
+
+	return 0;
+
+err:
+	wiphy_err(priv->hw->wiphy, "pci alloc fail\n");
+
+	return -EIO;
+}
+
+static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
+{
+	struct pci_dev *pdev;
+	int rc = 0;
+
+	pdev = priv->pdev;
+
+#ifdef CONFIG_SUPPORT_MFG
+	if (priv->mfg_mode)
+		rc = mwl_mfg_request_firmware(priv, fw_name);
+	else
+#endif
+		rc = request_firmware((const struct firmware **)&priv->fw_ucode,
+				      fw_name, &priv->pdev->dev);
+
+	if (rc) {
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot load firmware image <%s>\n",
+			  MWL_DRV_NAME, fw_name);
+		goto err_load_fw;
+	}
+
+	rc = mwl_fwdl_download_firmware(priv->hw);
+	if (rc) {
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot download firmware image <%s>\n",
+			  MWL_DRV_NAME, fw_name);
+		goto err_download_fw;
+	}
+
+	return rc;
+
+err_download_fw:
+
+#ifdef CONFIG_SUPPORT_MFG
+	if (priv->mfg_mode)
+		mwl_mfg_release_firmware(priv);
+	else
+#endif
+		release_firmware(priv->fw_ucode);
+
+err_load_fw:
+
+	wiphy_err(priv->hw->wiphy, "firmware init fail\n");
+
+	return rc;
+}
+
 static void mwl_process_of_dts(struct mwl_priv *priv)
 {
 #ifdef CONFIG_OF
@@ -397,6 +397,16 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 	priv->pwr_node = of_find_node_by_name(priv->dt_node,
 					      "marvell,powertable");
 #endif
+}
+
+static void mwl_period_timer(unsigned long data)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
+	struct mwl_priv *priv = hw->priv;
+
+	mwl_tx_flush_amsdu(data);
+
+	mod_timer(&priv->period_timer, jiffies + 1);
 }
 
 static void mwl_set_ht_caps(struct mwl_priv *priv,
@@ -559,14 +569,12 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	tasklet_disable(&priv->tx_task);
 	tasklet_init(&priv->rx_task, (void *)mwl_rx_recv, (unsigned long)hw);
 	tasklet_disable(&priv->rx_task);
-	tasklet_init(&priv->qe_task,
-		     (void *)mwl_tx_flush_amsdu, (unsigned long)hw);
-	tasklet_disable(&priv->qe_task);
 	priv->txq_limit = SYSADPT_TX_QUEUE_LIMIT;
 	priv->is_tx_schedule = false;
 	priv->recv_limit = SYSADPT_RECEIVE_LIMIT;
 	priv->is_rx_schedule = false;
-	priv->is_qe_schedule = false;
+
+	setup_timer(&priv->period_timer, mwl_period_timer, (unsigned long)hw);
 
 	spin_lock_init(&priv->tx_desc_lock);
 	spin_lock_init(&priv->rx_desc_lock);
@@ -685,7 +693,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	ieee80211_unregister_hw(hw);
 	mwl_rx_deinit(hw);
 	mwl_tx_deinit(hw);
-	tasklet_kill(&priv->qe_task);
+	del_timer_sync(&priv->period_timer);
 	tasklet_kill(&priv->rx_task);
 	tasklet_kill(&priv->tx_task);
 	cancel_work_sync(&priv->watchdog_ba_handle);

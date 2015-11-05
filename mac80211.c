@@ -77,7 +77,9 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	/* Enable TX reclaim and RX tasklets. */
 	tasklet_enable(&priv->tx_task);
 	tasklet_enable(&priv->rx_task);
-	tasklet_enable(&priv->qe_task);
+
+	/* Enable periodical timer */
+	mod_timer(&priv->period_timer, jiffies);
 
 	/* Enable interrupts */
 	mwl_fwcmd_int_enable(hw);
@@ -111,7 +113,6 @@ fwcmd_fail:
 	mwl_fwcmd_int_disable(hw);
 	tasklet_disable(&priv->tx_task);
 	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
 
 	return rc;
 }
@@ -130,7 +131,6 @@ static void mwl_mac80211_stop(struct ieee80211_hw *hw)
 	/* Disable TX reclaim and RX tasklets. */
 	tasklet_disable(&priv->tx_task);
 	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
 
 	/* Return all skbs to mac80211 */
 	mwl_tx_done((unsigned long)hw);
@@ -463,6 +463,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info = mwl_dev_get_sta(sta);
 
 	memset(sta_info, 0, sizeof(*sta_info));
+	if (vif->type == NL80211_IFTYPE_MESH_POINT)
+		sta_info->is_mesh_node = true;
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;
 		sta_info->is_amsdu_allowed = false;
@@ -593,58 +595,33 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	case IEEE80211_AMPDU_RX_STOP:
 		break;
 	case IEEE80211_AMPDU_TX_START:
-		/* By the time we get here the hw queues may contain outgoing
-		 * packets for this RA/TID that are not part of this BA
-		 * session.  The hw will assign sequence numbers to these
-		 * packets as they go out.  So if we query the hw for its next
-		 * sequence number and use that for the SSN here, it may end up
-		 * being wrong, which will lead to sequence number mismatch at
-		 * the recipient.  To avoid this, we reset the sequence number
-		 * to O for the first MPDU in this BA stream.
-		 */
-		*ssn = 0;
-
-		if (!stream) {
-			/* This means that somebody outside this driver called
-			 * ieee80211_start_tx_ba_session.  This is unexpected
-			 * because we do our own rate control.  Just warn and
-			 * move on.
-			 */
-			stream = mwl_fwcmd_add_stream(hw, sta, tid);
-		}
-
-		if (!stream) {
-			wiphy_warn(hw->wiphy, "no stream found\n");
-			rc = -EBUSY;
+		if (!sta_info->is_ampdu_allowed) {
+			wiphy_warn(hw->wiphy, "ampdu not allowed\n");
+			rc = -EPERM;
 			break;
 		}
 
-		stream->state = AMPDU_STREAM_IN_PROGRESS;
-
-		/* Release the lock before we do the time consuming stuff */
-		spin_unlock_bh(&priv->stream_lock);
-
-		/* Check if link is still valid */
-		if (!sta_info->is_ampdu_allowed) {
-			spin_lock_bh(&priv->stream_lock);
-			mwl_fwcmd_remove_stream(hw, stream);
-			spin_unlock_bh(&priv->stream_lock);
-			wiphy_warn(hw->wiphy,
-				   "link is not valid now\n");
-			return -EBUSY;
+		if (!stream) {
+			stream = mwl_fwcmd_add_stream(hw, sta, tid);
+			if (!stream) {
+				wiphy_warn(hw->wiphy, "no stream found\n");
+				rc = -EPERM;
+				break;
+			}
 		}
+
+		spin_unlock_bh(&priv->stream_lock);
 		rc = mwl_fwcmd_check_ba(hw, stream, vif);
-
 		spin_lock_bh(&priv->stream_lock);
-
 		if (rc) {
 			mwl_fwcmd_remove_stream(hw, stream);
 			wiphy_err(hw->wiphy,
 				  "ampdu start error code: %d\n", rc);
-			rc = -EBUSY;
+			rc = -EPERM;
 			break;
 		}
-
+		stream->state = AMPDU_STREAM_IN_PROGRESS;
+		*ssn = 0;
 		ieee80211_start_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_CONT:
@@ -660,30 +637,35 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			}
 
 			mwl_fwcmd_remove_stream(hw, stream);
-		}
-
-		ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
+			ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
+		} else
+			rc = -EPERM;
 		break;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
-		if (WARN_ON(stream->state != AMPDU_STREAM_IN_PROGRESS)) {
-			rc = -EPERM;
-			break;
-		}
-		spin_unlock_bh(&priv->stream_lock);
-		rc = mwl_fwcmd_create_ba(hw, stream, buf_size, vif);
-		spin_lock_bh(&priv->stream_lock);
-
-		if (!rc) {
-			stream->state = AMPDU_STREAM_ACTIVE;
-		} else {
-			idx = stream->idx;
+		if (stream) {
+			if (WARN_ON(stream->state !=
+				    AMPDU_STREAM_IN_PROGRESS)) {
+				rc = -EPERM;
+				break;
+			}
 			spin_unlock_bh(&priv->stream_lock);
-			mwl_fwcmd_destroy_ba(hw, idx);
+			rc = mwl_fwcmd_create_ba(hw, stream, buf_size, vif);
 			spin_lock_bh(&priv->stream_lock);
-			mwl_fwcmd_remove_stream(hw, stream);
-			wiphy_err(hw->wiphy,
-				  "ampdu operation error code: %d\n", rc);
-		}
+
+			if (!rc) {
+				stream->state = AMPDU_STREAM_ACTIVE;
+			} else {
+				idx = stream->idx;
+				spin_unlock_bh(&priv->stream_lock);
+				mwl_fwcmd_destroy_ba(hw, idx);
+				spin_lock_bh(&priv->stream_lock);
+				mwl_fwcmd_remove_stream(hw, stream);
+				wiphy_err(hw->wiphy,
+					  "ampdu operation error code: %d\n",
+					  rc);
+			}
+		} else
+			rc = -EPERM;
 		break;
 	default:
 		rc = -ENOTSUPP;

@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.12"
+#define MWL_DRV_VERSION	 "10.3.0.13"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -76,7 +76,6 @@
 			     MACREG_A2HRIC_BIT_RADAR_DETECT | \
 			     MACREG_A2HRIC_BIT_CHAN_SWITCH | \
 			     MACREG_A2HRIC_BIT_TX_WATCHDOG | \
-			     MACREG_A2HRIC_BIT_QUE_EMPTY | \
 			     MACREG_A2HRIC_BA_WATCHDOG | \
 			     MACREG_A2HRIC_CONSEC_TXFAIL)
 
@@ -320,12 +319,11 @@ struct mwl_priv {
 
 	struct tasklet_struct tx_task;
 	struct tasklet_struct rx_task;
-	struct tasklet_struct qe_task;
 	int txq_limit;
 	bool is_tx_schedule;
 	int recv_limit;
 	bool is_rx_schedule;
-	bool is_qe_schedule;
+	struct timer_list period_timer;
 	s8 noise;                    /* Most recently reported noise in dBm */
 	struct ieee80211_supported_band band_24;
 	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
@@ -433,6 +431,7 @@ struct mwl_amsdu_ctrl {
 
 struct mwl_sta {
 	struct list_head list;
+	bool is_mesh_node;
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];
 	bool is_amsdu_allowed;
