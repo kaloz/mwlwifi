@@ -66,6 +66,18 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			}
 		}
 
+		if (int_status & MACREG_A2HRIC_BIT_QUE_EMPTY) {
+			int_status &= ~MACREG_A2HRIC_BIT_QUE_EMPTY;
+
+			if (!priv->is_qe_schedule) {
+				status = readl(int_status_mask);
+				writel((status & ~MACREG_A2HRIC_BIT_QUE_EMPTY),
+				       int_status_mask);
+				tasklet_schedule(&priv->qe_task);
+				priv->is_qe_schedule = true;
+			}
+		}
+
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG) {
 			status = readl(int_status_mask);
 			writel((status & ~MACREG_A2HRIC_BA_WATCHDOG),

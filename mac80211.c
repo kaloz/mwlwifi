@@ -77,9 +77,7 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	/* Enable TX reclaim and RX tasklets. */
 	tasklet_enable(&priv->tx_task);
 	tasklet_enable(&priv->rx_task);
-
-	/* Enable periodical timer */
-	mod_timer(&priv->period_timer, jiffies);
+	tasklet_enable(&priv->qe_task);
 
 	/* Enable interrupts */
 	mwl_fwcmd_int_enable(hw);
@@ -113,6 +111,7 @@ fwcmd_fail:
 	mwl_fwcmd_int_disable(hw);
 	tasklet_disable(&priv->tx_task);
 	tasklet_disable(&priv->rx_task);
+	tasklet_disable(&priv->qe_task);
 
 	return rc;
 }
@@ -131,6 +130,7 @@ static void mwl_mac80211_stop(struct ieee80211_hw *hw)
 	/* Disable TX reclaim and RX tasklets. */
 	tasklet_disable(&priv->tx_task);
 	tasklet_disable(&priv->rx_task);
+	tasklet_disable(&priv->qe_task);
 
 	/* Return all skbs to mac80211 */
 	mwl_tx_done((unsigned long)hw);

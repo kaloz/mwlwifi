@@ -516,6 +516,7 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 {
 	struct hostcmd_cmd_set_ies *pcmd;
 	struct beacon_info *beacon = &mwl_vif->beacon_info;
+	u16 ie_list_len_proprietary = 0;
 
 	if (!beacon->valid)
 		return -EINVAL;
@@ -546,22 +547,22 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 #ifdef CONFIG_MAC80211_MESH
 	memcpy(pcmd->ie_list_proprietary, beacon->ie_meshid_ptr,
 	       beacon->ie_meshid_len);
-	pcmd->ie_list_len_proprietary = cpu_to_le16(beacon->ie_meshid_len);
-	memcpy(pcmd->ie_list_proprietary + pcmd->ie_list_len_proprietary,
+	ie_list_len_proprietary = beacon->ie_meshid_len;
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
 	       beacon->ie_meshcfg_ptr, beacon->ie_meshcfg_len);
-	pcmd->ie_list_len_proprietary += cpu_to_le16(beacon->ie_meshcfg_len);
-	memcpy(pcmd->ie_list_proprietary + pcmd->ie_list_len_proprietary,
+	ie_list_len_proprietary += beacon->ie_meshcfg_len;
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
 	       beacon->ie_meshchsw_ptr, beacon->ie_meshchsw_len);
-	pcmd->ie_list_len_proprietary += cpu_to_le16(beacon->ie_meshchsw_len);
+	ie_list_len_proprietary += beacon->ie_meshchsw_len;
 #endif
 
 	if (priv->chip_type == MWL8897) {
-		memcpy(pcmd->ie_list_proprietary +
-		       pcmd->ie_list_len_proprietary,
+		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
 		       beacon->ie_wmm_ptr, beacon->ie_wmm_len);
-		pcmd->ie_list_len_proprietary +=
-			cpu_to_le16(mwl_vif->beacon_info.ie_wmm_len);
+		ie_list_len_proprietary += mwl_vif->beacon_info.ie_wmm_len;
 	}
+
+	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_IES)) {
 		spin_unlock_bh(&priv->fwcmd_lock);

@@ -1180,6 +1180,7 @@ void mwl_tx_flush_amsdu(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
+	u32 status_mask;
 	struct mwl_sta *sta_info;
 	int i;
 	struct mwl_amsdu_frag *amsdu_frag;
@@ -1206,6 +1207,13 @@ void mwl_tx_flush_amsdu(unsigned long data)
 		spin_unlock(&priv->tx_desc_lock);
 	}
 	spin_unlock(&priv->sta_lock);
+
+	status_mask = readl(priv->iobase1 +
+			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	writel(status_mask | MACREG_A2HRIC_BIT_QUE_EMPTY,
+	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+
+	priv->is_qe_schedule = false;
 }
 
 void mwl_tx_del_sta_amsdu_pkts(struct ieee80211_sta *sta)

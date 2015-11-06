@@ -283,14 +283,6 @@ static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 	set = write ? WL_SET : WL_GET;
 
 	switch (priv->reg_type) {
-	case MWL_ACCESS_MAC:
-		if (set == WL_GET)
-			priv->reg_value =
-				le32_to_cpu(MAC_REG_ADDR_PCI(priv->reg_offset));
-		else
-			writel(cpu_to_le32(priv->reg_value),
-			       MAC_REG_ADDR_PCI(priv->reg_offset));
-		break;
 	case MWL_ACCESS_RF:
 		ret = mwl_fwcmd_reg_rf(hw, set, priv->reg_offset,
 				       &priv->reg_value);
