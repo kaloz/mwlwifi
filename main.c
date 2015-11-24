@@ -545,7 +545,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		     IEEE80211_HW_MFP_CAPABLE;
 #else
 	ieee80211_hw_set(hw, SUPPORTS_PER_STA_GTK);
-	ieee80211_hw_set(hw, HW_MFP_CAPABLE);
+	ieee80211_hw_set(hw, MFP_CAPABLE);
 #endif
 
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
