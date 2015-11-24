@@ -491,6 +491,7 @@ void mwl_rx_recv(unsigned long data)
 	spin_lock(&priv->rx_desc_lock);
 	desc = &priv->desc_data[0];
 	curr_hndl = desc->pnext_rx_hndl;
+	spin_unlock(&priv->rx_desc_lock);
 
 	if (!curr_hndl) {
 		status_mask = readl(priv->iobase1 +
@@ -500,7 +501,7 @@ void mwl_rx_recv(unsigned long data)
 
 		priv->is_rx_schedule = false;
 		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
-		spin_unlock(&priv->rx_desc_lock);
+		//spin_unlock(&priv->rx_desc_lock);
 		return;
 	}
 
@@ -564,7 +565,9 @@ void mwl_rx_recv(unsigned long data)
 
 					tr = (struct mwl_dma_data *)
 					     prx_skb->data;
+					spin_lock(&priv->rx_desc_lock);
 					memset((void *)&tr->data, 0, 4);
+					spin_unlock(&priv->rx_desc_lock);
 					pkt_len += 4;
 				}
 
@@ -607,8 +610,10 @@ void mwl_rx_recv(unsigned long data)
 					goto out;
 		}
 
+		spin_lock(&priv->rx_desc_lock);
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
+		spin_unlock(&priv->rx_desc_lock);
 out:
 		mwl_rx_refill(priv, curr_hndl);
 		curr_hndl->pdesc->rx_control = EAGLE_RXD_CTRL_DRIVER_OWN;
@@ -626,5 +631,5 @@ out:
 
 	priv->is_rx_schedule = false;
 
-	spin_unlock(&priv->rx_desc_lock);
+	//spin_unlock(&priv->rx_desc_lock);
 }
