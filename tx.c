@@ -424,7 +424,10 @@ static inline void mwl_tx_skb(struct mwl_priv *priv, int desc_num,
 	dma_data = (struct mwl_dma_data *)tx_skb->data;
 	wh = &dma_data->wh;
 
-	if (ieee80211_is_data(wh->frame_control)) {
+	if (ieee80211_is_data(wh->frame_control) ||
+	    (ieee80211_is_mgmt(wh->frame_control) &&
+	    ieee80211_has_protected(wh->frame_control) &&
+	    !is_multicast_ether_addr(wh->addr1))) {
 		if (is_multicast_ether_addr(wh->addr1)) {
 			if (ccmp) {
 				mwl_tx_insert_ccmp_hdr(dma_data->data,
@@ -1138,10 +1141,12 @@ void mwl_tx_done(unsigned long data)
 							      amsdu_pkts);
 					dev_kfree_skb_any(done_skb);
 					done_skb = NULL;
-				} else
+				} else {
 					mwl_tx_prepare_info(hw, rate, info);
-			} else
+				}
+			} else {
 				mwl_tx_prepare_info(hw, 0, info);
+			}
 
 			if (done_skb) {
 				/* Remove H/W dma header */

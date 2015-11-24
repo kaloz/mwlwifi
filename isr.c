@@ -70,11 +70,17 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			int_status &= ~MACREG_A2HRIC_BIT_QUE_EMPTY;
 
 			if (!priv->is_qe_schedule) {
-				status = readl(int_status_mask);
-				writel((status & ~MACREG_A2HRIC_BIT_QUE_EMPTY),
-				       int_status_mask);
-				tasklet_schedule(&priv->qe_task);
-				priv->is_qe_schedule = true;
+				if (time_after(jiffies,
+					       (priv->qe_trigger_time + 1))) {
+					status = readl(int_status_mask);
+					writel((status &
+					       ~MACREG_A2HRIC_BIT_QUE_EMPTY),
+					       int_status_mask);
+					tasklet_schedule(&priv->qe_task);
+					priv->qe_trigger_num++;
+					priv->is_qe_schedule = true;
+					priv->qe_trigger_time = jiffies;
+				}
 			}
 		}
 

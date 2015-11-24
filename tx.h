@@ -15,8 +15,8 @@
 
 /* Description:  This file defines transmit related functions. */
 
-#ifndef _tx_h_
-#define _tx_h_
+#ifndef _TX_H_
+#define _TX_H_
 
 int mwl_tx_init(struct ieee80211_hw *hw);
 void mwl_tx_deinit(struct ieee80211_hw *hw);
@@ -33,4 +33,4 @@ void mwl_tx_done(unsigned long data);
 void mwl_tx_flush_amsdu(unsigned long data);
 void mwl_tx_del_sta_amsdu_pkts(struct ieee80211_sta *sta);
 
-#endif /* _tx_h_ */
+#endif /* _TX_H_ */

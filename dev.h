@@ -15,8 +15,8 @@
 
 /* Description:  This file defines device related information. */
 
-#ifndef _dev_h_
-#define _dev_h_
+#ifndef _DEV_H_
+#define _DEV_H_
 
 #include <linux/version.h>
 #include <linux/interrupt.h>
@@ -143,7 +143,6 @@ enum {
 struct mwl_chip_info {
 	const char *part_name;
 	const char *fw_image;
-	const char *mfg_fw_image;
 	int antenna_tx;
 	int antenna_rx;
 };
@@ -265,7 +264,7 @@ struct mwl_ampdu_stream {
 };
 
 #ifdef CONFIG_DEBUG_FS
-#define MAC_REG_ADDR_PCI(offset)      ((priv->iobase1+0xA000) + offset)
+#define MAC_REG_ADDR_PCI(offset)      ((priv->iobase1 + 0xA000) + offset)
 
 #define MWL_ACCESS_MAC                1
 #define MWL_ACCESS_RF                 2
@@ -310,8 +309,10 @@ struct mwl_priv {
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
 
 	/* various descriptor data */
-	spinlock_t tx_desc_lock;     /* for tx descriptor data       */
-	spinlock_t rx_desc_lock;     /* for rx descriptor data       */
+	/* for tx descriptor data  */
+	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
+	/* for rx descriptor data  */
+	spinlock_t rx_desc_lock ____cacheline_aligned_in_smp;
 	struct mwl_desc_data desc_data[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head txq[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head delay_q;
@@ -326,6 +327,9 @@ struct mwl_priv {
 	int recv_limit;
 	bool is_rx_schedule;
 	bool is_qe_schedule;
+	u32 qe_trigger_num;
+	unsigned long qe_trigger_time;
+
 	s8 noise;                    /* Most recently reported noise in dBm */
 	struct ieee80211_supported_band band_24;
 	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
@@ -337,22 +341,29 @@ struct mwl_priv {
 	u32 ap_macids_supported;
 	u32 sta_macids_supported;
 	u32 macids_used;
-	spinlock_t vif_lock;         /* for private interface info   */
-	struct list_head vif_list;   /* List of interfaces.          */
 	u32 running_bsses;           /* bitmap of running BSSes      */
 
-	spinlock_t sta_lock;         /* for private sta info         */
-	struct list_head sta_list;   /* List of stations             */
+	struct {
+		spinlock_t vif_lock;         /* for private interface info  */
+		struct list_head vif_list;   /* List of interfaces.         */
+	} ____cacheline_aligned_in_smp;
+
+	struct {
+		spinlock_t sta_lock;         /* for private sta info        */
+		struct list_head sta_list;   /* List of stations            */
+	} ____cacheline_aligned_in_smp;
 
 	bool radio_on;
 	bool radio_short_preamble;
 	bool wmm_enabled;
 	struct ieee80211_tx_queue_params wmm_params[SYSADPT_TX_WMM_QUEUES];
 
-	/* Ampdu stream information */
-	u8 num_ampdu_queues;
-	spinlock_t stream_lock;      /* for ampdu stream             */
-	struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
+	/* ampdu stream information */
+	/* for ampdu stream */
+	struct {
+		spinlock_t stream_lock;
+		struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
+	} ____cacheline_aligned_in_smp;
 	struct work_struct watchdog_ba_handle;
 
 	bool mfg_mode;
@@ -437,8 +448,11 @@ struct mwl_sta {
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];
 	bool is_amsdu_allowed;
-	spinlock_t amsdu_lock;      /* for amsdu aggregation       */
-	struct mwl_amsdu_ctrl amsdu_ctrl;
+	/* for amsdu aggregation */
+	struct {
+		spinlock_t amsdu_lock;
+		struct mwl_amsdu_ctrl amsdu_ctrl;
+	} ____cacheline_aligned_in_smp;
 	u16 iv16;
 	u32 iv32;
 };
@@ -479,4 +493,4 @@ static inline struct mwl_sta *mwl_dev_get_sta(const struct ieee80211_sta *sta)
 /* Defined in mac80211.c. */
 extern const struct ieee80211_ops mwl_mac80211_ops;
 
-#endif /* _dev_h_ */
+#endif /* _DEV_H_ */

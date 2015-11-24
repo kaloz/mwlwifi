@@ -59,18 +59,18 @@ static int dump_data(char *p, u8 *data, int len, char *title)
 		if ((cur_byte + 8) < len) {
 			for (i = 0; i < 8; i++)
 				str += sprintf(str, "0x%02x ",
-					       *(data+cur_byte+i));
+					       *(data + cur_byte + i));
 			str += sprintf(str, "\n");
 		} else {
 			for (i = 0; i < (len - cur_byte); i++)
 				str += sprintf(str, "0x%02x ",
-					       *(data+cur_byte+i));
+					       *(data + cur_byte + i));
 			str += sprintf(str, "\n");
 			break;
 		}
 	}
 
-	return str-p;
+	return (str - p);
 }
 
 static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
@@ -108,11 +108,12 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	p += sprintf(p, "sta macid support: %08x\n",
 		     priv->sta_macids_supported);
 	p += sprintf(p, "macid used: %08x\n", priv->macids_used);
+	p += sprintf(p, "qe trigger number: %d\n", priv->qe_trigger_num);
 	p += sprintf(p, "mfg mode: %s\n", priv->mfg_mode ? "true" : "false");
 	p += sprintf(p, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *) page,
-				      (unsigned long) p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
 	free_page(page);
 
 	return ret;
@@ -126,7 +127,7 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	char *p = (char *)page;
 	struct mwl_vif *mwl_vif;
 	struct ieee80211_vif *vif;
-	char ssid[IEEE80211_MAX_SSID_LEN+1];
+	char ssid[IEEE80211_MAX_SSID_LEN + 1];
 	ssize_t ret;
 
 	if (!p)
@@ -177,8 +178,8 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	}
 	spin_unlock_bh(&priv->vif_lock);
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *) page,
-				      (unsigned long) p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
 	free_page(page);
 
 	return ret;
@@ -218,8 +219,8 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	}
 	spin_unlock_bh(&priv->sta_lock);
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *) page,
-				      (unsigned long) p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
 	free_page(page);
 
 	return ret;
@@ -246,15 +247,16 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 		p += sprintf(p, "idx: %u\n", stream->idx);
 		p += sprintf(p, "state: %u\n", stream->state);
 		if (stream->sta) {
-			p += sprintf(p, "mac address: %pM\n", stream->sta->addr);
+			p += sprintf(p, "mac address: %pM\n",
+				     stream->sta->addr);
 			p += sprintf(p, "tid: %u\n", stream->tid);
 		}
 	}
 	spin_unlock_bh(&priv->stream_lock);
 	p += sprintf(p, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *) page,
-				      (unsigned long) p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
 	free_page(page);
 
 	return ret;
@@ -270,18 +272,6 @@ static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 	set = write ? WL_SET : WL_GET;
 
 	switch (priv->reg_type) {
-	case MWL_ACCESS_RF:
-		ret = mwl_fwcmd_reg_rf(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_BBP:
-		ret = mwl_fwcmd_reg_bb(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_CAU:
-		ret = mwl_fwcmd_reg_cau(hw, set, priv->reg_offset,
-					&priv->reg_value);
-		break;
 	case MWL_ACCESS_ADDR0:
 		if (set == WL_GET)
 			priv->reg_value =
@@ -308,8 +298,9 @@ static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 			if ((!ret) && (set == WL_GET))
 				priv->reg_value = addr_val[0];
 			kfree(addr_val);
-		} else
+		} else {
 			ret = -ENOMEM;
+		}
 		break;
 	default:
 		ret = -EINVAL;
@@ -324,7 +315,7 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
-	char *buf = (char *) addr;
+	char *buf = (char *)addr;
 	int pos = 0, ret = 0;
 
 	if (!buf)
@@ -345,9 +336,15 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 	ret = mwl_debugfs_reg_access(priv, false);
 
 done:
-	pos += snprintf(buf, PAGE_SIZE, "%u 0x%08x 0x%08x\n",
-			priv->reg_type, priv->reg_offset,
-			priv->reg_value);
+	if (!ret)
+		pos += snprintf(buf, PAGE_SIZE, "%u 0x%08x 0x%08x\n",
+				priv->reg_type, priv->reg_offset,
+				priv->reg_value);
+	else
+		pos += snprintf(buf, PAGE_SIZE, "error: %d(%u 0x%08x 0x%08x)\n",
+				ret, priv->reg_type, priv->reg_offset,
+				priv->reg_value);
+
 	ret = simple_read_from_buffer(ubuf, count, ppos, buf, pos);
 
 none:
@@ -362,7 +359,7 @@ static ssize_t mwl_debugfs_regrdwr_write(struct file *file,
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
-	char *buf = (char *) addr;
+	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
 	int ret;
 	u32 reg_type = 0, reg_offset = 0, reg_value = UINT_MAX;

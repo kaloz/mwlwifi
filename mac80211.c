@@ -572,11 +572,19 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
 static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif,
 				     enum ieee80211_ampdu_mlme_action action,
 				     struct ieee80211_sta *sta,
 				     u16 tid, u16 *ssn, u8 buf_size)
+#else
+static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
+				     struct ieee80211_vif *vif,
+				     enum ieee80211_ampdu_mlme_action action,
+				     struct ieee80211_sta *sta,
+				     u16 tid, u16 *ssn, u8 buf_size, bool amsdu)
+#endif
 {
 	int rc = 0;
 	struct mwl_priv *priv = hw->priv;
@@ -638,8 +646,9 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 
 			mwl_fwcmd_remove_stream(hw, stream);
 			ieee80211_stop_tx_ba_cb_irqsafe(vif, addr, tid);
-		} else
+		} else {
 			rc = -EPERM;
+		}
 		break;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
 		if (stream) {
@@ -664,8 +673,9 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 					  "ampdu operation error code: %d\n",
 					  rc);
 			}
-		} else
+		} else {
 			rc = -EPERM;
+		}
 		break;
 	default:
 		rc = -ENOTSUPP;

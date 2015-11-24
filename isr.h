@@ -15,12 +15,12 @@
 
 /* Description:  This file defines interrupt related functions. */
 
-#ifndef _isr_h_
-#define _isr_h_
+#ifndef _ISR_H_
+#define _ISR_H_
 
 #include <linux/interrupt.h>
 
 irqreturn_t mwl_isr(int irq, void *dev_id);
 void mwl_watchdog_ba_events(struct work_struct *work);
 
-#endif /* _isr_h_ */
+#endif /* _ISR_H_ */

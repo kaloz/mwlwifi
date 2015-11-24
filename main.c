@@ -50,14 +50,12 @@ static struct mwl_chip_info mwl_chip_tbl[] = {
 	[MWL8864] = {
 		.part_name	= "88W8864",
 		.fw_image	= "mwlwifi/88W8864.bin",
-		.mfg_fw_image	= "./88W8864-MFG.bin",
 		.antenna_tx	= ANTENNA_TX_4_AUTO,
 		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
 	[MWL8897] = {
 		.part_name	= "88W8897",
 		.fw_image	= "mwlwifi/88W8897.bin",
-		.mfg_fw_image	= "./88W8897-MFG.bin",
 		.antenna_tx	= ANTENNA_TX_2,
 		.antenna_rx	= ANTENNA_RX_2,
 	},
@@ -213,24 +211,30 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 #ifdef CONFIG_SUPPORT_MFG
 	if (priv->mfg_mode)
-		rc = mwl_mfg_request_firmware(priv, fw_name);
+		rc = mwl_mfg_request_firmware(priv);
 	else
 #endif
 		rc = request_firmware((const struct firmware **)&priv->fw_ucode,
 				      fw_name, &priv->pdev->dev);
 
 	if (rc) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot load firmware image <%s>\n",
-			  MWL_DRV_NAME, fw_name);
+		if (priv->mfg_mode)
+			wiphy_err(priv->hw->wiphy, "cannot find firmware\n");
+		else
+			wiphy_err(priv->hw->wiphy,
+				  "%s: cannot find firmware image <%s>\n",
+				  MWL_DRV_NAME, fw_name);
 		goto err_load_fw;
 	}
 
 	rc = mwl_fwdl_download_firmware(priv->hw);
 	if (rc) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot download firmware image <%s>\n",
-			  MWL_DRV_NAME, fw_name);
+		if (priv->mfg_mode)
+			wiphy_err(priv->hw->wiphy, "download firmware fail\n");
+		else
+			wiphy_err(priv->hw->wiphy,
+				  "%s: cannot download firmware image <%s>\n",
+				  MWL_DRV_NAME, fw_name);
 		goto err_download_fw;
 	}
 
@@ -536,6 +540,16 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	ieee80211_hw_set(hw, AP_LINK_PS);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
+	hw->flags |= IEEE80211_HW_SUPPORTS_PER_STA_GTK |
+		     IEEE80211_HW_MFP_CAPABLE;
+#else
+	ieee80211_hw_set(hw, SUPPORTS_PER_STA_GTK);
+	ieee80211_hw_set(hw, HW_MFP_CAPABLE);
+#endif
+
+	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
+
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
 
@@ -567,6 +581,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->recv_limit = SYSADPT_RECEIVE_LIMIT;
 	priv->is_rx_schedule = false;
 	priv->is_qe_schedule = false;
+	priv->qe_trigger_num = 0;
+	priv->qe_trigger_time = jiffies;
 
 	spin_lock_init(&priv->tx_desc_lock);
 	spin_lock_init(&priv->rx_desc_lock);
@@ -755,10 +771,8 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	fw_name = mwl_chip_tbl[priv->chip_type].fw_image;
 
 #ifdef CONFIG_SUPPORT_MFG
-	if (mfg_mode) {
+	if (mfg_mode)
 		mwl_mfg_handler_init(priv);
-		fw_name = mwl_chip_tbl[priv->chip_type].mfg_fw_image;
-	}
 #endif
 
 	rc = mwl_init_firmware(priv, fw_name);

@@ -15,10 +15,10 @@
 
 /* Description:  This file defines debug fs related functions. */
 
-#ifndef _debugfs_h_
-#define _debugfs_h_
+#ifndef _MWL_DEBUGFS_H_
+#define _MWL_DEBUGFS_H_
 
 void mwl_debugfs_init(struct ieee80211_hw *hw);
 void mwl_debugfs_remove(struct ieee80211_hw *hw);
 
-#endif /* _debugfs_h_ */
+#endif /* _MWL_DEBUGFS_H_ */

@@ -17,15 +17,13 @@
  * structure.
  */
 
-#ifndef _hostcmd_h_
-#define _hostcmd_h_
+#ifndef _HOSTCMD_H_
+#define _HOSTCMD_H_
 
 /* 16 bit host command code */
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
 #define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
 #define HOSTCMD_CMD_802_11_GET_STAT             0x0014
-#define HOSTCMD_CMD_BBP_REG_ACCESS              0x001a
-#define HOSTCMD_CMD_RF_REG_ACCESS               0x001b
 #define HOSTCMD_CMD_802_11_RADIO_CONTROL        0x001c
 #define HOSTCMD_CMD_MEM_ADDR_ACCESS             0x001d
 #define HOSTCMD_CMD_802_11_TX_POWER             0x001f
@@ -55,7 +53,6 @@
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
-#define HOSTCMD_CMD_CAU_REG_ACCESS              0x1157
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -105,6 +102,8 @@
 #define KEY_TYPE_ID_TKIP                        0x01
 #define KEY_TYPE_ID_AES	                        0x02
 
+/* Group key for RX only */
+#define ENCR_KEY_FLAG_RXGROUPKEY                0x00000002
 #define ENCR_KEY_FLAG_TXGROUPKEY                0x00000004
 #define ENCR_KEY_FLAG_PAIRWISE                  0x00000008
 #define ENCR_KEY_FLAG_TSC_VALID                 0x00000040
@@ -266,24 +265,6 @@ struct hostcmd_cmd_802_11_get_stat {
 	__le32 rx_errors;
 	__le32 rx_rts_count;
 	__le32 tx_cts_count;
-} __packed;
-
-/* HOSTCMD_CMD_BBP_REG_ACCESS */
-struct hostcmd_cmd_bbp_reg_access {
-	struct hostcmd_header cmd_hdr;
-	__le16 action;
-	__le16 offset;
-	u8 value;
-	u8 reserverd[3];
-} __packed;
-
-/* HOSTCMD_CMD_RF_REG_ACCESS */
-struct hostcmd_cmd_rf_reg_access {
-	struct hostcmd_header cmd_hdr;
-	__le16 action;
-	__le16 offset;
-	u8 value;
-	u8 reserverd[3];
 } __packed;
 
 /* HOSTCMD_CMD_802_11_RADIO_CONTROL */
@@ -804,4 +785,4 @@ struct hostcmd_cmd_set_cdd {
 	__le32 enable;
 } __packed;
 
-#endif /* _hostcmd_h_ */
+#endif /* _HOSTCMD_H_ */

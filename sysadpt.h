@@ -15,8 +15,8 @@
 
 /* Description:  This file defines system adaptation related information. */
 
-#ifndef _mwl_sysadpt_h_
-#define _mwl_sysadpt_h_
+#ifndef _SYSADPT_H_
+#define _SYSADPT_H_
 
 #define SYSADPT_MAX_NUM_CHANNELS       64
 
@@ -70,4 +70,4 @@
 
 #define SYSADPT_MAX_TID                8
 
-#endif /* _mwl_sysadpt_h_ */
+#endif /* _SYSADPT_H_ */

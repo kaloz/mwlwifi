@@ -17,9 +17,9 @@
  * functions.
  */
 
-#ifndef _fwdl_h_
-#define _fwdl_h_
+#ifndef _FWDL_H_
+#define _FWDL_H_
 
 int mwl_fwdl_download_firmware(struct ieee80211_hw *hw);
 
-#endif /* _fwdl_h_ */
+#endif /* _FWDL_H_ */

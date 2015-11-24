@@ -15,11 +15,11 @@
 
 /* Description:  This file defines receive related functions. */
 
-#ifndef _rx_h_
-#define _rx_h_
+#ifndef _RX_H_
+#define _RX_H_
 
 int mwl_rx_init(struct ieee80211_hw *hw);
 void mwl_rx_deinit(struct ieee80211_hw *hw);
 void mwl_rx_recv(unsigned long data);
 
-#endif /* _rx_h_ */
+#endif /* _RX_H_ */
