@@ -488,7 +488,6 @@ void mwl_rx_recv(unsigned long data)
 	struct ieee80211_hdr *wh;
 	u32 status_mask;
 
-	spin_lock(&priv->rx_desc_lock);
 	desc = &priv->desc_data[0];
 	curr_hndl = desc->pnext_rx_hndl;
 
@@ -500,7 +499,6 @@ void mwl_rx_recv(unsigned long data)
 
 		priv->is_rx_schedule = false;
 		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
-		spin_unlock(&priv->rx_desc_lock);
 		return;
 	}
 
@@ -625,6 +623,4 @@ out:
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 	priv->is_rx_schedule = false;
-
-	spin_unlock(&priv->rx_desc_lock);
 }

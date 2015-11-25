@@ -311,8 +311,6 @@ struct mwl_priv {
 	/* various descriptor data */
 	/* for tx descriptor data  */
 	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
-	/* for rx descriptor data  */
-	spinlock_t rx_desc_lock ____cacheline_aligned_in_smp;
 	struct mwl_desc_data desc_data[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head txq[SYSADPT_NUM_OF_DESC_DATA];
 	struct sk_buff_head delay_q;

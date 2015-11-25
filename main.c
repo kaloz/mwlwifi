@@ -585,7 +585,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->qe_trigger_time = jiffies;
 
 	spin_lock_init(&priv->tx_desc_lock);
-	spin_lock_init(&priv->rx_desc_lock);
 	spin_lock_init(&priv->fwcmd_lock);
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
