@@ -501,7 +501,6 @@ void mwl_rx_recv(unsigned long data)
 
 		priv->is_rx_schedule = false;
 		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
-		//spin_unlock(&priv->rx_desc_lock);
 		return;
 	}
 
@@ -631,5 +630,4 @@ out:
 
 	priv->is_rx_schedule = false;
 
-	//spin_unlock(&priv->rx_desc_lock);
 }
