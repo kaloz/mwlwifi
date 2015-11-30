@@ -1040,13 +1040,15 @@ void mwl_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
-	int desc_num = SYSADPT_TX_WMM_QUEUES - tid - 1;
+	int ac, desc_num;
 	struct mwl_amsdu_frag *amsdu_frag;
 	struct sk_buff *skb, *tmp;
 	struct ieee80211_tx_info *tx_info;
 	struct mwl_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
 
+	ac = mwl_tx_tid_queue_mapping(tid);
+	desc_num = SYSADPT_TX_WMM_QUEUES - ac - 1;
 	spin_lock_bh(&priv->txq[desc_num].lock);
 	skb_queue_walk_safe(&priv->txq[desc_num], skb, tmp) {
 		tx_info = IEEE80211_SKB_CB(skb);
