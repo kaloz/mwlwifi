@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.14"
+#define MWL_DRV_VERSION	 "10.3.0.15-20151208"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -300,7 +300,7 @@ struct mwl_priv {
 	void __iomem *iobase1; /* MEM Base Address Register 1  */
 	u32 next_bar_num;
 
-	spinlock_t fwcmd_lock;       /* for firmware command         */
+	struct mutex fwcmd_mutex;    /* for firmware command         */
 	unsigned short *pcmd_buf;    /* pointer to CmdBuf (virtual)  */
 	dma_addr_t pphys_cmd_buf;    /* pointer to CmdBuf (physical) */
 	bool in_send_cmd;

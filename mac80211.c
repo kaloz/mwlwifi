@@ -463,8 +463,21 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info = mwl_dev_get_sta(sta);
 
 	memset(sta_info, 0, sizeof(*sta_info));
-	if (vif->type == NL80211_IFTYPE_MESH_POINT)
+
+	if (vif->type == NL80211_IFTYPE_MESH_POINT) {
 		sta_info->is_mesh_node = true;
+		/* Patch mesh interface for HT based on 88W8897. When authsae or
+		 * wpa_supplicant is used for mesh security, HT capbility wan't
+		 * be set. This would be removed if problem is fixed.
+		 */
+		sta->ht_cap.ht_supported = true;
+		sta->ht_cap.cap = 0x6f;
+		sta->ht_cap.mcs.rx_mask[0] = 0xff;
+		sta->ht_cap.mcs.rx_mask[1] = 0xff;
+		sta->ht_cap.ampdu_factor = 0x3;
+		sta->ht_cap.ampdu_density = 0x5;
+	}
+
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;
 		sta_info->is_amsdu_allowed = false;

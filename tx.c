@@ -847,9 +847,9 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 		if (is_multicast_ether_addr(wh->addr1))
 			xmitcontrol |= EAGLE_TXD_XMITCTRL_USE_MC_RATE;
-
-		k_conf = tx_info->control.hw_key;
 	}
+
+	k_conf = tx_info->control.hw_key;
 
 	/* Queue ADDBA request in the respective data queue.  While setting up
 	 * the ampdu stream, mac80211 queues further packets for that

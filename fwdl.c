@@ -22,7 +22,7 @@
 #include "sysadpt.h"
 #include "dev.h"
 #include "fwcmd.h"
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 #include "mfg.h"
 #endif
 #include "fwdl.h"
@@ -60,7 +60,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
 	u32 len = 0;
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 	u32 fwreadysignature = priv->mfg_mode ?
 		MFG_FW_READY_SIGNATURE : HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
 #else

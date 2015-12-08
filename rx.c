@@ -338,6 +338,7 @@ static inline void mwl_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 		skb_pull(skb, sizeof(*tr) - hdrlen);
 }
 
+#ifdef CONFIG_MAC80211_MESH
 static inline bool mwl_rx_process_mesh_amsdu(struct mwl_priv *priv,
 					     struct sk_buff *skb,
 					     struct ieee80211_rx_status *status)
@@ -407,6 +408,7 @@ static inline bool mwl_rx_process_mesh_amsdu(struct mwl_priv *priv,
 
 	return true;
 }
+#endif
 
 static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_hndl *rx_hndl)
 {
@@ -595,6 +597,7 @@ void mwl_rx_recv(unsigned long data)
 			}
 		}
 
+#ifdef CONFIG_MAC80211_MESH
 		if (ieee80211_is_data_qos(wh->frame_control) &&
 		    ieee80211_has_a4(wh->frame_control)) {
 			u8 *qc = ieee80211_get_qos_ctl(wh);
@@ -604,6 +607,7 @@ void mwl_rx_recv(unsigned long data)
 							      &status))
 					goto out;
 		}
+#endif
 
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);

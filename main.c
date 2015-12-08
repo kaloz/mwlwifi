@@ -27,7 +27,7 @@
 #include "tx.h"
 #include "rx.h"
 #include "isr.h"
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 #include "mfg.h"
 #endif
 #ifdef CONFIG_DEBUG_FS
@@ -209,7 +209,7 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 	pdev = priv->pdev;
 
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 	if (priv->mfg_mode)
 		rc = mwl_mfg_request_firmware(priv);
 	else
@@ -242,7 +242,7 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 err_download_fw:
 
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 	if (priv->mfg_mode)
 		mwl_mfg_release_firmware(priv);
 	else
@@ -584,8 +584,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->qe_trigger_num = 0;
 	priv->qe_trigger_time = jiffies;
 
+	mutex_init(&priv->fwcmd_mutex);
 	spin_lock_init(&priv->tx_desc_lock);
-	spin_lock_init(&priv->fwcmd_lock);
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
 	spin_lock_init(&priv->stream_lock);
@@ -769,7 +769,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	fw_name = mwl_chip_tbl[priv->chip_type].fw_image;
 
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 	if (mfg_mode)
 		mwl_mfg_handler_init(priv);
 #endif
@@ -783,7 +783,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* firmware is loaded to H/W, it can be released now */
-#ifdef CONFIG_SUPPORT_MFG
+#ifdef SUPPORT_MFG
 	if (priv->mfg_mode)
 		mwl_mfg_release_firmware(priv);
 	else
