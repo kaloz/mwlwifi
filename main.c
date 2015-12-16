@@ -338,8 +338,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 			}
 
 			/* Dump loaded power tabel */
-			wiphy_info(hw->wiphy, "%s: %s\n", dev_name(&wiphy->dev),
-				   prop->name);
+			wiphy_debug(hw->wiphy, "regdomain: %s\n", prop->name);
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
 				struct mwl_tx_pwr_tbl *pwr_tbl;
 				char disp_buf[64];
@@ -348,12 +347,12 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 				pwr_tbl = &priv->tx_pwr_tbl[i];
 				if (pwr_tbl->channel == 0)
 					break;
-				wiphy_info(hw->wiphy,
-					   "Channel: %d: 0x%x 0x%x 0x%x\n",
-					   pwr_tbl->channel,
-					   pwr_tbl->setcap,
-					   pwr_tbl->cdd,
-					   pwr_tbl->txantenna2);
+				wiphy_debug(hw->wiphy,
+					    "Channel: %d: 0x%x 0x%x 0x%x\n",
+					    pwr_tbl->channel,
+					    pwr_tbl->setcap,
+					    pwr_tbl->cdd,
+					    pwr_tbl->txantenna2);
 				disp_ptr = disp_buf;
 				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL;
 				     j++) {
@@ -361,7 +360,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 						sprintf(disp_ptr, "%x ",
 							pwr_tbl->tx_power[j]);
 				}
-				wiphy_info(hw->wiphy, "%s\n", disp_buf);
+				wiphy_debug(hw->wiphy, "%s\n", disp_buf);
 			}
 		}
 	}
@@ -799,23 +798,13 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_wl_init;
 	}
 
-	wiphy_info(priv->hw->wiphy,
-		   "2G: %s\n", priv->disable_2g ? "disable" : "enable");
-	wiphy_info(priv->hw->wiphy,
-		   "5G: %s\n", priv->disable_5g ? "disable" : "enable");
+	wiphy_info(priv->hw->wiphy, "2G %s, 5G %s\n",
+		   priv->disable_2g ? "disabled" : "enabled",
+		   priv->disable_5g ? "disabled" : "enabled");
 
-	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
-		wiphy_info(priv->hw->wiphy, "TX: 4 antennas\n");
-	else if (priv->antenna_tx == ANTENNA_TX_2)
-		wiphy_info(priv->hw->wiphy, "TX: 2 antennas\n");
-	else
-		wiphy_info(priv->hw->wiphy, "TX: unknown\n");
-	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
-		wiphy_info(priv->hw->wiphy, "RX: 4 antennas\n");
-	else if (priv->antenna_rx == ANTENNA_RX_2)
-		wiphy_info(priv->hw->wiphy, "RX: 2 antennas\n");
-	else
-		wiphy_info(priv->hw->wiphy, "RX: unknown\n");
+	wiphy_info(priv->hw->wiphy, "%s TX antennas, %s RX antennas\n",
+		   (priv->antenna_tx == ANTENNA_TX_4_AUTO) ? "4" : "2",
+		   (priv->antenna_rx == ANTENNA_RX_4_AUTO) ? "4" : "2");
 
 #ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_init(hw);

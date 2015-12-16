@@ -88,7 +88,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	 * reside on its respective blocks such as ITCM, DTCM, SQRAM,
 	 * (or even DDR, AFTER DDR is init'd before fw download
 	 */
-	wiphy_info(hw->wiphy, "fw download start 88\n");
+	wiphy_debug(hw->wiphy, "fw download start\n");
 
 	/* Disable PFU before FWDL */
 	writel(0x100, priv->iobase1 + 0xE0E4);
@@ -149,9 +149,9 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		size_fw_downloaded += len;
 	}
 
-	wiphy_info(hw->wiphy,
-		   "FwSize = %d downloaded Size = %d curr_iteration %d\n",
-		   (int)fw->size, size_fw_downloaded, curr_iteration);
+	wiphy_debug(hw->wiphy,
+		    "FwSize = %d downloaded Size = %d curr_iteration %d\n",
+		    (int)fw->size, size_fw_downloaded, curr_iteration);
 
 	/* Now firware is downloaded successfully, so this part is to check
 	 * whether fw can properly execute to an extent that write back
@@ -175,7 +175,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 			mdelay(FW_CHECK_MSECS);
 			int_code = readl(priv->iobase1 + 0xc44);
 		}
-		if (!(curr_iteration % 0xff))
+		if (!(curr_iteration % 0xff) && (int_code != 0))
 			wiphy_err(hw->wiphy, "%x;", int_code);
 	} while ((curr_iteration) &&
 		 (int_code != fwreadysignature));
@@ -186,7 +186,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		goto err_download;
 	}
 
-	wiphy_info(hw->wiphy, "complete\n");
+	wiphy_debug(hw->wiphy, "fw download complete\n");
 	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
 
 	return 0;
