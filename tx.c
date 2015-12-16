@@ -564,7 +564,7 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 		struct sk_buff *newskb;
 
 		amsdu_pkts = (struct sk_buff_head *)
-			kmalloc(sizeof(*amsdu_pkts), GFP_KERNEL);
+			kmalloc(sizeof(*amsdu_pkts), GFP_ATOMIC);
 		if (!amsdu_pkts) {
 			spin_unlock_bh(&sta_info->amsdu_lock);
 			return tx_skb;
