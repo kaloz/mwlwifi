@@ -85,6 +85,7 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_INFRA_MODE, "SetInfraMode" },
 		{ HOSTCMD_CMD_802_11_RTS_THSD, "80211RtsThreshold" },
 		{ HOSTCMD_CMD_SET_EDCA_PARAMS, "SetEDCAParams" },
+		{ HOSTCMD_CMD_802_11H_DETECT_RADAR, "80211hDetectRadar" },
 		{ HOSTCMD_CMD_SET_WMM_MODE, "SetWMMMode" },
 		{ HOSTCMD_CMD_HT_GUARD_INTERVAL, "HtGuardInterval" },
 		{ HOSTCMD_CMD_SET_FIXED_RATE, "SetFixedRate" },
@@ -98,12 +99,18 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_AP_BEACON, "SetApBeacon" },
 		{ HOSTCMD_CMD_SET_NEW_STN, "SetNewStation" },
 		{ HOSTCMD_CMD_SET_APMODE, "SetApMode" },
+		{ HOSTCMD_CMD_SET_SWITCH_CHANNEL, "SetSwitchChannel" },
 		{ HOSTCMD_CMD_UPDATE_ENCRYPTION, "UpdateEncryption" },
 		{ HOSTCMD_CMD_BASTREAM, "BAStream" },
+		{ HOSTCMD_CMD_SET_SPECTRUM_MGMT, "SetSpectrumMgmt" },
+		{ HOSTCMD_CMD_SET_POWER_CONSTRAINT, "SetPowerConstraint" },
+		{ HOSTCMD_CMD_SET_COUNTRY_CODE, "SetCountryCode" },
 		{ HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL, "SetOptimizationLevel"},
 		{ HOSTCMD_CMD_DWDS_ENABLE, "DwdsEnable" },
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
+		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
+		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 	};
 
 	max_entries = ARRAY_SIZE(cmds);
@@ -272,7 +279,7 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
 	return 0;
 }
 
-static u8 mwl_fwcmd_get_80m_pri_chnl_offset(u8 channel)
+static u8 mwl_fwcmd_get_80m_pri_chnl(u8 channel)
 {
 	u8 act_primary = ACT_PRIMARY_CHAN_0;
 
@@ -377,6 +384,7 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 	beacon_info->ie_vht_ptr = &beacon_info->ie_list_vht[0];
 
 	beacon_info->cap_info = le16_to_cpu(mgmt->u.beacon.capab_info);
+	beacon_info->power_constraint = 0;
 
 	pos = (u8 *)mgmt->u.beacon.variable;
 	left = len - baselen;
@@ -396,6 +404,10 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 		}
 
 		switch (id) {
+		case WLAN_EID_COUNTRY:
+			beacon_info->ie_country_len = (elen + 2);
+			beacon_info->ie_country_ptr = (pos - 2);
+			break;
 		case WLAN_EID_SUPP_RATES:
 		case WLAN_EID_EXT_SUPP_RATES:
 			{
@@ -434,6 +446,10 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				}
 			}
 			}
+			break;
+		case WLAN_EID_PWR_CONSTRAINT:
+			if (elen == 1)
+				beacon_info->power_constraint = *pos;
 			break;
 		case WLAN_EID_RSN:
 			beacon_info->ie_rsn48_len = (elen + 2);
@@ -517,9 +533,6 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	struct beacon_info *beacon = &mwl_vif->beacon_info;
 	u16 ie_list_len_proprietary = 0;
 
-	if (!beacon->valid)
-		return -EINVAL;
-
 	if (beacon->ie_ht_len > sizeof(pcmd->ie_list_ht))
 		goto einval;
 
@@ -586,9 +599,6 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 {
 	struct hostcmd_cmd_ap_beacon *pcmd;
 	struct ds_params *phy_ds_param_set;
-
-	if (!mwl_vif->beacon_info.valid)
-		return -EINVAL;
 
 	/* wmm structure of start command is defined less one byte,
 	 * due to following field country is not used, add byte one
@@ -658,6 +668,120 @@ ielenerr:
 	wiphy_err(priv->hw->wiphy, "length of IE is too long\n");
 
 	return -EINVAL;
+}
+
+static int mwl_fwcmd_set_spectrum_mgmt(struct mwl_priv *priv, bool enable)
+{
+	struct hostcmd_cmd_set_spectrum_mgmt *pcmd;
+
+	pcmd = (struct hostcmd_cmd_set_spectrum_mgmt *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_SPECTRUM_MGMT);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->spectrum_mgmt = cpu_to_le32(enable);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_SPECTRUM_MGMT)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(priv->hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+static int mwl_fwcmd_set_power_constraint(struct mwl_priv *priv,
+					  u32 power_constraint)
+{
+	struct hostcmd_cmd_set_power_constraint *pcmd;
+
+	pcmd = (struct hostcmd_cmd_set_power_constraint *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_POWER_CONSTRAINT);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->power_constraint = cpu_to_le32(power_constraint);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_POWER_CONSTRAINT)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(priv->hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+static int mwl_fwcmd_set_country_code(struct mwl_priv *priv,
+				      struct mwl_vif *mwl_vif,
+				      struct ieee80211_bss_conf *bss_conf)
+{
+	struct hostcmd_cmd_set_country_code *pcmd;
+	struct beacon_info *b_inf = &mwl_vif->beacon_info;
+	u8 chnl_len;
+	bool a_band;
+	bool enable = false;
+
+	if (b_inf->ie_country_ptr) {
+		if (bss_conf->chandef.chan->band == IEEE80211_BAND_2GHZ)
+			a_band = false;
+		else if (bss_conf->chandef.chan->band == IEEE80211_BAND_5GHZ)
+			a_band = true;
+		else
+			return -EINVAL;
+
+		chnl_len = b_inf->ie_country_len - 5;
+		if (a_band) {
+			if (chnl_len > sizeof(pcmd->domain_info.domain_entry_a))
+				return -EINVAL;
+		} else {
+			if (chnl_len > sizeof(pcmd->domain_info.domain_entry_g))
+				return -EINVAL;
+		}
+
+		enable = true;
+	}
+
+	pcmd = (struct hostcmd_cmd_set_country_code *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_COUNTRY_CODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le32(enable);
+	if (enable) {
+		memcpy(pcmd->domain_info.country_string,
+		       b_inf->ie_country_ptr + 2, 3);
+		if (a_band) {
+			pcmd->domain_info.g_chnl_len = 0;
+			pcmd->domain_info.a_chnl_len = chnl_len;
+			memcpy(pcmd->domain_info.domain_entry_a,
+			       b_inf->ie_country_ptr + 5, chnl_len);
+		} else {
+			pcmd->domain_info.a_chnl_len = 0;
+			pcmd->domain_info.g_chnl_len = chnl_len;
+			memcpy(pcmd->domain_info.domain_entry_g,
+			       b_inf->ie_country_ptr + 5, chnl_len);
+		}
+	}
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_COUNTRY_CODE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(priv->hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
 }
 
 static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
@@ -1255,7 +1379,7 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 	case NL80211_CHAN_WIDTH_80:
 		chnl_width = CH_80_MHZ_WIDTH;
 		act_primary =
-			mwl_fwcmd_get_80m_pri_chnl_offset(pcmd->curr_chnl);
+			mwl_fwcmd_get_80m_pri_chnl(pcmd->curr_chnl);
 		break;
 	default:
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -1396,6 +1520,50 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 		pcmd->txq_num = 0;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_EDCA_PARAMS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_radar_detect(struct ieee80211_hw *hw, u16 action)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_802_11h_detect_radar *pcmd;
+	u16 radar_type = RADAR_TYPE_CODE_0;
+	u8 channel = hw->conf.chandef.chan->hw_value;
+
+	pcmd = (struct hostcmd_cmd_802_11h_detect_radar *)&priv->pcmd_buf[0];
+
+	if (priv->dfs_region == NL80211_DFS_JP) {
+		if (channel >= 52 && channel <= 64)
+			radar_type = RADAR_TYPE_CODE_53;
+		else if (channel >= 100 && channel <= 140)
+			radar_type = RADAR_TYPE_CODE_56;
+		else
+			radar_type = RADAR_TYPE_CODE_0;
+	} else if (priv->dfs_region == NL80211_DFS_ETSI) {
+		radar_type = RADAR_TYPE_CODE_ETSI;
+	}
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11H_DETECT_RADAR);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(action);
+	pcmd->radar_type_code = cpu_to_le16(radar_type);
+	pcmd->min_chirp_cnt = cpu_to_le16(priv->dfs_chirp_count_min);
+	pcmd->chirp_time_intvl = cpu_to_le16(priv->dfs_chirp_time_interval);
+	pcmd->pw_filter = cpu_to_le16(priv->dfs_pw_filter);
+	pcmd->min_num_radar = cpu_to_le16(priv->dfs_min_num_radar);
+	pcmd->pri_min_num = cpu_to_le16(priv->dfs_min_pri_count);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11H_DETECT_RADAR)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
@@ -1678,10 +1846,16 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
+	struct beacon_info *b_inf;
+	int rc;
 
 	mwl_vif = mwl_dev_get_vif(vif);
+	b_inf = &mwl_vif->beacon_info;
 
 	mwl_fwcmd_parse_beacon(priv, mwl_vif, beacon, len);
+
+	if (!b_inf->valid)
+		goto err;
 
 	if (mwl_fwcmd_set_ies(priv, mwl_vif))
 		goto err;
@@ -1689,13 +1863,32 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 	if (mwl_fwcmd_set_ap_beacon(priv, mwl_vif, &vif->bss_conf))
 		goto err;
 
-	mwl_vif->beacon_info.valid = false;
+	if (mwl_fwcmd_bss_start(hw, vif, true))
+		goto err;
+
+	if (b_inf->cap_info & WLAN_CAPABILITY_SPECTRUM_MGMT)
+		rc = mwl_fwcmd_set_spectrum_mgmt(priv, true);
+	else
+		rc = mwl_fwcmd_set_spectrum_mgmt(priv, false);
+	if (rc)
+		goto err;
+
+	if (b_inf->power_constraint)
+		rc = mwl_fwcmd_set_power_constraint(priv,
+						    b_inf->power_constraint);
+	if (rc)
+		goto err;
+
+	if (mwl_fwcmd_set_country_code(priv, mwl_vif, &vif->bss_conf))
+		goto err;
+
+	b_inf->valid = false;
 
 	return 0;
 
 err:
 
-	mwl_vif->beacon_info.valid = false;
+	b_inf->valid = false;
 
 	return -EIO;
 }
@@ -1755,13 +1948,19 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
 	}
 
-	/* Patch mesh interface for VHT based on 88W8897. Once if mac80211
+	/* Patch mesh interface for VHT based on chip type. Once if mac80211
 	 * supports VHT for mesh interface, following code should be removed.
 	 */
 	if (vif->type == NL80211_IFTYPE_MESH_POINT) {
 		pcmd->peer_info.vht_max_rx_mcs = cpu_to_le32(0x0000fffa);
 		pcmd->peer_info.vht_cap = cpu_to_le32(0x33801931);
 		pcmd->peer_info.vht_rx_channel_width = 2;
+		if (priv->chip_type == MWL8864) {
+			if (priv->antenna_rx == ANTENNA_RX_4_AUTO) {
+				pcmd->peer_info.vht_max_rx_mcs =
+					cpu_to_le32(0x0000ffea);
+			}
+		}
 	}
 
 	pcmd->is_qos_sta = sta->wme;
@@ -1881,6 +2080,85 @@ int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode)
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_switch_channel(struct mwl_priv *priv,
+				 struct ieee80211_channel_switch *ch_switch)
+{
+	struct hostcmd_cmd_set_switch_channel *pcmd;
+	struct cfg80211_chan_def *chandef = &ch_switch->chandef;
+	struct ieee80211_channel *channel = chandef->chan;
+	u32 chnl_flags, freq_band, chnl_width, act_primary, sec_chnl_offset;
+
+	if (priv->csa_active)
+		return 0;
+
+	if (channel->band == IEEE80211_BAND_2GHZ)
+		freq_band = FREQ_BAND_2DOT4GHZ;
+	else if (channel->band == IEEE80211_BAND_5GHZ)
+		freq_band = FREQ_BAND_5GHZ;
+	else
+		return -EINVAL;
+
+	switch (chandef->width) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+	case NL80211_CHAN_WIDTH_20:
+		chnl_width = CH_20_MHZ_WIDTH;
+		act_primary = ACT_PRIMARY_CHAN_0;
+		sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_NONE;
+		break;
+	case NL80211_CHAN_WIDTH_40:
+		chnl_width = CH_40_MHZ_WIDTH;
+		if (chandef->center_freq1 > channel->center_freq) {
+			act_primary = ACT_PRIMARY_CHAN_0;
+			sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_ABOVE;
+		} else {
+			act_primary = ACT_PRIMARY_CHAN_1;
+			sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_BELOW;
+		}
+		break;
+	case NL80211_CHAN_WIDTH_80:
+		chnl_width = CH_80_MHZ_WIDTH;
+		act_primary =
+			mwl_fwcmd_get_80m_pri_chnl(channel->hw_value);
+		if ((act_primary == ACT_PRIMARY_CHAN_0) ||
+		    (act_primary == ACT_PRIMARY_CHAN_2))
+			sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_ABOVE;
+		else
+			sec_chnl_offset = IEEE80211_HT_PARAM_CHA_SEC_BELOW;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	chnl_flags = (freq_band & FREQ_BAND_MASK) |
+		((chnl_width << CHNL_WIDTH_SHIFT) & CHNL_WIDTH_MASK) |
+		((act_primary << ACT_PRIMARY_SHIFT) & ACT_PRIMARY_MASK);
+
+	pcmd = (struct hostcmd_cmd_set_switch_channel *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_SWITCH_CHANNEL);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->next_11h_chnl = cpu_to_le32(channel->hw_value);
+	pcmd->mode = cpu_to_le32(ch_switch->block_tx);
+	pcmd->init_count = cpu_to_le32(ch_switch->count + 1);
+	pcmd->chnl_flags = cpu_to_le32(chnl_flags);
+	pcmd->next_ht_extchnl_offset = cpu_to_le32(sec_chnl_offset);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_SWITCH_CHANNEL)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(priv->hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	priv->csa_active = true;
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
@@ -2402,6 +2680,64 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw)
 	pcmd->enable = cpu_to_le32(priv->cdd);
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_CDD)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_temp *pcmd;
+
+	pcmd = (struct hostcmd_cmd_get_temp *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_TEMP);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_TEMP)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	*temp = le32_to_cpu(pcmd->celcius);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
+			 u32 duration, u32 next_offset)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_quiet_mode *pcmd;
+
+	pcmd = (struct hostcmd_cmd_quiet_mode *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_QUIET_MODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->enable = cpu_to_le32(enable);
+	if (enable) {
+		pcmd->period = cpu_to_le32(period);
+		pcmd->duration = cpu_to_le32(duration);
+		pcmd->next_offset = cpu_to_le32(next_offset);
+	}
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_QUIET_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;

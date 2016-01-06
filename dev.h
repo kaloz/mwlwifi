@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.15-20151208"
+#define MWL_DRV_VERSION	 "10.3.0.16-20160105"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -296,6 +296,7 @@ struct mwl_priv {
 	u8 cal_tbl[200];
 
 	struct pci_dev *pdev;
+	struct device *dev;
 	void __iomem *iobase0; /* MEM Base Address Register 0  */
 	void __iomem *iobase1; /* MEM Base Address Register 1  */
 	u32 next_bar_num;
@@ -364,6 +365,15 @@ struct mwl_priv {
 	} ____cacheline_aligned_in_smp;
 	struct work_struct watchdog_ba_handle;
 
+	bool csa_active;
+	struct work_struct chnl_switch_handle;
+	enum nl80211_dfs_regions dfs_region;
+	u16 dfs_chirp_count_min;
+	u16 dfs_chirp_time_interval;
+	u16 dfs_pw_filter;
+	u16 dfs_min_num_radar;
+	u16 dfs_min_pri_count;
+
 	bool mfg_mode;
 
 #ifdef CONFIG_DEBUG_FS
@@ -377,6 +387,7 @@ struct mwl_priv {
 struct beacon_info {
 	bool valid;
 	u16 cap_info;
+	u8 power_constraint;
 	u8 b_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 op_rate_set[SYSADPT_MAX_DATA_RATES_G];
 	u8 ie_list_ht[148];
@@ -386,6 +397,7 @@ struct beacon_info {
 	u8 *ie_rsn48_ptr;
 	u8 *ie_ht_ptr;
 	u8 *ie_vht_ptr;
+	u8 *ie_country_ptr;
 #ifdef CONFIG_MAC80211_MESH
 	u8 *ie_meshid_ptr;
 	u8 *ie_meshcfg_ptr;
@@ -396,6 +408,7 @@ struct beacon_info {
 	u8 ie_rsn48_len;
 	u8 ie_ht_len;
 	u8 ie_vht_len;
+	u8 ie_country_len;
 #ifdef CONFIG_MAC80211_MESH
 	u8 ie_meshid_len;
 	u8 ie_meshcfg_len;

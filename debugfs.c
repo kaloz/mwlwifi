@@ -262,6 +262,130 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	return ret;
 }
 
+static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
+					    char __user *ubuf,
+					    size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	struct ieee80211_supported_band *sband;
+	struct ieee80211_channel*channel;
+	int i;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	sband = priv->hw->wiphy->bands[NL80211_BAND_5GHZ];
+	if (!sband)
+		return -EINVAL;
+
+	p += sprintf(p, "\n");
+	for (i = 0; i < sband->n_channels; i++) {
+		channel = &sband->channels[i];
+		if (channel->flags & IEEE80211_CHAN_RADAR) {
+			p += sprintf(p, "%d(%d): flags: %08x dfs_state: %d\n",
+				     channel->hw_value, channel->center_freq,
+				     channel->flags, channel->dfs_state);
+			p += sprintf(p, "cac timer: %d ms\n", channel->dfs_cac_ms);
+		}
+	}
+	p += sprintf(p, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_dfs_channel_write(struct file *file,
+					     const char __user *ubuf,
+					     size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	struct ieee80211_supported_band *sband;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int dfs_state = 0;
+	int cac_time = -1;
+	struct ieee80211_channel*channel;
+	int i;
+	ssize_t ret = count;
+
+	if (!buf)
+		return -ENOMEM;
+
+	sband = priv->hw->wiphy->bands[NL80211_BAND_5GHZ];
+	if (!sband) {
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+	sscanf(buf, "%d %d", &dfs_state, &cac_time);
+
+	for (i = 0; i < sband->n_channels; i++) {
+		channel = &sband->channels[i];
+		if (channel->flags & IEEE80211_CHAN_RADAR) {
+			channel->dfs_state = dfs_state;
+			if (cac_time != -1)
+				channel->dfs_cac_ms = cac_time * 1000;
+		}
+	}
+
+done:
+	free_page(addr);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_dfs_radar_read(struct file *file, char __user *ubuf,
+					  size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	p += sprintf(p, "\n");
+	p += sprintf(p, "csa_active: %d\n", priv->csa_active);
+	p += sprintf(p, "dfs_region: %d\n", priv->dfs_region);
+	p += sprintf(p, "chirp_count_min: %d\n", priv->dfs_chirp_count_min);
+	p += sprintf(p, "chirp_time_interval: %d\n",
+		     priv->dfs_chirp_time_interval);
+	p += sprintf(p, "pw_filter: %d\n", priv->dfs_pw_filter);
+	p += sprintf(p, "min_num_radar: %d\n", priv->dfs_min_num_radar);
+	p += sprintf(p, "min_pri_count: %d\n", priv->dfs_min_pri_count);
+	p += sprintf(p, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
+				      (unsigned long)p - page);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_dfs_radar_write(struct file *file,
+					   const char __user *ubuf,
+					   size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+
+	wiphy_info(priv->hw->wiphy, "simulate radar detected\n");
+	ieee80211_radar_detected(priv->hw);
+
+	return count;
+}
+
 static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 {
 	struct ieee80211_hw *hw = priv->hw;
@@ -393,6 +517,8 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(info);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
+MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
+MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
@@ -410,6 +536,8 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(vif);
 	MWLWIFI_DEBUGFS_ADD_FILE(sta);
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
+	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
+	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 }
 

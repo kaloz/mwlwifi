@@ -56,7 +56,7 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 	desc = &priv->desc_data[0];
 
 	desc->prx_ring = (struct mwl_rx_desc *)
-		dma_alloc_coherent(&priv->pdev->dev,
+		dma_alloc_coherent(priv->dev,
 				   MAX_NUM_RX_RING_BYTES,
 				   &desc->pphys_rx_ring,
 				   GFP_KERNEL);
@@ -71,7 +71,7 @@ static int mwl_rx_ring_alloc(struct mwl_priv *priv)
 	desc->rx_hndl = kmalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
 
 	if (!desc->rx_hndl) {
-		dma_free_coherent(&priv->pdev->dev,
+		dma_free_coherent(priv->dev,
 				  MAX_NUM_RX_RING_BYTES,
 				  desc->prx_ring,
 				  desc->pphys_rx_ring);
@@ -191,7 +191,7 @@ static void mwl_rx_ring_free(struct mwl_priv *priv)
 	if (desc->prx_ring) {
 		mwl_rx_ring_cleanup(priv);
 
-		dma_free_coherent(&priv->pdev->dev,
+		dma_free_coherent(priv->dev,
 				  MAX_NUM_RX_RING_BYTES,
 				  desc->prx_ring,
 				  desc->pphys_rx_ring);

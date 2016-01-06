@@ -42,6 +42,10 @@
 #define	LINK_CS_STATE_AUTO              2
 #define	LINK_CS_STATE_AUTO_DISABLED     3
 
+#define STOP_DETECT_RADAR               0
+#define CAC_START                       1
+#define MONITOR_START                   3
+
 enum {
 	WL_ANTENNATYPE_RX = 1,
 	WL_ANTENNATYPE_TX = 2,
@@ -104,6 +108,8 @@ int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 			      u16 cw_min, u16 cw_max, u8 aifs, u16 txop);
 
+int mwl_fwcmd_set_radar_detect(struct ieee80211_hw *hw, u16 action);
+
 int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw, bool enable);
 
 int mwl_fwcmd_ht_guard_interval(struct ieee80211_hw *hw, u32 gi_type);
@@ -143,6 +149,9 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif, u8 *addr);
 
 int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode);
+
+int mwl_fwcmd_set_switch_channel(struct mwl_priv *priv,
+				 struct ieee80211_channel_switch *ch_switch);
 
 int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 				       struct ieee80211_vif *vif,
@@ -192,6 +201,11 @@ int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value);
 
 int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw);
+
+int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp);
+
+int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
+			 u32 duration, u32 next_offset);
 
 int mwl_fwcmd_send_mfg_cmd(struct mwl_priv *priv, char *mfgcmd);
 

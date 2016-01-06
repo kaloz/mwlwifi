@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 
 irqreturn_t mwl_isr(int irq, void *dev_id);
+void mwl_chnl_switch_event(struct work_struct *work);
 void mwl_watchdog_ba_events(struct work_struct *work);
 
 #endif /* _ISR_H_ */

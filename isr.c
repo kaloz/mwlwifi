@@ -66,6 +66,12 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			}
 		}
 
+		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
+			int_status &= ~MACREG_A2HRIC_BIT_RADAR_DETECT;
+			wiphy_info(hw->wiphy, "radar detected by firmware\n");
+			ieee80211_radar_detected(hw);
+		}
+
 		if (int_status & MACREG_A2HRIC_BIT_QUE_EMPTY) {
 			int_status &= ~MACREG_A2HRIC_BIT_QUE_EMPTY;
 
@@ -84,11 +90,13 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			}
 		}
 
+		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH) {
+			int_status &= ~MACREG_A2HRIC_BIT_CHAN_SWITCH;
+			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
+		}
+
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG) {
 			status = readl(int_status_mask);
-			writel((status & ~MACREG_A2HRIC_BA_WATCHDOG),
-			       int_status_mask);
-			int_status &= ~MACREG_A2HRIC_BA_WATCHDOG;
 			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
 		}
 
@@ -99,6 +107,34 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+void mwl_chnl_switch_event(struct work_struct *work)
+{
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, chnl_switch_handle);
+	struct mwl_vif *mwl_vif;
+	struct ieee80211_vif *vif;
+
+	if (!priv->csa_active) {
+		wiphy_err(priv->hw->wiphy,
+			  "csa is not active (got channel switch event)\n");
+		return;
+	}
+
+	spin_lock_bh(&priv->vif_lock);
+	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
+		vif = container_of((char *)mwl_vif, struct ieee80211_vif,
+				   drv_priv[0]);
+
+		if (vif->csa_active)
+			ieee80211_csa_finish(vif);
+	}
+	spin_unlock_bh(&priv->vif_lock);
+
+	wiphy_info(priv->hw->wiphy, "channel switch is done\n");
+
+	priv->csa_active = false;
+}
+
 void mwl_watchdog_ba_events(struct work_struct *work)
 {
 	int rc;
@@ -106,12 +142,11 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 	struct mwl_ampdu_stream *streams;
 	struct mwl_priv *priv =
 		container_of(work, struct mwl_priv, watchdog_ba_handle);
-	u32 status;
 
 	rc = mwl_fwcmd_get_watchdog_bitmap(priv->hw, &bitmap);
 
 	if (rc)
-		goto done;
+		return;
 
 	spin_lock_bh(&priv->stream_lock);
 
@@ -147,10 +182,4 @@ void mwl_watchdog_ba_events(struct work_struct *work)
 	}
 
 	spin_unlock_bh(&priv->stream_lock);
-
-done:
-
-	status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status | MACREG_A2HRIC_BA_WATCHDOG,
-	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 }

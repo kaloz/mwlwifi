@@ -267,6 +267,12 @@ static int mwl_mac80211_config(struct ieee80211_hw *hw,
 			mwl_fwcmd_set_linkadapt_cs_mode(hw,
 							LINK_CS_STATE_AUTO);
 			rate = mwl_rates_50[0].hw_value;
+
+			if (conf->radar_enabled)
+				mwl_fwcmd_set_radar_detect(hw, MONITOR_START);
+			else
+				mwl_fwcmd_set_radar_detect(hw,
+							   STOP_DETECT_RADAR);
 		}
 
 		rc = mwl_fwcmd_set_rf_channel(hw, conf);
@@ -335,19 +341,19 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 	if (changed & (BSS_CHANGED_BEACON_INT | BSS_CHANGED_BEACON)) {
 		struct sk_buff *skb;
 
-		skb = ieee80211_beacon_get(hw, vif);
-
-		if (skb) {
-			mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
-			dev_kfree_skb_any(skb);
-		}
-
 		if ((info->ssid[0] != '\0') &&
 		    (info->ssid_len != 0) &&
 		    (!info->hidden_ssid))
 			mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);
 		else
 			mwl_fwcmd_broadcast_ssid_enable(hw, vif, false);
+
+		skb = ieee80211_beacon_get(hw, vif);
+
+		if (skb) {
+			mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
+			dev_kfree_skb_any(skb);
+		}
 	}
 
 	if (changed & BSS_CHANGED_BEACON_ENABLED)
@@ -466,9 +472,9 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_MESH_POINT) {
 		sta_info->is_mesh_node = true;
-		/* Patch mesh interface for HT based on 88W8897. When authsae or
-		 * wpa_supplicant is used for mesh security, HT capbility wan't
-		 * be set. This would be removed if problem is fixed.
+		/* Patch mesh interface for HT based on chip type. When authsae
+		 * or wpa_supplicant is used for mesh security, HT capbility
+		 * won't be set. This would be removed if problem is fixed.
 		 */
 		sta->ht_cap.ht_supported = true;
 		sta->ht_cap.cap = 0x6f;
@@ -476,6 +482,10 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		sta->ht_cap.mcs.rx_mask[1] = 0xff;
 		sta->ht_cap.ampdu_factor = 0x3;
 		sta->ht_cap.ampdu_density = 0x5;
+		if (priv->chip_type == MWL8864) {
+			if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
+				sta->ht_cap.mcs.rx_mask[2] = 0xff;
+		}
 	}
 
 	if (sta->ht_cap.ht_supported) {
@@ -700,6 +710,18 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	return rc;
 }
 
+static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
+				    struct ieee80211_vif *vif,
+				    struct ieee80211_channel_switch *ch_switch)
+{
+	struct mwl_priv *priv = hw->priv;
+	int rc = 0;
+
+	rc = mwl_fwcmd_set_switch_channel(priv, ch_switch);
+
+	return rc;
+}
+
 const struct ieee80211_ops mwl_mac80211_ops = {
 	.tx                 = mwl_mac80211_tx,
 	.start              = mwl_mac80211_start,
@@ -717,4 +739,5 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.get_stats          = mwl_mac80211_get_stats,
 	.get_survey         = mwl_mac80211_get_survey,
 	.ampdu_action       = mwl_mac80211_ampdu_action,
+	.pre_channel_switch = mwl_mac80211_chnl_switch,
 };

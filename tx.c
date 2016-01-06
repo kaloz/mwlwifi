@@ -76,7 +76,7 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 
 	desc = &priv->desc_data[0];
 
-	mem = dma_alloc_coherent(&priv->pdev->dev,
+	mem = dma_alloc_coherent(priv->dev,
 				 MAX_NUM_TX_RING_BYTES *
 				 SYSADPT_NUM_OF_DESC_DATA,
 				 &desc->pphys_tx_ring,
@@ -106,7 +106,7 @@ static int mwl_tx_ring_alloc(struct mwl_priv *priv)
 
 	if (!mem) {
 		wiphy_err(priv->hw->wiphy, "cannot alloc mem\n");
-		dma_free_coherent(&priv->pdev->dev,
+		dma_free_coherent(priv->dev,
 				  MAX_NUM_TX_RING_BYTES *
 				  SYSADPT_NUM_OF_DESC_DATA,
 				  priv->desc_data[0].ptx_ring,
@@ -214,7 +214,7 @@ static void mwl_tx_ring_free(struct mwl_priv *priv)
 	int num;
 
 	if (priv->desc_data[0].ptx_ring) {
-		dma_free_coherent(&priv->pdev->dev,
+		dma_free_coherent(priv->dev,
 				  MAX_NUM_TX_RING_BYTES *
 				  SYSADPT_NUM_OF_DESC_DATA,
 				  priv->desc_data[0].ptx_ring,

@@ -1,7 +1,7 @@
 1. Files for test:
 
-	a. 88W8864.bin: F/W binary. Please put this file under directory '/lib/firmware/mwlwifi'.
-	b. mwlwifi.ko: 88W8864 mac80211 driver kernel module.
+	a. 88W8864.bin,88W8897.bin: F/W binary. Please put this file under directory '/lib/firmware/mwlwifi'.
+	b. mwlwifi.ko: 88W8864/88W8897 mac80211 driver kernel module.
 	c. hostapd.conf: configuration file used to configure hostapd.
 	d. wpa_supplicant.conf: configuration file used to configure wpa_supplicant.
 	e. openwrt-mvebu-armada-xp-mamba-squashfs-factory.img: OpenWRT download image (built with kernel cfg80211/mac80211, iw, hostapd and wpa_supplicant).

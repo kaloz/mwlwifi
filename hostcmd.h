@@ -34,6 +34,7 @@
 #define HOSTCMD_CMD_SET_INFRA_MODE              0x010e /* per-vif */
 #define HOSTCMD_CMD_802_11_RTS_THSD             0x0113
 #define HOSTCMD_CMD_SET_EDCA_PARAMS             0x0115
+#define HOSTCMD_CMD_802_11H_DETECT_RADAR        0x0120
 #define HOSTCMD_CMD_SET_WMM_MODE                0x0123
 #define HOSTCMD_CMD_HT_GUARD_INTERVAL           0x0124
 #define HOSTCMD_CMD_SET_FIXED_RATE              0x0126
@@ -47,12 +48,18 @@
 #define HOSTCMD_CMD_AP_BEACON                   0x1101 /* per-vif */
 #define HOSTCMD_CMD_SET_NEW_STN                 0x1111 /* per-vif */
 #define HOSTCMD_CMD_SET_APMODE                  0x1114
+#define HOSTCMD_CMD_SET_SWITCH_CHANNEL          0x1121
 #define HOSTCMD_CMD_UPDATE_ENCRYPTION           0x1122 /* per-vif */
 #define HOSTCMD_CMD_BASTREAM                    0x1125
+#define HOSTCMD_CMD_SET_SPECTRUM_MGMT           0x1128
+#define HOSTCMD_CMD_SET_POWER_CONSTRAINT        0x1129
+#define HOSTCMD_CMD_SET_COUNTRY_CODE            0x1130
 #define HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL      0x1133
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
+#define HOSTCMD_CMD_GET_TEMP                    0x1159
+#define HOSTCMD_CMD_QUIET_MODE                  0x1201
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -356,6 +363,23 @@ struct hostcmd_cmd_set_edca_params {
 	u8 txq_num;                  /* Tx Queue number. */
 } __packed;
 
+/* HOSTCMD_CMD_802_11H_DETECT_RADAR */
+#define RADAR_TYPE_CODE_0    0
+#define RADAR_TYPE_CODE_53   53
+#define RADAR_TYPE_CODE_56   56
+#define RADAR_TYPE_CODE_ETSI 151
+
+struct hostcmd_cmd_802_11h_detect_radar {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 radar_type_code;
+	__le16 min_chirp_cnt;
+	__le16 chirp_time_intvl;
+	__le16 pw_filter;
+	__le16 min_num_radar;
+	__le16 pri_min_num;
+} __packed;
+
 /* HOSTCMD_CMD_SET_WMM_MODE */
 struct hostcmd_cmd_set_wmm_mode {
 	struct hostcmd_header cmd_hdr;
@@ -613,6 +637,17 @@ struct hostcmd_cmd_set_apmode {
 	u8 apmode;
 } __packed;
 
+/* HOSTCMD_CMD_SET_SWITCH_CHANNEL */
+struct hostcmd_cmd_set_switch_channel {
+	struct hostcmd_header cmd_hdr;
+	__le32 next_11h_chnl;
+	__le32 mode;
+	__le32 init_count;
+	__le32 chnl_flags;
+	__le32 next_ht_extchnl_offset;
+	__le32 dfs_test_mode;
+} __packed;
+
 /* HOSTCMD_CMD_UPDATE_ENCRYPTION */
 struct hostcmd_cmd_update_encryption {
 	struct hostcmd_header cmd_hdr;
@@ -760,6 +795,39 @@ struct hostcmd_cmd_bastream {
 	union ba_info ba_info;
 } __packed;
 
+/* HOSTCMD_CMD_SET_SPECTRUM_MGMT */
+struct hostcmd_cmd_set_spectrum_mgmt {
+	struct hostcmd_header cmd_hdr;
+	__le32 spectrum_mgmt;
+} __packed;
+
+/* HOSTCMD_CMD_SET_POWER_CONSTRAINT */
+struct hostcmd_cmd_set_power_constraint {
+	struct hostcmd_header cmd_hdr;
+	__le32 power_constraint;
+} __packed;
+
+/* HOSTCMD_CMD_SET_COUNTRY_CODE */
+struct domain_chnl_entry {
+	u8 first_chnl_num;
+	u8 chnl_num;
+	u8 max_transmit_pw;
+} __packed;
+
+struct domain_country_info {
+	u8 country_string[3];
+	u8 g_chnl_len;
+	struct domain_chnl_entry domain_entry_g[1];
+	u8 a_chnl_len;
+	struct domain_chnl_entry domain_entry_a[20];
+} __packed;
+
+struct hostcmd_cmd_set_country_code {
+	struct hostcmd_header cmd_hdr;
+	__le32 action ; /* 0 -> unset, 1 ->set */
+	struct domain_country_info domain_info;
+} __packed;
+
 /* HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL */
 struct hostcmd_cmd_set_optimization_level {
 	struct hostcmd_header cmd_hdr;
@@ -783,6 +851,23 @@ struct hostcmd_cmd_fw_flush_timer {
 struct hostcmd_cmd_set_cdd {
 	struct hostcmd_header cmd_hdr;
 	__le32 enable;
+} __packed;
+
+/* HOSTCMD_CMD_GET_TEMP */
+struct hostcmd_cmd_get_temp {
+	struct hostcmd_header cmd_hdr;
+	__le32 celcius;
+	__le32 raw_data;
+} __packed;
+
+/* HOSTCMD_CMD_QUIET_MODE */
+struct hostcmd_cmd_quiet_mode {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le32 enable;
+	__le32 period;
+	__le32 duration;
+	__le32 next_offset;
 } __packed;
 
 #endif /* _HOSTCMD_H_ */
