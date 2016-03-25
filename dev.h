@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.16-20160105"
+#define MWL_DRV_VERSION	 "10.3.0.17-20160324"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -319,10 +319,11 @@ struct mwl_priv {
 	int fw_desc_cnt[SYSADPT_NUM_OF_DESC_DATA];
 
 	struct tasklet_struct tx_task;
+	struct tasklet_struct tx_done_task;
 	struct tasklet_struct rx_task;
 	struct tasklet_struct qe_task;
 	int txq_limit;
-	bool is_tx_schedule;
+	bool is_tx_done_schedule;
 	int recv_limit;
 	bool is_rx_schedule;
 	bool is_qe_schedule;
@@ -374,6 +375,11 @@ struct mwl_priv {
 	u16 dfs_min_num_radar;
 	u16 dfs_min_pri_count;
 
+	struct thermal_cooling_device *cdev;
+	u32 throttle_state;
+	u32 quiet_period;
+	int temperature;
+
 	bool mfg_mode;
 
 #ifdef CONFIG_DEBUG_FS
@@ -381,6 +387,7 @@ struct mwl_priv {
 	u32 reg_type;
 	u32 reg_offset;
 	u32 reg_value;
+	int tx_desc_num;
 #endif
 };
 

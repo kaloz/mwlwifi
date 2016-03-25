@@ -7,7 +7,8 @@ mwlwifi-objs		+= fwcmd.o
 mwlwifi-objs		+= tx.o
 mwlwifi-objs		+= rx.o
 mwlwifi-objs		+= isr.o
-mwlwifi-$(CONFIG_DEBUG_FS) += debugfs.o
+mwlwifi-$(CONFIG_THERMAL)	+= thermal.o
+mwlwifi-$(CONFIG_DEBUG_FS)	+= debugfs.o
 ifeq (1, $(BUILD_MFG))
 mwlwifi-objs += mfg.o
 endif
@@ -21,6 +22,10 @@ EXTRA_CFLAGS+= -O2 -funroll-loops -D__CHECK_ENDIAN__
 
 ifeq (1, $(BUILD_MFG))
 EXTRA_CFLAGS+= -DSUPPORT_MFG
+endif
+
+ifeq (1, $(BUILD_BG4CT_A0))
+EXTRA_CFLAGS+= -DBG4CT_A0_WORKAROUND
 endif
 
 EXTRA_CFLAGS+= -I${PWD}

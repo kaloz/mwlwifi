@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -69,5 +69,13 @@
 #define SYSADPT_AMSDU_PACKET_THRESHOLD 10
 
 #define SYSADPT_MAX_TID                8
+
+#define SYSADPT_QUIET_PERIOD_DEFAULT   100
+
+#define SYSADPT_QUIET_PERIOD_MIN       25
+
+#define SYSADPT_QUIET_START_OFFSET     10
+
+#define SYSADPT_THERMAL_THROTTLE_MAX   100
 
 #endif /* _SYSADPT_H_ */

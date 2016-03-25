@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -29,6 +29,7 @@ void mwl_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 			     struct ieee80211_sta *sta);
 void mwl_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 			   struct ieee80211_sta *sta, u8 tid);
+void mwl_tx_skbs(unsigned long data);
 void mwl_tx_done(unsigned long data);
 void mwl_tx_flush_amsdu(unsigned long data);
 void mwl_tx_del_sta_amsdu_pkts(struct ieee80211_sta *sta);

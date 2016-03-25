@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -74,8 +74,9 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	int rc;
 
-	/* Enable TX reclaim and RX tasklets. */
+	/* Enable TX and RX tasklets. */
 	tasklet_enable(&priv->tx_task);
+	tasklet_enable(&priv->tx_done_task);
 	tasklet_enable(&priv->rx_task);
 	tasklet_enable(&priv->qe_task);
 
@@ -110,6 +111,7 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 fwcmd_fail:
 	mwl_fwcmd_int_disable(hw);
 	tasklet_disable(&priv->tx_task);
+	tasklet_disable(&priv->tx_done_task);
 	tasklet_disable(&priv->rx_task);
 	tasklet_disable(&priv->qe_task);
 
@@ -129,6 +131,7 @@ static void mwl_mac80211_stop(struct ieee80211_hw *hw)
 
 	/* Disable TX reclaim and RX tasklets. */
 	tasklet_disable(&priv->tx_task);
+	tasklet_disable(&priv->tx_done_task);
 	tasklet_disable(&priv->rx_task);
 	tasklet_disable(&priv->qe_task);
 
@@ -710,6 +713,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	return rc;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_channel_switch *ch_switch)
@@ -721,6 +725,7 @@ static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 
 	return rc;
 }
+#endif
 
 const struct ieee80211_ops mwl_mac80211_ops = {
 	.tx                 = mwl_mac80211_tx,
@@ -739,5 +744,7 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.get_stats          = mwl_mac80211_get_stats,
 	.get_survey         = mwl_mac80211_get_survey,
 	.ampdu_action       = mwl_mac80211_ampdu_action,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 	.pre_channel_switch = mwl_mac80211_chnl_switch,
+#endif
 };

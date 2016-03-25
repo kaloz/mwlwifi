@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -21,6 +21,7 @@
 #include "dev.h"
 #include "hostcmd.h"
 #include "fwcmd.h"
+#include "thermal.h"
 #include "debugfs.h"
 
 #define MWLWIFI_DEBUGFS_ADD_FILE(name) do { \
@@ -48,29 +49,30 @@ static const struct file_operations mwl_debugfs_##name##_fops = { \
 	.open = simple_open, \
 }
 
-static int dump_data(char *p, u8 *data, int len, char *title)
+static void dump_data(char *p, int size, int *len, u8 *data,
+		      int data_len, char *title)
 {
-	char *str = p;
 	int cur_byte = 0;
 	int i;
 
-	str += sprintf(str, "%s\n", title);
-	for (cur_byte = 0; cur_byte < len; cur_byte += 8) {
-		if ((cur_byte + 8) < len) {
+	*len += scnprintf(p + *len, size - *len, "%s\n", title);
+
+	for (cur_byte = 0; cur_byte < data_len; cur_byte += 8) {
+		if ((cur_byte + 8) < data_len) {
 			for (i = 0; i < 8; i++)
-				str += sprintf(str, "0x%02x ",
-					       *(data + cur_byte + i));
-			str += sprintf(str, "\n");
+				*len += scnprintf(p + *len, size - *len,
+						  "0x%02x ",
+						  *(data + cur_byte + i));
+			*len += scnprintf(p + *len, size - *len, "\n");
 		} else {
-			for (i = 0; i < (len - cur_byte); i++)
-				str += sprintf(str, "0x%02x ",
-					       *(data + cur_byte + i));
-			str += sprintf(str, "\n");
+			for (i = 0; i < (data_len - cur_byte); i++)
+				*len += scnprintf(p + *len, size - *len,
+						  "0x%02x ",
+						  *(data + cur_byte + i));
+			*len += scnprintf(p + *len, size - *len, "\n");
 			break;
 		}
 	}
-
-	return (str - p);
 }
 
 static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
@@ -79,41 +81,52 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	ssize_t ret;
 
 	if (!p)
 		return -ENOMEM;
 
-	p += sprintf(p, "\n");
-	p += sprintf(p, "driver name: %s\n", MWL_DRV_NAME);
-	p += sprintf(p, "chip type: %s\n",
-		     (priv->chip_type == MWL8864) ? "88W8864" : "88W8897");
-	p += sprintf(p, "hw version: %X\n", priv->hw_data.hw_version);
-	p += sprintf(p, "driver version: %s\n", MWL_DRV_VERSION);
-	p += sprintf(p, "firmware version: 0x%08x\n",
-		     priv->hw_data.fw_release_num);
-	p += sprintf(p, "mac address: %pM\n", priv->hw_data.mac_addr);
-	p += sprintf(p, "2g: %s\n", priv->disable_2g ? "disable" : "enable");
-	p += sprintf(p, "5g: %s\n", priv->disable_5g ? "disable" : "enable");
-	p += sprintf(p, "antenna: %d %d\n",
-		     (priv->antenna_tx == ANTENNA_TX_4_AUTO) ? 4 : 2,
-		     (priv->antenna_rx == ANTENNA_TX_4_AUTO) ? 4 : 2);
-	p += sprintf(p, "irq number: %d\n", priv->irq);
-	p += sprintf(p, "iobase0: %p\n", priv->iobase0);
-	p += sprintf(p, "iobase1: %p\n", priv->iobase1);
-	p += sprintf(p, "tx limit: %d\n", priv->txq_limit);
-	p += sprintf(p, "rx limit: %d\n", priv->recv_limit);
-	p += sprintf(p, "ap macid support: %08x\n",
-		     priv->ap_macids_supported);
-	p += sprintf(p, "sta macid support: %08x\n",
-		     priv->sta_macids_supported);
-	p += sprintf(p, "macid used: %08x\n", priv->macids_used);
-	p += sprintf(p, "qe trigger number: %d\n", priv->qe_trigger_num);
-	p += sprintf(p, "mfg mode: %s\n", priv->mfg_mode ? "true" : "false");
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len,
+			 "driver name: %s\n", MWL_DRV_NAME);
+	len += scnprintf(p + len, size - len, "chip type: %s\n",
+			 (priv->chip_type == MWL8864) ? "88W8864" : "88W8897");
+	len += scnprintf(p + len, size - len,
+			 "hw version: %X\n", priv->hw_data.hw_version);
+	len += scnprintf(p + len, size - len,
+			 "driver version: %s\n", MWL_DRV_VERSION);
+	len += scnprintf(p + len, size - len, "firmware version: 0x%08x\n",
+			 priv->hw_data.fw_release_num);
+	len += scnprintf(p + len, size - len,
+			 "mac address: %pM\n", priv->hw_data.mac_addr);
+	len += scnprintf(p + len, size - len,
+			 "2g: %s\n", priv->disable_2g ? "disable" : "enable");
+	len += scnprintf(p + len, size - len,
+			 "5g: %s\n", priv->disable_5g ? "disable" : "enable");
+	len += scnprintf(p + len, size - len, "antenna: %d %d\n",
+			 (priv->antenna_tx == ANTENNA_TX_4_AUTO) ? 4 : 2,
+			 (priv->antenna_rx == ANTENNA_TX_4_AUTO) ? 4 : 2);
+	len += scnprintf(p + len, size - len, "irq number: %d\n", priv->irq);
+	len += scnprintf(p + len, size - len, "iobase0: %p\n", priv->iobase0);
+	len += scnprintf(p + len, size - len, "iobase1: %p\n", priv->iobase1);
+	len += scnprintf(p + len, size - len,
+			 "tx limit: %d\n", priv->txq_limit);
+	len += scnprintf(p + len, size - len,
+			 "rx limit: %d\n", priv->recv_limit);
+	len += scnprintf(p + len, size - len, "ap macid support: %08x\n",
+			 priv->ap_macids_supported);
+	len += scnprintf(p + len, size - len, "sta macid support: %08x\n",
+			 priv->sta_macids_supported);
+	len += scnprintf(p + len, size - len,
+			 "macid used: %08x\n", priv->macids_used);
+	len += scnprintf(p + len, size - len,
+			 "qe trigger number: %d\n", priv->qe_trigger_num);
+	len += scnprintf(p + len, size - len,
+			 "mfg mode: %s\n", priv->mfg_mode ? "true" : "false");
+	len += scnprintf(p + len, size - len, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
 	return ret;
@@ -125,6 +138,7 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	struct mwl_vif *mwl_vif;
 	struct ieee80211_vif *vif;
 	char ssid[IEEE80211_MAX_SSID_LEN + 1];
@@ -133,53 +147,63 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	if (!p)
 		return -ENOMEM;
 
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 	spin_lock_bh(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
 		vif = container_of((char *)mwl_vif, struct ieee80211_vif,
 				   drv_priv[0]);
-		p += sprintf(p, "macid: %d\n", mwl_vif->macid);
+		len += scnprintf(p + len, size - len,
+				 "macid: %d\n", mwl_vif->macid);
 		switch (vif->type) {
 		case NL80211_IFTYPE_AP:
-			p += sprintf(p, "type: ap\n");
+			len += scnprintf(p + len, size - len, "type: ap\n");
 			memcpy(ssid, vif->bss_conf.ssid,
 			       vif->bss_conf.ssid_len);
 			ssid[vif->bss_conf.ssid_len] = 0;
-			p += sprintf(p, "ssid: %s\n", ssid);
-			p += sprintf(p, "mac address: %pM\n", mwl_vif->bssid);
+			len += scnprintf(p + len, size - len,
+					 "ssid: %s\n", ssid);
+			len += scnprintf(p + len, size - len,
+					 "mac address: %pM\n", mwl_vif->bssid);
 			break;
 		case NL80211_IFTYPE_MESH_POINT:
-			p += sprintf(p, "type: mesh\n");
-			p += sprintf(p, "mac address: %pM\n", mwl_vif->bssid);
+			len += scnprintf(p + len, size - len, "type: mesh\n");
+			len += scnprintf(p + len, size - len,
+					 "mac address: %pM\n", mwl_vif->bssid);
 			break;
 		case NL80211_IFTYPE_STATION:
-			p += sprintf(p, "type: sta\n");
-			p += sprintf(p, "mac address: %pM\n", mwl_vif->sta_mac);
+			len += scnprintf(p + len, size - len, "type: sta\n");
+			len += scnprintf(p + len, size - len,
+					 "mac address: %pM\n",
+					 mwl_vif->sta_mac);
 			break;
 		default:
-			p += sprintf(p, "type: unknown\n");
+			len += scnprintf(p + len, size - len,
+					 "type: unknown\n");
 			break;
 		}
-		p += sprintf(p, "hw_crypto_enabled: %s\n",
-			     mwl_vif->is_hw_crypto_enabled ? "true" : "false");
-		p += sprintf(p, "key idx: %d\n", mwl_vif->keyidx);
-		p += sprintf(p, "IV: %08x%04x\n", mwl_vif->iv32, mwl_vif->iv16);
-		p += dump_data(p, mwl_vif->beacon_info.ie_wmm_ptr,
-			       mwl_vif->beacon_info.ie_wmm_len, "WMM:");
-		p += dump_data(p, mwl_vif->beacon_info.ie_rsn_ptr,
-			       mwl_vif->beacon_info.ie_rsn_len, "RSN:");
-		p += dump_data(p, mwl_vif->beacon_info.ie_rsn48_ptr,
-			       mwl_vif->beacon_info.ie_rsn48_len, "RSN48:");
-		p += dump_data(p, mwl_vif->beacon_info.ie_ht_ptr,
-			       mwl_vif->beacon_info.ie_ht_len, "HT:");
-		p += dump_data(p, mwl_vif->beacon_info.ie_vht_ptr,
-			       mwl_vif->beacon_info.ie_vht_len, "VHT:");
-		p += sprintf(p, "\n");
+		len += scnprintf(p + len, size - len, "hw_crypto_enabled: %s\n",
+				 mwl_vif->is_hw_crypto_enabled ?
+				 "true" : "false");
+		len += scnprintf(p + len, size - len,
+				 "key idx: %d\n", mwl_vif->keyidx);
+		len += scnprintf(p + len, size - len,
+				 "IV: %08x%04x\n", mwl_vif->iv32,
+				 mwl_vif->iv16);
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_wmm_ptr,
+			  mwl_vif->beacon_info.ie_wmm_len, "WMM:");
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn_ptr,
+			  mwl_vif->beacon_info.ie_rsn_len, "RSN:");
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn48_ptr,
+			  mwl_vif->beacon_info.ie_rsn48_len, "RSN48:");
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_ht_ptr,
+			  mwl_vif->beacon_info.ie_ht_len, "HT:");
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_vht_ptr,
+			  mwl_vif->beacon_info.ie_vht_len, "VHT:");
+		len += scnprintf(p + len, size - len, "\n");
 	}
 	spin_unlock_bh(&priv->vif_lock);
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
 	return ret;
@@ -191,6 +215,7 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 	ssize_t ret;
@@ -198,29 +223,30 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	if (!p)
 		return -ENOMEM;
 
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((char *)sta_info, struct ieee80211_sta,
 				   drv_priv[0]);
-		p += sprintf(p, "mac address: %pM\n", sta->addr);
-		p += sprintf(p, "aid: %u\n", sta->aid);
-		p += sprintf(p, "ampdu: %s\n",
-			     sta_info->is_ampdu_allowed ? "true" : "false");
-		p += sprintf(p, "amsdu: %s\n",
-			     sta_info->is_amsdu_allowed ? "true" : "false");
+		len += scnprintf(p + len, size - len,
+				 "mac address: %pM\n", sta->addr);
+		len += scnprintf(p + len, size - len, "aid: %u\n", sta->aid);
+		len += scnprintf(p + len, size - len, "ampdu: %s\n",
+				 sta_info->is_ampdu_allowed ? "true" : "false");
+		len += scnprintf(p + len, size - len, "amsdu: %s\n",
+				 sta_info->is_amsdu_allowed ? "true" : "false");
 		if (sta_info->is_amsdu_allowed) {
-			p += sprintf(p, "amsdu cap: 0x%02x\n",
-				     sta_info->amsdu_ctrl.cap);
+			len += scnprintf(p + len, size - len,
+					 "amsdu cap: 0x%02x\n",
+					 sta_info->amsdu_ctrl.cap);
 		}
-		p += sprintf(p, "IV: %08x%04x\n",
-			     sta_info->iv32, sta_info->iv16);
-		p += sprintf(p, "\n");
+		len += scnprintf(p + len, size - len, "IV: %08x%04x\n",
+				 sta_info->iv32, sta_info->iv16);
+		len += scnprintf(p + len, size - len, "\n");
 	}
 	spin_unlock_bh(&priv->sta_lock);
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
 	return ret;
@@ -232,6 +258,7 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	struct mwl_ampdu_stream *stream;
 	int i;
 	ssize_t ret;
@@ -239,26 +266,103 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	if (!p)
 		return -ENOMEM;
 
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 	spin_lock_bh(&priv->stream_lock);
 	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
 		stream = &priv->ampdu[i];
-		p += sprintf(p, "stream: %d\n", i);
-		p += sprintf(p, "idx: %u\n", stream->idx);
-		p += sprintf(p, "state: %u\n", stream->state);
+		len += scnprintf(p + len, size - len, "stream: %d\n", i);
+		len += scnprintf(p + len, size - len, "idx: %u\n", stream->idx);
+		len += scnprintf(p + len, size - len,
+				 "state: %u\n", stream->state);
 		if (stream->sta) {
-			p += sprintf(p, "mac address: %pM\n",
-				     stream->sta->addr);
-			p += sprintf(p, "tid: %u\n", stream->tid);
+			len += scnprintf(p + len, size - len,
+					 "mac address: %pM\n",
+					 stream->sta->addr);
+			len += scnprintf(p + len, size - len,
+					 "tid: %u\n", stream->tid);
 		}
 	}
 	spin_unlock_bh(&priv->stream_lock);
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
+	return ret;
+}
+
+static ssize_t mwl_debugfs_tx_desc_read(struct file *file,
+					char __user *ubuf,
+					size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct mwl_desc_data *desc;
+	int i, num, write_item = -1, free_item = -1;
+	ssize_t ret;
+
+	spin_lock_bh(&priv->tx_desc_lock);
+	num = priv->tx_desc_num;
+	desc = &priv->desc_data[num];
+	len += scnprintf(p + len, size - len, "num: %i fw_desc_cnt:%i\n",
+			 num, priv->fw_desc_cnt[num]);
+	for (i = 0; i < SYSADPT_MAX_NUM_TX_DESC; i++) {
+		len += scnprintf(p + len, size - len, "%3i %x\n", i,
+				 desc->tx_hndl[i].pdesc->status);
+		if (desc->pnext_tx_hndl == &desc->tx_hndl[i])
+			write_item = i;
+		if (desc->pstale_tx_hndl == &desc->tx_hndl[i])
+			free_item = i;
+	}
+	len += scnprintf(p + len, size - len, "next:%i stale:%i\n",
+			 write_item, free_item);
+	len += scnprintf(p + len, size - len, "\n");
+	spin_unlock_bh(&priv->tx_desc_lock);
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_tx_desc_write(struct file *file,
+					 const char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int tx_desc_num = 0;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	ret = sscanf(buf, "%d", &tx_desc_num);
+
+	if (ret != 1) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if ((tx_desc_num < 0) || (tx_desc_num >= SYSADPT_NUM_OF_DESC_DATA)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	priv->tx_desc_num = tx_desc_num;
+	ret = count;
+
+err:
+	free_page(addr);
 	return ret;
 }
 
@@ -269,8 +373,9 @@ static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	struct ieee80211_supported_band *sband;
-	struct ieee80211_channel*channel;
+	struct ieee80211_channel *channel;
 	int i;
 	ssize_t ret;
 
@@ -281,20 +386,25 @@ static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 	if (!sband)
 		return -EINVAL;
 
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 	for (i = 0; i < sband->n_channels; i++) {
 		channel = &sband->channels[i];
 		if (channel->flags & IEEE80211_CHAN_RADAR) {
-			p += sprintf(p, "%d(%d): flags: %08x dfs_state: %d\n",
-				     channel->hw_value, channel->center_freq,
-				     channel->flags, channel->dfs_state);
-			p += sprintf(p, "cac timer: %d ms\n", channel->dfs_cac_ms);
+			len += scnprintf(p + len, size - len,
+					 "%d(%d): flags: %08x dfs_state: %d\n",
+					 channel->hw_value,
+					 channel->center_freq,
+					 channel->flags, channel->dfs_state);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
+			len += scnprintf(p + len, size - len,
+					 "cac timer: %d ms\n",
+					 channel->dfs_cac_ms);
+#endif
 		}
 	}
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
 	return ret;
@@ -311,9 +421,9 @@ static ssize_t mwl_debugfs_dfs_channel_write(struct file *file,
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
 	int dfs_state = 0;
 	int cac_time = -1;
-	struct ieee80211_channel*channel;
+	struct ieee80211_channel *channel;
 	int i;
-	ssize_t ret = count;
+	ssize_t ret;
 
 	if (!buf)
 		return -ENOMEM;
@@ -321,26 +431,34 @@ static ssize_t mwl_debugfs_dfs_channel_write(struct file *file,
 	sband = priv->hw->wiphy->bands[NL80211_BAND_5GHZ];
 	if (!sband) {
 		ret = -EINVAL;
-		goto done;
+		goto err;
 	}
 
 	if (copy_from_user(buf, ubuf, buf_size)) {
 		ret = -EFAULT;
-		goto done;
+		goto err;
 	}
 
-	sscanf(buf, "%d %d", &dfs_state, &cac_time);
+	ret = sscanf(buf, "%d %d", &dfs_state, &cac_time);
+
+	if ((ret < 1) || (ret > 2)) {
+		ret = -EINVAL;
+		goto err;
+	}
 
 	for (i = 0; i < sband->n_channels; i++) {
 		channel = &sband->channels[i];
 		if (channel->flags & IEEE80211_CHAN_RADAR) {
 			channel->dfs_state = dfs_state;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
 			if (cac_time != -1)
 				channel->dfs_cac_ms = cac_time * 1000;
+#endif
 		}
 	}
+	ret = count;
 
-done:
+err:
 	free_page(addr);
 	return ret;
 }
@@ -351,24 +469,30 @@ static ssize_t mwl_debugfs_dfs_radar_read(struct file *file, char __user *ubuf,
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
 	ssize_t ret;
 
 	if (!p)
 		return -ENOMEM;
 
-	p += sprintf(p, "\n");
-	p += sprintf(p, "csa_active: %d\n", priv->csa_active);
-	p += sprintf(p, "dfs_region: %d\n", priv->dfs_region);
-	p += sprintf(p, "chirp_count_min: %d\n", priv->dfs_chirp_count_min);
-	p += sprintf(p, "chirp_time_interval: %d\n",
-		     priv->dfs_chirp_time_interval);
-	p += sprintf(p, "pw_filter: %d\n", priv->dfs_pw_filter);
-	p += sprintf(p, "min_num_radar: %d\n", priv->dfs_min_num_radar);
-	p += sprintf(p, "min_pri_count: %d\n", priv->dfs_min_pri_count);
-	p += sprintf(p, "\n");
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len,
+			 "csa_active: %d\n", priv->csa_active);
+	len += scnprintf(p + len, size - len,
+			 "dfs_region: %d\n", priv->dfs_region);
+	len += scnprintf(p + len, size - len,
+			 "chirp_count_min: %d\n", priv->dfs_chirp_count_min);
+	len += scnprintf(p + len, size - len, "chirp_time_interval: %d\n",
+			 priv->dfs_chirp_time_interval);
+	len += scnprintf(p + len, size - len,
+			 "pw_filter: %d\n", priv->dfs_pw_filter);
+	len += scnprintf(p + len, size - len,
+			 "min_num_radar: %d\n", priv->dfs_min_num_radar);
+	len += scnprintf(p + len, size - len,
+			 "min_pri_count: %d\n", priv->dfs_min_pri_count);
+	len += scnprintf(p + len, size - len, "\n");
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, (char *)page,
-				      (unsigned long)p - page);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
 	return ret;
@@ -385,6 +509,78 @@ static ssize_t mwl_debugfs_dfs_radar_write(struct file *file,
 
 	return count;
 }
+
+static ssize_t mwl_debugfs_thermal_read(struct file *file,
+					char __user *ubuf,
+					size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	mwl_fwcmd_get_temp(priv->hw, &priv->temperature);
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len, "quiet period: %d\n",
+			 priv->quiet_period);
+	len += scnprintf(p + len, size - len, "throttle state: %d\n",
+			 priv->throttle_state);
+	len += scnprintf(p + len, size - len, "temperature: %d\n",
+			 priv->temperature);
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_thermal_write(struct file *file,
+					 const char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int throttle_state;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &throttle_state)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (throttle_state > SYSADPT_THERMAL_THROTTLE_MAX) {
+		wiphy_warn(priv->hw->wiphy,
+			   "throttle state %d is exceeding the limit %d\n",
+			   throttle_state, SYSADPT_THERMAL_THROTTLE_MAX);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	priv->throttle_state = throttle_state;
+	mwl_thermal_set_throttling(priv);
+	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
 
 static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 {
@@ -438,16 +634,17 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
-	unsigned long addr = get_zeroed_page(GFP_KERNEL);
-	char *buf = (char *)addr;
-	int pos = 0, ret = 0;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	int ret = 0;
 
-	if (!buf)
+	if (!p)
 		return -ENOMEM;
 
 	if (!priv->reg_type) {
 		/* No command has been given */
-		pos += snprintf(buf, PAGE_SIZE, "0");
+		len += scnprintf(p + len, size - len, "0");
 		goto none;
 	}
 
@@ -461,19 +658,20 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 
 done:
 	if (!ret)
-		pos += snprintf(buf, PAGE_SIZE, "%u 0x%08x 0x%08x\n",
-				priv->reg_type, priv->reg_offset,
-				priv->reg_value);
+		len += scnprintf(p + len, size - len, "%u 0x%08x 0x%08x\n",
+				 priv->reg_type, priv->reg_offset,
+				 priv->reg_value);
 	else
-		pos += snprintf(buf, PAGE_SIZE, "error: %d(%u 0x%08x 0x%08x)\n",
-				ret, priv->reg_type, priv->reg_offset,
-				priv->reg_value);
+		len += scnprintf(p + len, size - len,
+				 "error: %d(%u 0x%08x 0x%08x)\n",
+				 ret, priv->reg_type, priv->reg_offset,
+				 priv->reg_value);
 
-	ret = simple_read_from_buffer(ubuf, count, ppos, buf, pos);
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
 none:
 
-	free_page(addr);
+	free_page(page);
 	return ret;
 }
 
@@ -517,8 +715,10 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(info);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
+MWLWIFI_DEBUGFS_FILE_OPS(tx_desc);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
+MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
@@ -536,8 +736,10 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(vif);
 	MWLWIFI_DEBUGFS_ADD_FILE(sta);
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
+	MWLWIFI_DEBUGFS_ADD_FILE(tx_desc);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
+	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 }
 

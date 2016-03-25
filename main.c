@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -27,11 +27,12 @@
 #include "tx.h"
 #include "rx.h"
 #include "isr.h"
-#ifdef SUPPORT_MFG
-#include "mfg.h"
-#endif
+#include "thermal.h"
 #ifdef CONFIG_DEBUG_FS
 #include "debugfs.h"
+#endif
+#ifdef SUPPORT_MFG
+#include "mfg.h"
 #endif
 
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
@@ -582,15 +583,18 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
 	INIT_WORK(&priv->chnl_switch_handle, mwl_chnl_switch_event);
 
-	tasklet_init(&priv->tx_task, (void *)mwl_tx_done, (unsigned long)hw);
+	tasklet_init(&priv->tx_task, (void *)mwl_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&priv->tx_task);
+	tasklet_init(&priv->tx_done_task,
+		     (void *)mwl_tx_done, (unsigned long)hw);
+	tasklet_disable(&priv->tx_done_task);
 	tasklet_init(&priv->rx_task, (void *)mwl_rx_recv, (unsigned long)hw);
 	tasklet_disable(&priv->rx_task);
 	tasklet_init(&priv->qe_task,
 		     (void *)mwl_tx_flush_amsdu, (unsigned long)hw);
 	tasklet_disable(&priv->qe_task);
 	priv->txq_limit = SYSADPT_TX_QUEUE_LIMIT;
-	priv->is_tx_schedule = false;
+	priv->is_tx_done_schedule = false;
 	priv->recv_limit = SYSADPT_RECEIVE_LIMIT;
 	priv->is_rx_schedule = false;
 	priv->is_qe_schedule = false;
@@ -602,6 +606,13 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
 	spin_lock_init(&priv->stream_lock);
+
+	rc = mwl_thermal_register(priv);
+	if (rc) {
+		wiphy_err(hw->wiphy, "%s: fail to register thermal framework\n",
+			  MWL_DRV_NAME);
+		goto err_thermal_register;
+	}
 
 	rc = mwl_tx_init(hw);
 	if (rc) {
@@ -693,6 +704,7 @@ err_mwl_rx_init:
 	mwl_tx_deinit(hw);
 
 err_mwl_tx_init:
+err_thermal_register:
 
 	wiphy_err(hw->wiphy, "init fail\n");
 
@@ -711,10 +723,12 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	}
 
 	ieee80211_unregister_hw(hw);
+	mwl_thermal_unregister(priv);
 	mwl_rx_deinit(hw);
 	mwl_tx_deinit(hw);
 	tasklet_kill(&priv->qe_task);
 	tasklet_kill(&priv->rx_task);
+	tasklet_kill(&priv->tx_done_task);
 	tasklet_kill(&priv->tx_task);
 	cancel_work_sync(&priv->watchdog_ba_handle);
 	mwl_fwcmd_reset(hw);

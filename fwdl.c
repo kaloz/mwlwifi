@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -61,7 +61,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	u32 int_code = 0;
 	u32 len = 0;
 #ifdef SUPPORT_MFG
-	u32 fwreadysignature = priv->mfg_mode ?
+	u32 fwreadysignature = (priv->mfg_mode && priv->chip_type == MWL8897) ?
 		MFG_FW_READY_SIGNATURE : HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
 #else
 	u32 fwreadysignature = HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
@@ -162,18 +162,18 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	*((u32 *)&priv->pcmd_buf[1]) = 0;
 	mwl_fwdl_trig_pcicmd(priv);
 	curr_iteration = FW_MAX_NUM_CHECKS;
-	if (priv->mfg_mode)
+	if (priv->mfg_mode && priv->chip_type == MWL8897)
 		writel(fwreadysignature, priv->iobase1 + 0xcf0);
 	do {
 		curr_iteration--;
-		if (!priv->mfg_mode) {
+		if (priv->mfg_mode && priv->chip_type == MWL8897) {
+			mdelay(FW_CHECK_MSECS);
+			int_code = readl(priv->iobase1 + 0xc44);
+		} else {
 			writel(HOSTCMD_SOFTAP_MODE,
 			       priv->iobase1 + MACREG_REG_GEN_PTR);
 			mdelay(FW_CHECK_MSECS);
 			int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
-		} else {
-			mdelay(FW_CHECK_MSECS);
-			int_code = readl(priv->iobase1 + 0xc44);
 		}
 		if (!(curr_iteration % 0xff) && (int_code != 0))
 			wiphy_err(hw->wiphy, "%x;", int_code);

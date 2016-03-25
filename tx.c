@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2015, Marvell International Ltd.
+ * Copyright (C) 2006-2016, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -532,12 +532,6 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 			mwl_tx_skb(priv, desc_num, amsdu->skb);
 			amsdu->num = 0;
 			amsdu->cur_pos = NULL;
-
-			if (!mwl_tx_available(priv, desc_num)) {
-				skb_queue_head(&priv->txq[desc_num], tx_skb);
-				spin_unlock_bh(&sta_info->amsdu_lock);
-				return NULL;
-			}
 		}
 		spin_unlock_bh(&sta_info->amsdu_lock);
 		return tx_skb;
@@ -635,47 +629,6 @@ static inline struct sk_buff *mwl_tx_do_amsdu(struct mwl_priv *priv,
 
 	spin_unlock_bh(&sta_info->amsdu_lock);
 	return NULL;
-}
-
-static inline void mwl_tx_skbs(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-	int num = SYSADPT_TX_WMM_QUEUES;
-	struct sk_buff *tx_skb;
-
-	spin_lock_bh(&priv->tx_desc_lock);
-	while (num--) {
-		while (skb_queue_len(&priv->txq[num]) > 0) {
-			struct ieee80211_tx_info *tx_info;
-			struct mwl_tx_ctrl *tx_ctrl;
-
-			if (!mwl_tx_available(priv, num))
-				break;
-
-			tx_skb = skb_dequeue(&priv->txq[num]);
-			tx_info = IEEE80211_SKB_CB(tx_skb);
-			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
-
-			if ((tx_skb->protocol != cpu_to_be16(ETH_P_PAE)) &&
-			    (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)) {
-				tx_skb = mwl_tx_do_amsdu(priv, num,
-							 tx_skb, tx_info);
-			}
-
-			if (tx_skb)
-				mwl_tx_skb(priv, num, tx_skb);
-		}
-
-		if (skb_queue_len(&priv->txq[num]) <
-		    SYSADPT_TX_WAKE_Q_THRESHOLD) {
-			int queue;
-
-			queue = SYSADPT_TX_WMM_QUEUES - num - 1;
-			if (ieee80211_queue_stopped(hw, queue))
-				ieee80211_wake_queue(hw, queue);
-		}
-	}
-	spin_unlock_bh(&priv->tx_desc_lock);
 }
 
 static inline void mwl_tx_prepare_info(struct ieee80211_hw *hw, u32 rate,
@@ -964,7 +917,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 
 	skb_queue_tail(&priv->txq[index], skb);
 
-	mwl_tx_skbs(hw);
+	tasklet_schedule(&priv->tx_task);
 
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
@@ -1086,6 +1039,52 @@ void mwl_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 	spin_unlock_bh(&sta_info->amsdu_lock);
 }
 
+void mwl_tx_skbs(unsigned long data)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
+	struct mwl_priv *priv = hw->priv;
+	int num = SYSADPT_TX_WMM_QUEUES;
+	struct sk_buff *tx_skb;
+
+	spin_lock_bh(&priv->tx_desc_lock);
+	while (num--) {
+		while (skb_queue_len(&priv->txq[num]) > 0) {
+			struct ieee80211_tx_info *tx_info;
+			struct mwl_tx_ctrl *tx_ctrl;
+
+			if (!mwl_tx_available(priv, num))
+				break;
+
+			tx_skb = skb_dequeue(&priv->txq[num]);
+			tx_info = IEEE80211_SKB_CB(tx_skb);
+			tx_ctrl = (struct mwl_tx_ctrl *)&tx_info->status;
+
+			if ((tx_skb->protocol != cpu_to_be16(ETH_P_PAE)) &&
+			    (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)) {
+				tx_skb = mwl_tx_do_amsdu(priv, num,
+							 tx_skb, tx_info);
+			}
+
+			if (tx_skb) {
+				if (mwl_tx_available(priv, num))
+					mwl_tx_skb(priv, num, tx_skb);
+				else
+					skb_queue_head(&priv->txq[num], tx_skb);
+			}
+		}
+
+		if (skb_queue_len(&priv->txq[num]) <
+		    SYSADPT_TX_WAKE_Q_THRESHOLD) {
+			int queue;
+
+			queue = SYSADPT_TX_WMM_QUEUES - num - 1;
+			if (ieee80211_queue_stopped(hw, queue))
+				ieee80211_wake_queue(hw, queue);
+		}
+	}
+	spin_unlock_bh(&priv->tx_desc_lock);
+}
+
 void mwl_tx_done(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
@@ -1108,6 +1107,12 @@ void mwl_tx_done(unsigned long data)
 		tx_hndl = desc->pstale_tx_hndl;
 		tx_desc = tx_hndl->pdesc;
 
+		if ((tx_desc->status &
+		    cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED)) &&
+		    (tx_hndl->pnext->pdesc->status &
+		    cpu_to_le32(EAGLE_TXD_STATUS_OK)))
+			tx_desc->status = cpu_to_le32(EAGLE_TXD_STATUS_OK);
+
 		while (tx_hndl &&
 		       (tx_desc->status & cpu_to_le32(EAGLE_TXD_STATUS_OK)) &&
 		       (!(tx_desc->status &
@@ -1118,6 +1123,7 @@ void mwl_tx_done(unsigned long data)
 					 PCI_DMA_TODEVICE);
 			done_skb = tx_hndl->psk_buff;
 			rate = le32_to_cpu(tx_desc->rate_info);
+			tx_desc->pkt_ptr = 0;
 			tx_desc->pkt_len = 0;
 			tx_desc->status =
 				cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
@@ -1169,7 +1175,7 @@ void mwl_tx_done(unsigned long data)
 	}
 	spin_unlock_bh(&priv->tx_desc_lock);
 
-	if (priv->irq != -1) {
+	if (priv->is_tx_done_schedule) {
 		u32 status_mask;
 
 		status_mask = readl(priv->iobase1 +
@@ -1177,10 +1183,9 @@ void mwl_tx_done(unsigned long data)
 		writel(status_mask | MACREG_A2HRIC_BIT_TX_DONE,
 		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
-		mwl_tx_skbs(hw);
+		tasklet_schedule(&priv->tx_task);
+		priv->is_tx_done_schedule = false;
 	}
-
-	priv->is_tx_schedule = false;
 }
 
 void mwl_tx_flush_amsdu(unsigned long data)

@@ -13,15 +13,28 @@
  * this warranty disclaimer.
  */
 
-/* Description:  This file defines interrupt related functions. */
+/* Description:  This file defines Linux thermal framework related functions. */
 
-#ifndef _ISR_H_
-#define _ISR_H_
+#ifndef _THERMAL_H_
+#define _THERMAL_H_
 
-#include <linux/interrupt.h>
+#ifdef CONFIG_THERMAL
+int mwl_thermal_register(struct mwl_priv *priv);
+void mwl_thermal_unregister(struct mwl_priv *priv);
+void mwl_thermal_set_throttling(struct mwl_priv *priv);
+#else
+static inline int mwl_thermal_register(struct mwl_priv *priv)
+{
+	return 0;
+}
 
-irqreturn_t mwl_isr(int irq, void *dev_id);
-void mwl_chnl_switch_event(struct work_struct *work);
-void mwl_watchdog_ba_events(struct work_struct *work);
+static inline void mwl_thermal_unregister(struct mwl_priv *priv)
+{
+}
 
-#endif /* _ISR_H_ */
+static inline void mwl_thermal_set_throttling(struct mwl_priv *priv)
+{
+}
+#endif
+
+#endif /* _THERMAL_H_ */
