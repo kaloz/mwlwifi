@@ -547,7 +547,8 @@ static void timer_routine(unsigned long data)
 	}
 	spin_unlock_bh(&priv->stream_lock);
 
-	mod_timer(&priv->period_timer, jiffies + msecs_to_jiffies(10));
+	mod_timer(&priv->period_timer, jiffies +
+		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
 }
 
 static int mwl_wl_init(struct mwl_priv *priv)
@@ -724,7 +725,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->irq = priv->pdev->irq;
 
 	setup_timer(&priv->period_timer, timer_routine, (unsigned long)priv);
-	mod_timer(&priv->period_timer, jiffies + msecs_to_jiffies(10));
+	mod_timer(&priv->period_timer, jiffies +
+		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
 
 	return rc;
 
