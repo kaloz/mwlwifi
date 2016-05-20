@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.17-20160324"
+#define MWL_DRV_VERSION	 "10.3.0.17-20160520"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -329,6 +329,8 @@ struct mwl_priv {
 	bool is_qe_schedule;
 	u32 qe_trigger_num;
 	unsigned long qe_trigger_time;
+
+	struct timer_list period_timer;
 
 	s8 noise;                    /* Most recently reported noise in dBm */
 	struct ieee80211_supported_band band_24;

@@ -365,7 +365,7 @@ static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 	 */
 	if (jiffies - tx_stats->start_time > HZ) {
 		tx_stats->pkts = 0;
-		tx_stats->start_time = 0;
+		tx_stats->start_time = jiffies;
 	} else {
 		tx_stats->pkts++;
 	}

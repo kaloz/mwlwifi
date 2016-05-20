@@ -517,6 +517,39 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	}
 }
 
+static void timer_routine(unsigned long data)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)data;
+	struct mwl_ampdu_stream *stream;
+	struct mwl_sta *sta_info;
+	struct mwl_tx_info *tx_stats;
+	int i;
+
+	spin_lock_bh(&priv->stream_lock);
+	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
+		stream = &priv->ampdu[i];
+
+		if (stream->state == AMPDU_STREAM_ACTIVE) {
+			sta_info = mwl_dev_get_sta(stream->sta);
+			tx_stats = &sta_info->tx_stats[stream->tid];
+
+			if ((jiffies - tx_stats->start_time > HZ) &&
+			    (tx_stats->pkts < SYSADPT_AMPDU_PACKET_THRESHOLD)) {
+				ieee80211_stop_tx_ba_session(stream->sta,
+							     stream->tid);
+			}
+
+			if (jiffies - tx_stats->start_time > HZ) {
+				tx_stats->pkts = 0;
+				tx_stats->start_time = jiffies;
+			}
+		}
+	}
+	spin_unlock_bh(&priv->stream_lock);
+
+	mod_timer(&priv->period_timer, jiffies + msecs_to_jiffies(10));
+}
+
 static int mwl_wl_init(struct mwl_priv *priv)
 {
 	struct ieee80211_hw *hw;
@@ -690,6 +723,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	}
 	priv->irq = priv->pdev->irq;
 
+	setup_timer(&priv->period_timer, timer_routine, (unsigned long)priv);
+	mod_timer(&priv->period_timer, jiffies + msecs_to_jiffies(10));
+
 	return rc;
 
 err_register_irq:
@@ -713,9 +749,9 @@ err_thermal_register:
 
 static void mwl_wl_deinit(struct mwl_priv *priv)
 {
-	struct ieee80211_hw *hw;
+	struct ieee80211_hw *hw = priv->hw;
 
-	hw = priv->hw;
+	del_timer_sync(&priv->period_timer);
 
 	if (priv->irq != -1) {
 		free_irq(priv->pdev->irq, hw);

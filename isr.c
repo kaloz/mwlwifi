@@ -33,7 +33,7 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 #ifdef BG4CT_A0_WORKAROUND
 	unsigned int currIteration = 0;
 #endif
-	u32 int_status, clr_status;
+	u32 int_status;
 	u32 status;
 
 #ifdef BG4CT_A0_WORKAROUND
@@ -49,11 +49,10 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 	if (int_status == 0xffffffff) {
 		wiphy_warn(hw->wiphy, "card unplugged?\n");
 	} else {
-		clr_status = int_status;
+		writel(~int_status,
+		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
-			int_status &= ~MACREG_A2HRIC_BIT_TX_DONE;
-
 			if (!priv->is_tx_done_schedule) {
 				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_TX_DONE),
@@ -64,8 +63,6 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
-			int_status &= ~MACREG_A2HRIC_BIT_RX_RDY;
-
 			if (!priv->is_rx_schedule) {
 				status = readl(int_status_mask);
 				writel((status & ~MACREG_A2HRIC_BIT_RX_RDY),
@@ -76,14 +73,11 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
-			int_status &= ~MACREG_A2HRIC_BIT_RADAR_DETECT;
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
 			ieee80211_radar_detected(hw);
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_QUE_EMPTY) {
-			int_status &= ~MACREG_A2HRIC_BIT_QUE_EMPTY;
-
 			if (!priv->is_qe_schedule) {
 				if (time_after(jiffies,
 					       (priv->qe_trigger_time + 1))) {
@@ -99,16 +93,12 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 			}
 		}
 
-		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH) {
-			int_status &= ~MACREG_A2HRIC_BIT_CHAN_SWITCH;
+		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
 			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
-		}
 
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG)
 			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
 
-		writel(~clr_status,
-		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 	}
 #ifdef BG4CT_A0_WORKAROUND
 	} while (currIteration++ < MAX_ISR_ITERATION);
