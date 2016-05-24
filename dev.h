@@ -402,6 +402,7 @@ struct beacon_info {
 	u8 ie_list_ht[148];
 	u8 ie_list_vht[24];
 	u8 *ie_wmm_ptr;
+        u8 *ie_wps_ptr;
 	u8 *ie_rsn_ptr;
 	u8 *ie_rsn48_ptr;
 	u8 *ie_ht_ptr;
@@ -413,6 +414,7 @@ struct beacon_info {
 	u8 *ie_meshchsw_ptr;
 #endif
 	u8 ie_wmm_len;
+        u8 ie_wps_len;
 	u8 ie_rsn_len;
 	u8 ie_rsn48_len;
 	u8 ie_ht_len;
