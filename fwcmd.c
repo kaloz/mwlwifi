@@ -510,6 +510,11 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 					beacon_info->ie_wmm_len = (elen + 2);
 					beacon_info->ie_wmm_ptr = (pos - 2);
 				}
+
+                                if (pos[3] == 0x04) {
+                                        beacon_info->ie_wps_len = (elen + 2);
+                                        beacon_info->ie_wps_ptr = (pos -2);
+                                }
 			}
 			break;
 		default:
@@ -573,6 +578,10 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 		       beacon->ie_wmm_ptr, beacon->ie_wmm_len);
 		ie_list_len_proprietary += mwl_vif->beacon_info.ie_wmm_len;
 	}
+
+        memcpy(pcmd->ie_list_len_proprietary + ie_list_len_proprietary,
+                beacon->ie_wps_ptr, beacon->ie_wps_len);
+        ie_list_len_proprietary += beacon->ie_wps_len;
 
 	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
 
