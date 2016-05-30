@@ -649,10 +649,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		spin_lock_bh(&priv->stream_lock);
 		if (rc) {
 			mwl_fwcmd_remove_stream(hw, stream);
-			if (printk_ratelimit())
-				wiphy_debug(hw->wiphy,
-					    "ampdu start error code: %d(%pM)\n",
-					    rc, addr);
+			sta_info->check_ba_failed[tid]++;
 			rc = -EPERM;
 			break;
 		}
@@ -691,6 +688,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 
 			if (!rc) {
 				stream->state = AMPDU_STREAM_ACTIVE;
+				sta_info->check_ba_failed[tid] = 0;
 			} else {
 				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);

@@ -2393,10 +2393,6 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 
 	if (pcmd->cmd_hdr.result != 0) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		if (printk_ratelimit())
-			wiphy_debug(hw->wiphy, "check ba result err %d(%pM)\n",
-				    le16_to_cpu(pcmd->cmd_hdr.result),
-				    stream->sta->addr);
 		return -EINVAL;
 	}
 

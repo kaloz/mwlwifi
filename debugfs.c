@@ -240,6 +240,32 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 					 "amsdu cap: 0x%02x\n",
 					 sta_info->amsdu_ctrl.cap);
 		}
+		if (sta->ht_cap.ht_supported) {
+			len += scnprintf(p + len, size - len,
+					 "ht_cap: 0x%04x, ampdu: %02x, %02x\n",
+					 sta->ht_cap.cap,
+					 sta->ht_cap.ampdu_factor,
+					 sta->ht_cap.ampdu_density);
+			len += scnprintf(p + len, size - len,
+					 "rx_mask: 0x%02x, %02x, %02x, %02x\n",
+					 sta->ht_cap.mcs.rx_mask[0],
+					 sta->ht_cap.mcs.rx_mask[1],
+					 sta->ht_cap.mcs.rx_mask[2],
+					 sta->ht_cap.mcs.rx_mask[3]);
+		}
+		if (sta->vht_cap.vht_supported) {
+			len += scnprintf(p + len, size - len,
+					 "vht_cap: 0x%08x, mcs: %02x, %02x\n",
+					 sta->vht_cap.cap,
+					 sta->vht_cap.vht_mcs.rx_mcs_map,
+					 sta->vht_cap.vht_mcs.tx_mcs_map);
+		}
+		len += scnprintf(p + len, size - len, "rx_bw: %d, rx_nss: %d\n",
+				 sta->bandwidth, sta->rx_nss);
+		len += scnprintf(p + len, size - len, "tdls: %d, tdls_init: %d\n",
+				 sta->tdls, sta->tdls_initiator);
+		len += scnprintf(p + len, size - len, "wme: %d, mfp: %d\n",
+				 sta->wme, sta->mfp);
 		len += scnprintf(p + len, size - len, "IV: %08x%04x\n",
 				 sta_info->iv32, sta_info->iv16);
 		len += scnprintf(p + len, size - len, "\n");
@@ -261,6 +287,8 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	int len = 0, size = PAGE_SIZE;
 	struct mwl_ampdu_stream *stream;
 	int i;
+	struct mwl_sta *sta_info;
+	struct ieee80211_sta *sta;
 	ssize_t ret;
 
 	if (!p)
@@ -283,6 +311,21 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 		}
 	}
 	spin_unlock_bh(&priv->stream_lock);
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		for (i = 0; i < MWL_MAX_TID; i++) {
+			if (sta_info->check_ba_failed[i]) {
+				sta = container_of((char *)sta_info,
+						   struct ieee80211_sta,
+						   drv_priv[0]);
+				len += scnprintf(p + len, size - len,
+						 "%pM(%d): %d\n",
+						 sta->addr, i,
+						 sta_info->check_ba_failed[i]);
+			}
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
 	len += scnprintf(p + len, size - len, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);

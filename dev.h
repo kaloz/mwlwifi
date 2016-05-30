@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.17-20160523"
+#define MWL_DRV_VERSION	 "10.3.0.17-20160530"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -467,6 +467,7 @@ struct mwl_sta {
 	bool is_mesh_node;
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];
+	u32 check_ba_failed[MWL_MAX_TID];
 	bool is_amsdu_allowed;
 	/* for amsdu aggregation */
 	struct {
