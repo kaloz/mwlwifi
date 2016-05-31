@@ -537,10 +537,16 @@ void mwl_rx_recv(unsigned long data)
 			 * this bss. If yes, set the status flags
 			 * accordingly
 			 */
-			if (ieee80211_has_tods(wh->frame_control))
+			if (ieee80211_has_tods(wh->frame_control)) {
 				mwl_vif = mwl_rx_find_vif_bss(priv, wh->addr1);
-			else
+				if (!mwl_vif &&
+				    ieee80211_has_a4(wh->frame_control))
+					mwl_vif =
+						mwl_rx_find_vif_bss(priv,
+								    wh->addr2);
+			} else {
 				mwl_vif = mwl_rx_find_vif_bss(priv, wh->addr2);
+			}
 
 			if  ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
 			     is_multicast_ether_addr(wh->addr1) ||
