@@ -196,6 +196,8 @@ bool mwl_fwcmd_ampdu_allowed(struct ieee80211_sta *sta, u8 tid);
 
 int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level);
 
+int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data);
+
 int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 
 int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value);

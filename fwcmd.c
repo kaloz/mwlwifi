@@ -105,7 +105,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_SPECTRUM_MGMT, "SetSpectrumMgmt" },
 		{ HOSTCMD_CMD_SET_POWER_CONSTRAINT, "SetPowerConstraint" },
 		{ HOSTCMD_CMD_SET_COUNTRY_CODE, "SetCountryCode" },
-		{ HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL, "SetOptimizationLevel"},
+		{ HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL, "SetOptimizationLevel" },
+		{ HOSTCMD_CMD_SET_WSC_IE, "SetWscIE" },
 		{ HOSTCMD_CMD_DWDS_ENABLE, "DwdsEnable" },
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
@@ -509,6 +510,11 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				if (pos[3] == 0x02) {
 					beacon_info->ie_wmm_len = (elen + 2);
 					beacon_info->ie_wmm_ptr = (pos - 2);
+				}
+
+				if (pos[3] == 0x04) {
+					beacon_info->ie_wsc_len = (elen + 2);
+					beacon_info->ie_wsc_ptr = (pos - 2);
 				}
 			}
 			break;
@@ -1860,6 +1866,9 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 	if (mwl_fwcmd_set_ies(priv, mwl_vif))
 		goto err;
 
+	if (mwl_fwcmd_set_wsc_ie(hw, b_inf->ie_wsc_len, b_inf->ie_wsc_ptr))
+		goto err;
+
 	if (mwl_fwcmd_set_ap_beacon(priv, mwl_vif, &vif->bss_conf))
 		goto err;
 
@@ -2603,6 +2612,32 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level)
 	pcmd->opt_level = opt_level;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_set_wsc_ie *pcmd;
+
+	pcmd = (struct hostcmd_cmd_set_wsc_ie *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_WSC_IE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->len = cpu_to_le16(len);
+	memcpy(pcmd->data, data, len);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WSC_IE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;

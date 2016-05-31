@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.17-20160530"
+#define MWL_DRV_VERSION	 "10.3.0.17-20160531"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -402,6 +402,7 @@ struct beacon_info {
 	u8 ie_list_ht[148];
 	u8 ie_list_vht[24];
 	u8 *ie_wmm_ptr;
+	u8 *ie_wsc_ptr;
 	u8 *ie_rsn_ptr;
 	u8 *ie_rsn48_ptr;
 	u8 *ie_ht_ptr;
@@ -413,6 +414,7 @@ struct beacon_info {
 	u8 *ie_meshchsw_ptr;
 #endif
 	u8 ie_wmm_len;
+	u8 ie_wsc_len;
 	u8 ie_rsn_len;
 	u8 ie_rsn48_len;
 	u8 ie_ht_len;

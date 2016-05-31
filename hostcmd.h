@@ -55,6 +55,7 @@
 #define HOSTCMD_CMD_SET_POWER_CONSTRAINT        0x1129
 #define HOSTCMD_CMD_SET_COUNTRY_CODE            0x1130
 #define HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL      0x1133
+#define HOSTCMD_CMD_SET_WSC_IE                  0x1136 /* per-vif */
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
@@ -127,8 +128,7 @@
 #define HOSTCMD_ACT_GEN_GET_LIST                0x0003
 
 /* Misc */
-#define MAX_ENCR_KEY_LENGTH                     16
-#define MIC_KEY_LENGTH                          8
+#define WSC_IE_MAX_LENGTH                       251
 
 enum {
 	WL_DISABLE = 0,
@@ -832,6 +832,14 @@ struct hostcmd_cmd_set_country_code {
 struct hostcmd_cmd_set_optimization_level {
 	struct hostcmd_header cmd_hdr;
 	u8 opt_level;
+} __packed;
+
+/* HOSTCMD_CMD_SET_WSC_IE */
+struct hostcmd_cmd_set_wsc_ie {
+	struct hostcmd_header cmd_hdr;
+	__le16 ie_type;              /* 0 -- beacon. or 1 -- probe response. */
+	__le16 len;
+	u8 data[WSC_IE_MAX_LENGTH];
 } __packed;
 
 /* HOSTCMD_CMD_DWDS_ENABLE */
