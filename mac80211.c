@@ -149,7 +149,6 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
-	case NL80211_IFTYPE_MESH_POINT:
 		macids_supported = priv->ap_macids_supported;
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -180,10 +179,6 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
-		ether_addr_copy(mwl_vif->bssid, vif->addr);
-		mwl_fwcmd_set_new_stn_add_self(hw, vif);
-		break;
-	case NL80211_IFTYPE_MESH_POINT:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
 		mwl_fwcmd_set_new_stn_add_self(hw, vif);
 		break;
@@ -228,7 +223,6 @@ static void mwl_mac80211_remove_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
-	case NL80211_IFTYPE_MESH_POINT:
 		mwl_fwcmd_set_new_stn_del(hw, vif, vif->addr);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -370,7 +364,6 @@ static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
 {
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
-	case NL80211_IFTYPE_MESH_POINT:
 		mwl_mac80211_bss_info_changed_ap(hw, vif, info, changed);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -472,24 +465,6 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info = mwl_dev_get_sta(sta);
 
 	memset(sta_info, 0, sizeof(*sta_info));
-
-	if (vif->type == NL80211_IFTYPE_MESH_POINT) {
-		sta_info->is_mesh_node = true;
-		/* Patch mesh interface for HT based on chip type. When authsae
-		 * or wpa_supplicant is used for mesh security, HT capbility
-		 * won't be set. This would be removed if problem is fixed.
-		 */
-		sta->ht_cap.ht_supported = true;
-		sta->ht_cap.cap = 0x6f;
-		sta->ht_cap.mcs.rx_mask[0] = 0xff;
-		sta->ht_cap.mcs.rx_mask[1] = 0xff;
-		sta->ht_cap.ampdu_factor = 0x3;
-		sta->ht_cap.ampdu_density = 0x5;
-		if (priv->chip_type == MWL8864) {
-			if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
-				sta->ht_cap.mcs.rx_mask[2] = 0xff;
-		}
-	}
 
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;

@@ -165,11 +165,6 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			len += scnprintf(p + len, size - len,
 					 "mac address: %pM\n", mwl_vif->bssid);
 			break;
-		case NL80211_IFTYPE_MESH_POINT:
-			len += scnprintf(p + len, size - len, "type: mesh\n");
-			len += scnprintf(p + len, size - len,
-					 "mac address: %pM\n", mwl_vif->bssid);
-			break;
 		case NL80211_IFTYPE_STATION:
 			len += scnprintf(p + len, size - len, "type: sta\n");
 			len += scnprintf(p + len, size - len,

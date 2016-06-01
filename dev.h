@@ -408,11 +408,6 @@ struct beacon_info {
 	u8 *ie_ht_ptr;
 	u8 *ie_vht_ptr;
 	u8 *ie_country_ptr;
-#ifdef CONFIG_MAC80211_MESH
-	u8 *ie_meshid_ptr;
-	u8 *ie_meshcfg_ptr;
-	u8 *ie_meshchsw_ptr;
-#endif
 	u8 ie_wmm_len;
 	u8 ie_wsc_len;
 	u8 ie_rsn_len;
@@ -420,11 +415,6 @@ struct beacon_info {
 	u8 ie_ht_len;
 	u8 ie_vht_len;
 	u8 ie_country_len;
-#ifdef CONFIG_MAC80211_MESH
-	u8 ie_meshid_len;
-	u8 ie_meshcfg_len;
-	u8 ie_meshchsw_len;
-#endif
 };
 
 struct mwl_vif {

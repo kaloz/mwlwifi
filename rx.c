@@ -336,78 +336,6 @@ static inline void mwl_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 		skb_pull(skb, sizeof(*tr) - hdrlen);
 }
 
-#ifdef CONFIG_MAC80211_MESH
-static inline bool mwl_rx_process_mesh_amsdu(struct mwl_priv *priv,
-					     struct sk_buff *skb,
-					     struct ieee80211_rx_status *status)
-{
-	struct ieee80211_hdr *wh;
-	struct mwl_sta *sta_info;
-	struct ieee80211_sta *sta;
-	u8 *qc;
-	int wh_len;
-	int len;
-	u8 pad;
-	u8 *data;
-	u16 frame_len;
-	struct sk_buff *newskb;
-
-	wh = (struct ieee80211_hdr *)skb->data;
-
-	spin_lock_bh(&priv->sta_lock);
-	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((char *)sta_info, struct ieee80211_sta,
-				   drv_priv[0]);
-		if (ether_addr_equal(sta->addr, wh->addr2)) {
-			if (!sta_info->is_mesh_node) {
-				spin_unlock_bh(&priv->sta_lock);
-				return false;
-			}
-		}
-	}
-	spin_unlock_bh(&priv->sta_lock);
-
-	qc = ieee80211_get_qos_ctl(wh);
-	*qc &= ~IEEE80211_QOS_CTL_A_MSDU_PRESENT;
-
-	wh_len = ieee80211_hdrlen(wh->frame_control);
-	len = wh_len;
-	data = skb->data;
-
-	while (len < skb->len) {
-		frame_len = *(u8 *)(data + len + ETH_HLEN - 1) |
-			(*(u8 *)(data + len + ETH_HLEN - 2) << 8);
-
-		if ((len + ETH_HLEN + frame_len) > skb->len)
-			break;
-
-		newskb = dev_alloc_skb(wh_len + frame_len);
-		if (!newskb)
-			break;
-
-		ether_addr_copy(wh->addr3, data + len);
-		ether_addr_copy(wh->addr4, data + len + ETH_ALEN);
-		memcpy(newskb->data, wh, wh_len);
-		memcpy(newskb->data + wh_len, data + len + ETH_HLEN, frame_len);
-		skb_put(newskb, wh_len + frame_len);
-
-		pad = ((ETH_HLEN + frame_len) % 4) ?
-			(4 - (ETH_HLEN + frame_len) % 4) : 0;
-		len += (ETH_HLEN + frame_len + pad);
-		if (len < skb->len)
-			status->flag |= RX_FLAG_AMSDU_MORE;
-		else
-			status->flag &= ~RX_FLAG_AMSDU_MORE;
-		memcpy(IEEE80211_SKB_RXCB(newskb), status, sizeof(*status));
-		ieee80211_rx(priv->hw, newskb);
-	}
-
-	dev_kfree_skb_any(skb);
-
-	return true;
-}
-#endif
-
 static int mwl_rx_refill(struct mwl_priv *priv, struct mwl_rx_hndl *rx_hndl)
 {
 	struct mwl_desc_data *desc;
@@ -600,18 +528,6 @@ void mwl_rx_recv(unsigned long data)
 					mwl_rx_enable_sta_amsdu(priv, mgmt->sa);
 			}
 		}
-
-#ifdef CONFIG_MAC80211_MESH
-		if (ieee80211_is_data_qos(wh->frame_control) &&
-		    ieee80211_has_a4(wh->frame_control)) {
-			u8 *qc = ieee80211_get_qos_ctl(wh);
-
-			if (*qc & IEEE80211_QOS_CTL_A_MSDU_PRESENT)
-				if (mwl_rx_process_mesh_amsdu(priv, prx_skb,
-							      &status))
-					goto out;
-		}
-#endif
 
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
