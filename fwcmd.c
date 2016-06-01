@@ -48,16 +48,6 @@ static bool mwl_fwcmd_chk_adapter(struct mwl_priv *priv)
 
 static void mwl_fwcmd_send_cmd(struct mwl_priv *priv)
 {
-	if (priv->mfg_mode) {
-		struct cmd_header *cmd_hdr =
-			(struct cmd_header *)&priv->pcmd_buf[2];
-		u16 len = le16_to_cpu(cmd_hdr->len);
-
-		writel(priv->pphys_cmd_buf, priv->iobase1 + 0xcd0);
-		writel(0x00, priv->iobase1 + 0xcd4);
-		writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-		writel(len + 4, priv->iobase1 + 0xc40);
-	}
 	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
 	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
@@ -129,10 +119,7 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	unsigned short int_code = 0;
 
 	do {
-		if (priv->mfg_mode)
-			int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[2]));
-		else
-			int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
+		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
 		mdelay(1);
 	} while ((int_code != cmd) && (--curr_iteration));
 
@@ -847,9 +834,6 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 	int retry;
 	int i;
 
-	if (priv->mfg_mode)
-		return 0;
-
 	pcmd = (struct hostcmd_cmd_get_hw_spec *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
@@ -902,9 +886,6 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_hw_spec *pcmd;
 	int i;
-
-	if (priv->mfg_mode)
-		return 0;
 
 	pcmd = (struct hostcmd_cmd_set_hw_spec *)&priv->pcmd_buf[0];
 
@@ -982,9 +963,6 @@ int mwl_fwcmd_set_radio_preamble(struct ieee80211_hw *hw, bool short_preamble)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
-
-	if (priv->mfg_mode)
-		return 0;
 
 	priv->radio_short_preamble = short_preamble;
 	rc = mwl_fwcmd_802_11_radio_control(priv, true, true);
@@ -1245,9 +1223,6 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_802_11_rf_antenna *pcmd;
-
-	if (priv->mfg_mode)
-		return 0;
 
 	pcmd = (struct hostcmd_cmd_802_11_rf_antenna *)&priv->pcmd_buf[0];
 

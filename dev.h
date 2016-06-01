@@ -382,8 +382,6 @@ struct mwl_priv {
 	u32 quiet_period;
 	int temperature;
 
-	bool mfg_mode;
-
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_phy;
 	u32 reg_type;

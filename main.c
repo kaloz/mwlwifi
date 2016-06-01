@@ -31,9 +31,6 @@
 #ifdef CONFIG_DEBUG_FS
 #include "debugfs.h"
 #endif
-#ifdef SUPPORT_MFG
-#include "mfg.h"
-#endif
 
 #define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
 #define MWL_DEV_NAME     "Marvell 802.11ac Adapter"
@@ -208,32 +205,21 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 {
 	int rc = 0;
 
-#ifdef SUPPORT_MFG
-	if (priv->mfg_mode)
-		rc = mwl_mfg_request_firmware(priv);
-	else
-#endif
-		rc = request_firmware((const struct firmware **)&priv->fw_ucode,
-				      fw_name, priv->dev);
+	rc = request_firmware((const struct firmware **)&priv->fw_ucode,
+			      fw_name, priv->dev);
 
 	if (rc) {
-		if (priv->mfg_mode)
-			wiphy_err(priv->hw->wiphy, "cannot find firmware\n");
-		else
-			wiphy_err(priv->hw->wiphy,
-				  "%s: cannot find firmware image <%s>\n",
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot find firmware image <%s>\n",
 				  MWL_DRV_NAME, fw_name);
 		goto err_load_fw;
 	}
 
 	rc = mwl_fwdl_download_firmware(priv->hw);
 	if (rc) {
-		if (priv->mfg_mode)
-			wiphy_err(priv->hw->wiphy, "download firmware fail\n");
-		else
-			wiphy_err(priv->hw->wiphy,
-				  "%s: cannot download firmware image <%s>\n",
-				  MWL_DRV_NAME, fw_name);
+		wiphy_err(priv->hw->wiphy,
+			  "%s: cannot download firmware image <%s>\n",
+			  MWL_DRV_NAME, fw_name);
 		goto err_download_fw;
 	}
 
@@ -241,12 +227,7 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 err_download_fw:
 
-#ifdef SUPPORT_MFG
-	if (priv->mfg_mode)
-		mwl_mfg_release_firmware(priv);
-	else
-#endif
-		release_firmware(priv->fw_ucode);
+	release_firmware(priv->fw_ucode);
 
 err_load_fw:
 
@@ -813,11 +794,6 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	fw_name = mwl_chip_tbl[priv->chip_type].fw_image;
 
-#ifdef SUPPORT_MFG
-	if (mfg_mode)
-		mwl_mfg_handler_init(priv);
-#endif
-
 	rc = mwl_init_firmware(priv, fw_name);
 
 	if (rc) {
@@ -827,12 +803,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	/* firmware is loaded to H/W, it can be released now */
-#ifdef SUPPORT_MFG
-	if (priv->mfg_mode)
-		mwl_mfg_release_firmware(priv);
-	else
-#endif
-		release_firmware(priv->fw_ucode);
+	release_firmware(priv->fw_ucode);
 
 	mwl_process_of_dts(priv);
 

@@ -122,8 +122,6 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 "macid used: %08x\n", priv->macids_used);
 	len += scnprintf(p + len, size - len,
 			 "qe trigger number: %d\n", priv->qe_trigger_num);
-	len += scnprintf(p + len, size - len,
-			 "mfg mode: %s\n", priv->mfg_mode ? "true" : "false");
 	len += scnprintf(p + len, size - len, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
