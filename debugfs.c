@@ -438,11 +438,9 @@ static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 					 channel->hw_value,
 					 channel->center_freq,
 					 channel->flags, channel->dfs_state);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
 			len += scnprintf(p + len, size - len,
 					 "cac timer: %d ms\n",
 					 channel->dfs_cac_ms);
-#endif
 		}
 	}
 	len += scnprintf(p + len, size - len, "\n");
@@ -493,10 +491,8 @@ static ssize_t mwl_debugfs_dfs_channel_write(struct file *file,
 		channel = &sband->channels[i];
 		if (channel->flags & IEEE80211_CHAN_RADAR) {
 			channel->dfs_state = dfs_state;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
 			if (cac_time != -1)
 				channel->dfs_cac_ms = cac_time * 1000;
-#endif
 		}
 	}
 	ret = count;

@@ -509,10 +509,6 @@ static inline struct mwl_sta *mwl_dev_get_sta(const struct ieee80211_sta *sta)
 	return (struct mwl_sta *)&sta->drv_priv;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0)
-#define ether_addr_copy(dst, src) memcpy(dst, src, ETH_ALEN)
-#endif
-
 /* Defined in mac80211.c. */
 extern const struct ieee80211_ops mwl_mac80211_ops;
 

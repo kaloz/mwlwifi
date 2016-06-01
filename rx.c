@@ -232,10 +232,8 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 		status->flag |= RX_FLAG_VHT;
 		if (bw == RX_RATE_INFO_HT40)
 			status->flag |= RX_FLAG_40MHZ;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 18, 0)
 		if (bw == RX_RATE_INFO_HT80)
 			status->vht_flag |= RX_VHT_FLAG_80MHZ;
-#endif
 		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
 			status->flag |= RX_FLAG_SHORT_GI;
 		status->vht_nss = (nss + 1);

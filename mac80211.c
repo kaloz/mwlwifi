@@ -598,19 +598,11 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 0)
-static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
-				     struct ieee80211_vif *vif,
-				     enum ieee80211_ampdu_mlme_action action,
-				     struct ieee80211_sta *sta,
-				     u16 tid, u16 *ssn, u8 buf_size)
-#else
 static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif,
 				     enum ieee80211_ampdu_mlme_action action,
 				     struct ieee80211_sta *sta,
 				     u16 tid, u16 *ssn, u8 buf_size, bool amsdu)
-#endif
 {
 	int rc = 0;
 	struct mwl_priv *priv = hw->priv;
@@ -713,7 +705,6 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	return rc;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_channel_switch *ch_switch)
@@ -725,7 +716,6 @@ static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 
 	return rc;
 }
-#endif
 
 const struct ieee80211_ops mwl_mac80211_ops = {
 	.tx                 = mwl_mac80211_tx,
@@ -744,7 +734,5 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.get_stats          = mwl_mac80211_get_stats,
 	.get_survey         = mwl_mac80211_get_survey,
 	.ampdu_action       = mwl_mac80211_ampdu_action,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
 	.pre_channel_switch = mwl_mac80211_chnl_switch,
-#endif
 };
