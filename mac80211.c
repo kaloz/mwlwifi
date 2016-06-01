@@ -575,13 +575,15 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 
 static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				     struct ieee80211_vif *vif,
-				     enum ieee80211_ampdu_mlme_action action,
-				     struct ieee80211_sta *sta,
-				     u16 tid, u16 *ssn, u8 buf_size, bool amsdu)
+				     struct ieee80211_ampdu_params *params)
 {
 	int rc = 0;
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
+	enum ieee80211_ampdu_mlme_action action = params->action;
+	struct ieee80211_sta *sta = params->sta;
+	u16 tid = params->tid;
+	u8 buf_size = params->buf_size;
 	u8 *addr = sta->addr, idx;
 	struct mwl_sta *sta_info;
 
@@ -621,7 +623,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			break;
 		}
 		stream->state = AMPDU_STREAM_IN_PROGRESS;
-		*ssn = 0;
+		params->ssn = 0;
 		ieee80211_start_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_CONT:
@@ -634,6 +636,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, idx);
 				spin_lock_bh(&priv->stream_lock);
+				sta_info->is_amsdu_allowed = false;
 			}
 
 			mwl_fwcmd_remove_stream(hw, stream);
@@ -656,6 +659,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			if (!rc) {
 				stream->state = AMPDU_STREAM_ACTIVE;
 				sta_info->check_ba_failed[tid] = 0;
+				sta_info->is_amsdu_allowed = params->amsdu;
 			} else {
 				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);
