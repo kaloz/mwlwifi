@@ -66,7 +66,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	/* FW before jumping to boot rom, it will enable PCIe transaction retry,
 	 * wait for boot code to stop it.
 	 */
-	mdelay(FW_CHECK_MSECS);
+	usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
 
 	writel(MACREG_A2HRIC_BIT_MASK,
 	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
@@ -87,7 +87,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
 	while (readl(priv->iobase1 + 0xc40) == 0)
-		;
+		cond_resched();
 
 	while (size_fw_downloaded < fw->size) {
 		len = readl(priv->iobase1 + 0xc40);
@@ -117,6 +117,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 			int_code = readl(priv->iobase1 + 0xc1c);
 			if (int_code != 0)
 				break;
+			cond_resched();
 			curr_iteration--;
 		} while (curr_iteration);
 
@@ -125,6 +126,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
 			    MACREG_H2ARIC_BIT_DOOR_BELL)
 				break;
+			cond_resched();
 			curr_iteration--;
 		} while (curr_iteration);
 
@@ -158,7 +160,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		curr_iteration--;
 		writel(HOSTCMD_SOFTAP_MODE,
 		       priv->iobase1 + MACREG_REG_GEN_PTR);
-		mdelay(FW_CHECK_MSECS);
+		usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
 		int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
 		if (!(curr_iteration % 0xff) && (int_code != 0))
 			wiphy_err(hw->wiphy, "%x;", int_code);

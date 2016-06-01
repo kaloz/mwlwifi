@@ -120,7 +120,7 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 
 	do {
 		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
-		mdelay(1);
+		usleep_range(1000, 2000);
 	} while ((int_code != cmd) && (--curr_iteration));
 
 	if (curr_iteration == 0) {
@@ -130,7 +130,7 @@ static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 		return -EIO;
 	}
 
-	mdelay(3);
+	usleep_range(3000, 5000);
 
 	return 0;
 }
