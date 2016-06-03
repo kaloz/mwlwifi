@@ -1,7 +1,7 @@
 # mwlwifi
 mac80211 driver for the Marvell 88W8864 802.11ac chip
 
-1. How to build mwlwifi with OpenWrt:
+* How to build mwlwifi with OpenWrt:
 
 10.3.0.17-20160601 had been modified to be built with latest backports package "compat-wireless-2016-01-10" without patches.
 
@@ -17,4 +17,4 @@ c. make package/kernel/mwlwifi/clean
 
 d. make V=s (-jx)
 
-2. For driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
+* For driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
