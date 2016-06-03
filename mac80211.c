@@ -473,6 +473,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 			sta_info->amsdu_ctrl.cap = MWL_AMSDU_SIZE_8K;
 		else
 			sta_info->amsdu_ctrl.cap = MWL_AMSDU_SIZE_4K;
+		if ((sta->tdls) && (!sta->wme))
+			sta->wme = true;
 	}
 	sta_info->iv16 = 1;
 	sta_info->iv32 = 0;
