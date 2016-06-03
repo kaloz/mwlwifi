@@ -419,7 +419,7 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 {
 	band->vht_cap.vht_supported = 1;
 
-	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_7991;
+	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
