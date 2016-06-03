@@ -2572,6 +2572,14 @@ int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data)
 		return -EIO;
 	}
 
+	pcmd->ie_type = WSC_IE_SET_PROBE_RESPONSE;
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WSC_IE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
 	mutex_unlock(&priv->fwcmd_mutex);
 
 	return 0;

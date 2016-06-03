@@ -129,6 +129,8 @@
 
 /* Misc */
 #define WSC_IE_MAX_LENGTH                       251
+#define WSC_IE_SET_BEACON                       0
+#define WSC_IE_SET_PROBE_RESPONSE               1
 
 enum {
 	WL_DISABLE = 0,
