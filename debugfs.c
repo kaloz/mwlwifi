@@ -255,7 +255,8 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 		}
 		len += scnprintf(p + len, size - len, "rx_bw: %d, rx_nss: %d\n",
 				 sta->bandwidth, sta->rx_nss);
-		len += scnprintf(p + len, size - len, "tdls: %d, tdls_init: %d\n",
+		len += scnprintf(p + len, size - len,
+				 "tdls: %d, tdls_init: %d\n",
 				 sta->tdls, sta->tdls_initiator);
 		len += scnprintf(p + len, size - len, "wme: %d, mfp: %d\n",
 				 sta->wme, sta->mfp);
@@ -382,9 +383,7 @@ static ssize_t mwl_debugfs_tx_desc_write(struct file *file,
 		goto err;
 	}
 
-	ret = sscanf(buf, "%d", &tx_desc_num);
-
-	if (ret != 1) {
+	if (kstrtoint(buf, 0, &tx_desc_num)) {
 		ret = -EINVAL;
 		goto err;
 	}
