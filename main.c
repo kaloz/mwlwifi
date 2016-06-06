@@ -60,20 +60,20 @@ static struct mwl_chip_info mwl_chip_tbl[] = {
 };
 
 static const struct ieee80211_channel mwl_channels_24[] = {
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2412, .hw_value = 1, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2417, .hw_value = 2, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2422, .hw_value = 3, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2427, .hw_value = 4, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2432, .hw_value = 5, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2437, .hw_value = 6, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2442, .hw_value = 7, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2447, .hw_value = 8, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2452, .hw_value = 9, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2457, .hw_value = 10, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2462, .hw_value = 11, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2467, .hw_value = 12, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2472, .hw_value = 13, },
-	{ .band = IEEE80211_BAND_2GHZ, .center_freq = 2484, .hw_value = 14, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2412, .hw_value = 1, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2417, .hw_value = 2, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2422, .hw_value = 3, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2427, .hw_value = 4, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2432, .hw_value = 5, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2437, .hw_value = 6, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2442, .hw_value = 7, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2447, .hw_value = 8, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2452, .hw_value = 9, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2457, .hw_value = 10, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2462, .hw_value = 11, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2467, .hw_value = 12, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2472, .hw_value = 13, },
+	{ .band = NL80211_BAND_2GHZ, .center_freq = 2484, .hw_value = 14, },
 };
 
 static const struct ieee80211_rate mwl_rates_24[] = {
@@ -93,30 +93,30 @@ static const struct ieee80211_rate mwl_rates_24[] = {
 };
 
 static const struct ieee80211_channel mwl_channels_50[] = {
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5180, .hw_value = 36, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5200, .hw_value = 40, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5220, .hw_value = 44, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5240, .hw_value = 48, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5260, .hw_value = 52, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5280, .hw_value = 56, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5300, .hw_value = 60, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5320, .hw_value = 64, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5500, .hw_value = 100, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5520, .hw_value = 104, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5540, .hw_value = 108, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5560, .hw_value = 112, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5580, .hw_value = 116, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5600, .hw_value = 120, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5620, .hw_value = 124, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5640, .hw_value = 128, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5660, .hw_value = 132, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5680, .hw_value = 136, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5700, .hw_value = 140, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5720, .hw_value = 144, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5745, .hw_value = 149, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5765, .hw_value = 153, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5785, .hw_value = 157, },
-	{ .band = IEEE80211_BAND_5GHZ, .center_freq = 5805, .hw_value = 161, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5180, .hw_value = 36, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5200, .hw_value = 40, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5220, .hw_value = 44, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5240, .hw_value = 48, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5260, .hw_value = 52, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5280, .hw_value = 56, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5300, .hw_value = 60, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5320, .hw_value = 64, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5500, .hw_value = 100, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5520, .hw_value = 104, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5540, .hw_value = 108, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5560, .hw_value = 112, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5580, .hw_value = 116, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5600, .hw_value = 120, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5620, .hw_value = 124, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5640, .hw_value = 128, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5660, .hw_value = 132, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5680, .hw_value = 136, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5700, .hw_value = 140, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5720, .hw_value = 144, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5745, .hw_value = 149, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5765, .hw_value = 153, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5785, .hw_value = 157, },
+	{ .band = NL80211_BAND_5GHZ, .center_freq = 5805, .hw_value = 161, },
 };
 
 static const struct ieee80211_rate mwl_rates_50[] = {
@@ -456,7 +456,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		BUILD_BUG_ON(sizeof(priv->rates_24) != sizeof(mwl_rates_24));
 		memcpy(priv->rates_24, mwl_rates_24, sizeof(mwl_rates_24));
 
-		priv->band_24.band = IEEE80211_BAND_2GHZ;
+		priv->band_24.band = NL80211_BAND_2GHZ;
 		priv->band_24.channels = priv->channels_24;
 		priv->band_24.n_channels = ARRAY_SIZE(mwl_channels_24);
 		priv->band_24.bitrates = priv->rates_24;
@@ -465,7 +465,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		mwl_set_ht_caps(priv, &priv->band_24);
 		mwl_set_vht_caps(priv, &priv->band_24);
 
-		hw->wiphy->bands[IEEE80211_BAND_2GHZ] = &priv->band_24;
+		hw->wiphy->bands[NL80211_BAND_2GHZ] = &priv->band_24;
 	}
 
 	/* set up band information for 5G */
@@ -478,7 +478,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		BUILD_BUG_ON(sizeof(priv->rates_50) != sizeof(mwl_rates_50));
 		memcpy(priv->rates_50, mwl_rates_50, sizeof(mwl_rates_50));
 
-		priv->band_50.band = IEEE80211_BAND_5GHZ;
+		priv->band_50.band = NL80211_BAND_5GHZ;
 		priv->band_50.channels = priv->channels_50;
 		priv->band_50.n_channels = ARRAY_SIZE(mwl_channels_50);
 		priv->band_50.bitrates = priv->rates_50;
@@ -487,7 +487,7 @@ static void mwl_set_caps(struct mwl_priv *priv)
 		mwl_set_ht_caps(priv, &priv->band_50);
 		mwl_set_vht_caps(priv, &priv->band_50);
 
-		hw->wiphy->bands[IEEE80211_BAND_5GHZ] = &priv->band_50;
+		hw->wiphy->bands[NL80211_BAND_5GHZ] = &priv->band_50;
 	}
 }
 

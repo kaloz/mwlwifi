@@ -243,7 +243,7 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 	status->rate_idx = rt;
 
 	if (pdesc->channel > BAND_24_CHANNEL_NUM) {
-		status->band = IEEE80211_BAND_5GHZ;
+		status->band = NL80211_BAND_5GHZ;
 		if ((!(status->flag & RX_FLAG_HT)) &&
 		    (!(status->flag & RX_FLAG_VHT))) {
 			status->rate_idx -= 5;
@@ -251,7 +251,7 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 				status->rate_idx = BAND_50_RATE_NUM - 1;
 		}
 	} else {
-		status->band = IEEE80211_BAND_2GHZ;
+		status->band = NL80211_BAND_2GHZ;
 		if ((!(status->flag & RX_FLAG_HT)) &&
 		    (!(status->flag & RX_FLAG_VHT))) {
 			if (status->rate_idx >= BAND_24_RATE_NUM)

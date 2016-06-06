@@ -697,9 +697,9 @@ static int mwl_fwcmd_set_country_code(struct mwl_priv *priv,
 	bool enable = false;
 
 	if (b_inf->ie_country_ptr) {
-		if (bss_conf->chandef.chan->band == IEEE80211_BAND_2GHZ)
+		if (bss_conf->chandef.chan->band == NL80211_BAND_2GHZ)
 			a_band = false;
-		else if (bss_conf->chandef.chan->band == IEEE80211_BAND_5GHZ)
+		else if (bss_conf->chandef.chan->band == NL80211_BAND_5GHZ)
 			a_band = true;
 		else
 			return -EINVAL;
@@ -1033,9 +1033,9 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 		break;
 	}
 
-	if (channel->band == IEEE80211_BAND_2GHZ)
+	if (channel->band == NL80211_BAND_2GHZ)
 		band = FREQ_BAND_2DOT4GHZ;
-	else if (channel->band == IEEE80211_BAND_5GHZ)
+	else if (channel->band == NL80211_BAND_5GHZ)
 		band = FREQ_BAND_5GHZ;
 
 	switch (conf->chandef.width) {
@@ -1119,9 +1119,9 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 		break;
 	}
 
-	if (channel->band == IEEE80211_BAND_2GHZ)
+	if (channel->band == NL80211_BAND_2GHZ)
 		band = FREQ_BAND_2DOT4GHZ;
-	else if (channel->band == IEEE80211_BAND_5GHZ)
+	else if (channel->band == NL80211_BAND_5GHZ)
 		band = FREQ_BAND_5GHZ;
 
 	switch (conf->chandef.width) {
@@ -1309,9 +1309,9 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 	pcmd->action = cpu_to_le16(WL_SET);
 	pcmd->curr_chnl = channel->hw_value;
 
-	if (channel->band == IEEE80211_BAND_2GHZ) {
+	if (channel->band == NL80211_BAND_2GHZ) {
 		freq_band = FREQ_BAND_2DOT4GHZ;
-	} else if (channel->band == IEEE80211_BAND_5GHZ) {
+	} else if (channel->band == NL80211_BAND_5GHZ) {
 		freq_band = FREQ_BAND_5GHZ;
 	} else {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -1881,10 +1881,10 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	}
 	ether_addr_copy(pcmd->mac_addr, sta->addr);
 
-	if (hw->conf.chandef.chan->band == IEEE80211_BAND_2GHZ)
-		rates = sta->supp_rates[IEEE80211_BAND_2GHZ];
+	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
+		rates = sta->supp_rates[NL80211_BAND_2GHZ];
 	else
-		rates = sta->supp_rates[IEEE80211_BAND_5GHZ] << 5;
+		rates = sta->supp_rates[NL80211_BAND_5GHZ] << 5;
 	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
 
 	if (sta->ht_cap.ht_supported) {
@@ -2040,9 +2040,9 @@ int mwl_fwcmd_set_switch_channel(struct mwl_priv *priv,
 	if (priv->csa_active)
 		return 0;
 
-	if (channel->band == IEEE80211_BAND_2GHZ)
+	if (channel->band == NL80211_BAND_2GHZ)
 		freq_band = FREQ_BAND_2DOT4GHZ;
-	else if (channel->band == IEEE80211_BAND_5GHZ)
+	else if (channel->band == NL80211_BAND_5GHZ)
 		freq_band = FREQ_BAND_5GHZ;
 	else
 		return -EINVAL;
