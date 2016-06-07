@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.0.17-20160603"
+#define MWL_DRV_VERSION	 "10.3.0.17-20160607"
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -363,7 +363,7 @@ struct mwl_priv {
 	/* ampdu stream information */
 	/* for ampdu stream */
 	struct {
-		spinlock_t stream_lock;
+		spinlock_t stream_lock;      /* for BA stream               */
 		struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
 	} ____cacheline_aligned_in_smp;
 	struct work_struct watchdog_ba_handle;
@@ -461,7 +461,7 @@ struct mwl_sta {
 	bool is_amsdu_allowed;
 	/* for amsdu aggregation */
 	struct {
-		spinlock_t amsdu_lock;
+		spinlock_t amsdu_lock;   /* for amsdu */
 		struct mwl_amsdu_ctrl amsdu_ctrl;
 	} ____cacheline_aligned_in_smp;
 	u16 iv16;
