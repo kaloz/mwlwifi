@@ -21,24 +21,15 @@
 #include "isr.h"
 
 #define INVALID_WATCHDOG 0xAA
-#ifdef BG4CT_A0_WORKAROUND
-#define MAX_ISR_ITERATION 2
-#endif
 
 irqreturn_t mwl_isr(int irq, void *dev_id)
 {
 	struct ieee80211_hw *hw = dev_id;
 	struct mwl_priv *priv = hw->priv;
 	void __iomem *int_status_mask;
-#ifdef BG4CT_A0_WORKAROUND
-	unsigned int currIteration = 0;
-#endif
 	u32 int_status;
 	u32 status;
 
-#ifdef BG4CT_A0_WORKAROUND
-	do {
-#endif
 	int_status_mask = priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 
 	int_status = readl(priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
@@ -98,11 +89,7 @@ irqreturn_t mwl_isr(int irq, void *dev_id)
 
 		if (int_status & MACREG_A2HRIC_BA_WATCHDOG)
 			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
-
 	}
-#ifdef BG4CT_A0_WORKAROUND
-	} while (currIteration++ < MAX_ISR_ITERATION);
-#endif
 
 	return IRQ_HANDLED;
 }
