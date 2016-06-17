@@ -798,7 +798,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			qos |= MWL_QOS_ACK_POLICY_NORMAL;
 		}
 
-		if (is_multicast_ether_addr(wh->addr1))
+		if (is_multicast_ether_addr(wh->addr1) || eapol_frame)
 			xmitcontrol |= EAGLE_TXD_XMITCTRL_USE_MC_RATE;
 	}
 
