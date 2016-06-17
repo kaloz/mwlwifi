@@ -492,6 +492,20 @@ void mwl_rx_recv(unsigned long data)
 		skb_put(prx_skb, pkt_len);
 		mwl_rx_remove_dma_header(prx_skb, curr_hndl->pdesc->qos_ctrl);
 
+		wh = (struct ieee80211_hdr *)prx_skb->data;
+
+		if (ieee80211_is_data_qos(wh->frame_control)) {
+			const u8 eapol[] = {0x88, 0x8e};
+			u8 *qc = ieee80211_get_qos_ctl(wh);
+			u8 *data;
+
+			data = prx_skb->data +
+				ieee80211_hdrlen(wh->frame_control) + 6;
+
+			if (!memcmp(data, eapol, sizeof(eapol)))
+				*qc |= 7;
+		}
+
 		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
 out:
