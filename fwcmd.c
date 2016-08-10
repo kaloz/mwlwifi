@@ -101,6 +101,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
+		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
+		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 	};
 
@@ -1012,7 +1014,10 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 	u16 band = 0, width = 0, sub_ch = 0;
 	u16 maxtxpow[SYSADPT_TX_POWER_LEVEL_TOTAL];
 	int i, tmp;
-	int rc;
+	int rc = 0;
+
+	if (priv->forbidden_setting)
+		return rc;
 
 	switch (fraction) {
 	case 0:
@@ -1098,7 +1103,10 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	u16 txpow[SYSADPT_TX_POWER_LEVEL_TOTAL];
 	int index, found = 0;
 	int i, tmp;
-	int rc;
+	int rc = 0;
+
+	if (priv->forbidden_setting)
+		return rc;
 
 	switch (fraction) {
 	case 0:
@@ -1351,6 +1359,11 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
+	}
+
+	if (pcmd->cmd_hdr.result != 0) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EINVAL;
 	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
@@ -2684,6 +2697,83 @@ int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
 	mutex_unlock(&priv->fwcmd_mutex);
 
 	return 0;
+}
+
+int mwl_fwcmd_get_fw_region_code(struct ieee80211_hw *hw,
+				 u32 *fw_region_code)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_fw_region_code *pcmd;
+	int status;
+
+	pcmd = (struct hostcmd_cmd_get_fw_region_code *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_FW_REGION_CODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_FW_REGION_CODE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	if (pcmd->cmd_hdr.result != 0) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EINVAL;
+	}
+
+	status = le32_to_cpu(pcmd->status);
+
+	if (!status)
+		*fw_region_code = le32_to_cpu(pcmd->fw_region_code);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
+				 struct mwl_device_pwr_tbl *device_ch_pwrtbl,
+				 u8 *region_code,
+				 u8 *number_of_channels,
+				 u32 channel_index)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_device_pwr_tbl *pcmd;
+	int status;
+
+	pcmd = (struct hostcmd_cmd_get_device_pwr_tbl *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_DEVICE_PWR_TBL);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->status = cpu_to_le16(HOSTCMD_CMD_GET_DEVICE_PWR_TBL);
+	pcmd->current_channel_index = cpu_to_le32(channel_index);
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_DEVICE_PWR_TBL)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	device_ch_pwrtbl->channel = pcmd->channel_pwr_tbl.channel;
+	memcpy(device_ch_pwrtbl->tx_pwr, pcmd->channel_pwr_tbl.tx_pwr,
+	       SYSADPT_TX_POWER_LEVEL_TOTAL);
+	device_ch_pwrtbl->dfs_capable = pcmd->channel_pwr_tbl.dfs_capable;
+	device_ch_pwrtbl->ax_ant = pcmd->channel_pwr_tbl.ax_ant;
+	device_ch_pwrtbl->cdd = pcmd->channel_pwr_tbl.cdd;
+	*region_code = pcmd->region_code;
+	*number_of_channels = pcmd->number_of_channels;
+	status = le16_to_cpu(pcmd->status);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return status;
 }
 
 int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,

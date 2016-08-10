@@ -147,6 +147,14 @@ struct mwl_chip_info {
 	int antenna_rx;
 };
 
+struct mwl_device_pwr_tbl {
+	u8 channel;
+	u8 tx_pwr[SYSADPT_TX_POWER_LEVEL_TOTAL];
+	u8 dfs_capable;
+	u8 ax_ant;
+	u8 cdd;
+};
+
 struct mwl_tx_pwr_tbl {
 	u8 channel;
 	u8 setcap;
@@ -278,6 +286,13 @@ struct mwl_ampdu_stream {
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	struct firmware *fw_ucode;
+	bool fw_device_pwrtbl;
+	bool forbidden_setting;
+	bool regulatory_set;
+	u32 fw_region_code;
+	char fw_alpha2[2];
+	u8 number_of_channels;
+	struct mwl_device_pwr_tbl device_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
 	int chip_type;
 
 	struct device_node *dt_node;
@@ -293,7 +308,6 @@ struct mwl_priv {
 	u8 powinited;
 	u16 max_tx_pow[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* max tx power (dBm) */
 	u16 target_powers[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* target powers   */
-	u8 cal_tbl[200];
 
 	struct pci_dev *pdev;
 	struct device *dev;

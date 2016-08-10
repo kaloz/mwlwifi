@@ -99,6 +99,11 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len, "firmware version: 0x%08x\n",
 			 priv->hw_data.fw_release_num);
 	len += scnprintf(p + len, size - len,
+			 "power table loaded from dts: %s\n",
+			 priv->forbidden_setting ? "no" : "yes");
+	len += scnprintf(p + len, size - len, "firmware region code: 0x%x\n",
+			 priv->fw_region_code);
+	len += scnprintf(p + len, size - len,
 			 "mac address: %pM\n", priv->hw_data.mac_addr);
 	len += scnprintf(p + len, size - len,
 			 "2g: %s\n", priv->disable_2g ? "disable" : "enable");
@@ -320,6 +325,49 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 		}
 	}
 	spin_unlock_bh(&priv->sta_lock);
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_device_pwrtbl_read(struct file *file,
+					      char __user *ubuf,
+					      size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	int i, j;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len,
+			 "power table loaded from dts: %s\n",
+			 priv->forbidden_setting ? "no" : "yes");
+	len += scnprintf(p + len, size - len, "firmware region code: 0x%x\n",
+			 priv->fw_region_code);
+	len += scnprintf(p + len, size - len, "number of channel: %d\n",
+			 priv->number_of_channels);
+	for (i = 0; i < priv->number_of_channels; i++) {
+		len += scnprintf(p + len, size - len, "%3d ",
+				 priv->device_pwr_tbl[i].channel);
+		for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL; j++)
+			len += scnprintf(p + len, size - len, "%3d ",
+					 priv->device_pwr_tbl[i].tx_pwr[j]);
+		len += scnprintf(p + len, size - len, "%3d ",
+				 priv->device_pwr_tbl[i].dfs_capable);
+		len += scnprintf(p + len, size - len, "%3d ",
+				 priv->device_pwr_tbl[i].ax_ant);
+		len += scnprintf(p + len, size - len, "%3d\n",
+				 priv->device_pwr_tbl[i].cdd);
+	}
 	len += scnprintf(p + len, size - len, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
@@ -746,6 +794,7 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(info);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
+MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
 MWLWIFI_DEBUGFS_FILE_OPS(tx_desc);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
@@ -767,6 +816,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(vif);
 	MWLWIFI_DEBUGFS_ADD_FILE(sta);
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
+	MWLWIFI_DEBUGFS_ADD_FILE(device_pwrtbl);
 	MWLWIFI_DEBUGFS_ADD_FILE(tx_desc);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);

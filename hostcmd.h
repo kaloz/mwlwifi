@@ -60,6 +60,8 @@
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
+#define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
+#define HOSTCMD_CMD_GET_DEVICE_PWR_TBL          0x116B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
 
 /* Define general result code for each command */
@@ -868,6 +870,34 @@ struct hostcmd_cmd_get_temp {
 	struct hostcmd_header cmd_hdr;
 	__le32 celcius;
 	__le32 raw_data;
+} __packed;
+
+/* HOSTCMD_CMD_GET_FW_REGION_CODE */
+struct hostcmd_cmd_get_fw_region_code {
+	struct hostcmd_header cmd_hdr;
+	__le32 status; /* 0 = Found, 1 = Error */
+	__le32 fw_region_code;
+} __packed;
+
+/* HOSTCMD_CMD_GET_DEVICE_PWR_TBL */
+#define HAL_TRPC_ID_MAX    16
+
+struct channel_power_tbl {
+	u8 channel;
+	u8 tx_pwr[HAL_TRPC_ID_MAX];
+	u8 dfs_capable;
+	u8 ax_ant;
+	u8 cdd;
+} __packed;
+
+struct hostcmd_cmd_get_device_pwr_tbl {
+	struct hostcmd_header cmd_hdr;
+	__le16 status; /* 0 = Found, 1 = Error */
+	u8 region_code;
+	u8 number_of_channels;
+	__le32 current_channel_index;
+	/* Only for 1 channel, so, 1 channel at a time */
+	struct channel_power_tbl channel_pwr_tbl;
 } __packed;
 
 /* HOSTCMD_CMD_QUIET_MODE */

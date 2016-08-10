@@ -146,6 +146,23 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 				BIT(NL80211_CHAN_WIDTH_80),
 };
 
+struct region_code_mapping {
+	const char *alpha2;
+	u32 region_code;
+};
+
+static const struct region_code_mapping regmap[] = {
+	{"US", 0x10}, /* US FCC */
+	{"CA", 0x20}, /* Canada */
+	{"EU", 0x30}, /* ETSI   */
+	{"ES", 0x31}, /* Spain  */
+	{"FR", 0x32}, /* France */
+	{"JP", 0x40}, /* Japan  */
+	{"TW", 0x80}, /* Taiwan */
+	{"AU", 0x81}, /* Australia */
+	{"CN", 0x90}, /* China (Asia) */
+};
+
 static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 {
 	struct pci_dev *pdev = priv->pdev;
@@ -252,6 +269,17 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 
 	hw = (struct ieee80211_hw *)wiphy_priv(wiphy);
 	priv = hw->priv;
+
+	if (priv->forbidden_setting) {
+		if (!priv->regulatory_set) {
+			regulatory_hint(wiphy, priv->fw_alpha2);
+			priv->regulatory_set = true;
+		} else {
+			if (memcmp(priv->fw_alpha2, request->alpha2, 2))
+				regulatory_hint(wiphy, priv->fw_alpha2);
+		}
+		return;
+	}
 
 	priv->dfs_region = request->dfs_region;
 
@@ -492,6 +520,37 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	}
 }
 
+static void mwl_regd_init(struct mwl_priv *priv)
+{
+	u8 region_code;
+	int i;
+
+	/* hook regulatory domain change notification */
+	priv->hw->wiphy->reg_notifier = mwl_reg_notifier;
+
+	if (mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+					 &priv->device_pwr_tbl[0],
+					 &region_code,
+					 &priv->number_of_channels,
+					 0))
+		return;
+
+	priv->forbidden_setting = true;
+
+	for (i = 0; i < priv->number_of_channels; i++)
+		mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+					     &priv->device_pwr_tbl[i],
+					     &region_code,
+					     &priv->number_of_channels,
+					     i);
+
+	for (i = 0; i < ARRAY_SIZE(regmap); i++)
+		if (regmap[i].region_code == priv->fw_region_code) {
+			memcpy(priv->fw_alpha2, regmap[i].alpha2, 2);
+			break;
+		}
+}
+
 static void timer_routine(unsigned long data)
 {
 	struct mwl_priv *priv = (struct mwl_priv *)data;
@@ -655,6 +714,13 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	wiphy_info(hw->wiphy,
 		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
 
+	if (!mwl_fwcmd_get_fw_region_code(hw, &priv->fw_region_code)) {
+		priv->fw_device_pwrtbl = true;
+		mwl_regd_init(priv);
+		wiphy_info(hw->wiphy,
+			   "firmware region code: %x\n", priv->fw_region_code);
+	}
+
 	mwl_fwcmd_radio_disable(hw);
 
 	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, priv->antenna_tx);
@@ -774,9 +840,6 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_pci_disable_device;
 	}
 
-	/* hook regulatory domain change notification */
-	hw->wiphy->reg_notifier = mwl_reg_notifier;
-
 	pci_set_drvdata(pdev, hw);
 
 	priv = hw->priv;
@@ -784,6 +847,9 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	priv->pdev = pdev;
 	priv->dev = &pdev->dev;
 	priv->chip_type = id->driver_data;
+	priv->fw_device_pwrtbl = false;
+	priv->forbidden_setting = false;
+	priv->regulatory_set = false;
 	priv->disable_2g = false;
 	priv->disable_5g = false;
 	priv->antenna_tx = mwl_chip_tbl[priv->chip_type].antenna_tx;
