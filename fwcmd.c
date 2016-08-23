@@ -1901,10 +1901,16 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
 
 	if (sta->ht_cap.ht_supported) {
-		pcmd->peer_info.ht_rates[0] = sta->ht_cap.mcs.rx_mask[0];
-		pcmd->peer_info.ht_rates[1] = sta->ht_cap.mcs.rx_mask[1];
-		pcmd->peer_info.ht_rates[2] = sta->ht_cap.mcs.rx_mask[2];
-		pcmd->peer_info.ht_rates[3] = sta->ht_cap.mcs.rx_mask[3];
+		int i;
+
+		for (i = 0; i < 4; i++) {
+			if (i < sta->rx_nss) {
+				pcmd->peer_info.ht_rates[i] =
+					sta->ht_cap.mcs.rx_mask[i];
+			} else {
+				pcmd->peer_info.ht_rates[i] = 0;
+			}
+		}
 		pcmd->peer_info.ht_cap_info = cpu_to_le16(sta->ht_cap.cap);
 		pcmd->peer_info.mac_ht_param_info =
 			(sta->ht_cap.ampdu_factor & 3) |
@@ -1912,9 +1918,13 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	}
 
 	if (sta->vht_cap.vht_supported) {
+		u32 rx_mcs_map_mask = 0;
+
+		rx_mcs_map_mask = ((0x0000FFFF) >> (sta->rx_nss * 2))
+			<< (sta->rx_nss * 2);
 		pcmd->peer_info.vht_max_rx_mcs =
-			cpu_to_le32(*((u32 *)
-			&sta->vht_cap.vht_mcs.rx_mcs_map));
+			cpu_to_le32((*((u32 *)
+			&sta->vht_cap.vht_mcs.rx_mcs_map)) | rx_mcs_map_mask);
 		pcmd->peer_info.vht_cap = cpu_to_le32(sta->vht_cap.cap);
 		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
 	}
