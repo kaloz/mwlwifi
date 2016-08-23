@@ -1877,8 +1877,9 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
 	if (vif->type == NL80211_IFTYPE_STATION) {
-		pcmd->aid = 0;
-		pcmd->stn_id = 0;
+		pcmd->aid = 1;
+		pcmd->stn_id = 1;
+		pcmd->reserved = 1;
 	} else {
 		pcmd->aid = cpu_to_le16(sta->aid);
 		pcmd->stn_id = cpu_to_le16(sta->aid);
@@ -1931,7 +1932,9 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
-
+		pcmd->aid = 2;
+		pcmd->stn_id = 2;
+		pcmd->reserved = 0;
 		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			wiphy_err(hw->wiphy, "failed execution\n");
