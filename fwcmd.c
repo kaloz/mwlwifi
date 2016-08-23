@@ -1473,19 +1473,10 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 
 	pcmd->action = cpu_to_le16(0xffff);
 	pcmd->txop = cpu_to_le16(txop);
-	pcmd->cw_max = cpu_to_le32(ilog2(cw_max + 1));
-	pcmd->cw_min = cpu_to_le32(ilog2(cw_min + 1));
+	pcmd->cw_max = cpu_to_le32(cw_max);
+	pcmd->cw_min = cpu_to_le32(cw_min);
 	pcmd->aifsn = aifs;
 	pcmd->txq_num = index;
-
-	/* The array index defined in qos.h has a reversed bk and be.
-	 * The HW queue was not used this way; the qos code needs to
-	 * be changed or checked
-	 */
-	if (index == 0)
-		pcmd->txq_num = 1;
-	else if (index == 1)
-		pcmd->txq_num = 0;
 
 	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_EDCA_PARAMS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
