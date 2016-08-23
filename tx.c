@@ -839,7 +839,7 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 				len = *pos++;
 				while (len) {
 					if (hw->conf.chandef.chan->band
-					    == IEEE80211_BAND_2GHZ) {
+					    == NL80211_BAND_2GHZ) {
 						if ((*pos == 2) ||
 						    (*pos == 4) ||
 						    (*pos == 11) ||
