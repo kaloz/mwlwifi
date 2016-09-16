@@ -41,6 +41,7 @@
 static struct pci_device_id mwl_pci_id_tbl[] = {
 	{ PCI_VDEVICE(MARVELL, 0x2a55), .driver_data = MWL8864, },
 	{ PCI_VDEVICE(MARVELL, 0x2b38), .driver_data = MWL8897, },
+	{ PCI_VDEVICE(MARVELL, 0x2b40), .driver_data = MWL8964, },
 	{ },
 };
 
@@ -56,6 +57,12 @@ static struct mwl_chip_info mwl_chip_tbl[] = {
 		.fw_image	= "mwlwifi/88W8897.bin",
 		.antenna_tx	= ANTENNA_TX_2,
 		.antenna_rx	= ANTENNA_RX_2,
+	},
+	[MWL8964] = {
+		.part_name	= "88W8964",
+		.fw_image	= "mwlwifi/88W8964.bin",
+		.antenna_tx	= ANTENNA_TX_4_AUTO,
+		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
 };
 
@@ -143,7 +150,8 @@ static const struct ieee80211_iface_combination ap_if_comb = {
 	.radar_detect_widths =	BIT(NL80211_CHAN_WIDTH_20_NOHT) |
 				BIT(NL80211_CHAN_WIDTH_20) |
 				BIT(NL80211_CHAN_WIDTH_40) |
-				BIT(NL80211_CHAN_WIDTH_80),
+				BIT(NL80211_CHAN_WIDTH_80) |
+				BIT(NL80211_CHAN_WIDTH_160),
 };
 
 struct region_code_mapping {

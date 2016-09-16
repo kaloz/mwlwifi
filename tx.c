@@ -51,6 +51,7 @@
 #define TX_RATE_BANDWIDTH_20          0
 #define TX_RATE_BANDWIDTH_40          1
 #define TX_RATE_BANDWIDTH_80          2
+#define TX_RATE_BANDWIDTH_160         3
 
 #define TX_RATE_INFO_STD_GI           0
 #define TX_RATE_INFO_SHORT_GI         1
@@ -672,6 +673,9 @@ static inline void mwl_tx_prepare_info(struct ieee80211_hw *hw, u32 rate,
 		if (bandwidth == TX_RATE_BANDWIDTH_80)
 			info->status.rates[0].flags |=
 				IEEE80211_TX_RC_80_MHZ_WIDTH;
+		if (bandwidth == TX_RATE_BANDWIDTH_160)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_160_MHZ_WIDTH;
 		if (short_gi == TX_RATE_INFO_SHORT_GI)
 			info->status.rates[0].flags |=
 				IEEE80211_TX_RC_SHORT_GI;

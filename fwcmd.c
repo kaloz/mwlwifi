@@ -103,6 +103,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
+		{ HOSTCMD_CMD_GET_FW_REGION_CODE_SC4, "GetFwRegionCodeSC4" },
+		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 	};
 
@@ -345,6 +347,64 @@ static u8 mwl_fwcmd_get_80m_pri_chnl(u8 channel)
 		break;
 	case 161:
 		act_primary = ACT_PRIMARY_CHAN_3;
+		break;
+	}
+
+	return act_primary;
+}
+
+static u8 mwl_fwcmd_get_160m_pri_chnl(u8 channel)
+{
+	u8 act_primary = ACT_PRIMARY_CHAN_0;
+
+	switch (channel) {
+	case 36:
+		act_primary = ACT_PRIMARY_CHAN_0;
+		break;
+	case 40:
+		act_primary = ACT_PRIMARY_CHAN_1;
+		break;
+	case 44:
+		act_primary = ACT_PRIMARY_CHAN_2;
+		break;
+	case 48:
+		act_primary = ACT_PRIMARY_CHAN_3;
+		break;
+	case 52:
+		act_primary = ACT_PRIMARY_CHAN_4;
+		break;
+	case 56:
+		act_primary = ACT_PRIMARY_CHAN_5;
+		break;
+	case 60:
+		act_primary = ACT_PRIMARY_CHAN_6;
+		break;
+	case 64:
+		act_primary = ACT_PRIMARY_CHAN_7;
+		break;
+	case 100:
+		act_primary = ACT_PRIMARY_CHAN_0;
+		break;
+	case 104:
+		act_primary = ACT_PRIMARY_CHAN_1;
+		break;
+	case 108:
+		act_primary = ACT_PRIMARY_CHAN_2;
+		break;
+	case 112:
+		act_primary = ACT_PRIMARY_CHAN_3;
+		break;
+	case 116:
+		act_primary = ACT_PRIMARY_CHAN_4;
+		break;
+	case 120:
+		act_primary = ACT_PRIMARY_CHAN_5;
+		break;
+	case 124:
+		act_primary = ACT_PRIMARY_CHAN_6;
+		break;
+	case 128:
+		act_primary = ACT_PRIMARY_CHAN_7;
 		break;
 	}
 
@@ -1343,6 +1403,11 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 		chnl_width = CH_80_MHZ_WIDTH;
 		act_primary =
 			mwl_fwcmd_get_80m_pri_chnl(pcmd->curr_chnl);
+		break;
+	case NL80211_CHAN_WIDTH_160:
+		chnl_width = CH_160_MHZ_WIDTH;
+		act_primary =
+			mwl_fwcmd_get_160m_pri_chnl(pcmd->curr_chnl);
 		break;
 	default:
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -2708,6 +2773,7 @@ int mwl_fwcmd_get_fw_region_code(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_fw_region_code *pcmd;
+	u16 cmd;
 	int status;
 
 	pcmd = (struct hostcmd_cmd_get_fw_region_code *)&priv->pcmd_buf[0];
@@ -2715,10 +2781,14 @@ int mwl_fwcmd_get_fw_region_code(struct ieee80211_hw *hw,
 	mutex_lock(&priv->fwcmd_mutex);
 
 	memset(pcmd, 0x00, sizeof(*pcmd));
-	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_FW_REGION_CODE);
+	if (priv->chip_type == MWL8964)
+		cmd = HOSTCMD_CMD_GET_FW_REGION_CODE_SC4;
+	else
+		cmd = HOSTCMD_CMD_GET_FW_REGION_CODE;
+	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_FW_REGION_CODE)) {
+	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
@@ -2748,18 +2818,23 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_device_pwr_tbl *pcmd;
 	int status;
+	u16 cmd;
 
 	pcmd = (struct hostcmd_cmd_get_device_pwr_tbl *)&priv->pcmd_buf[0];
 
 	mutex_lock(&priv->fwcmd_mutex);
 
 	memset(pcmd, 0x00, sizeof(*pcmd));
-	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_DEVICE_PWR_TBL);
+	if (priv->chip_type == MWL8964)
+		cmd = HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4;
+	else
+		cmd = HOSTCMD_CMD_GET_DEVICE_PWR_TBL;
+	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->status = cpu_to_le16(HOSTCMD_CMD_GET_DEVICE_PWR_TBL);
+	pcmd->status = cpu_to_le16(cmd);
 	pcmd->current_channel_index = cpu_to_le32(channel_index);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_DEVICE_PWR_TBL)) {
+	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;

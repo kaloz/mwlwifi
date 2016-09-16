@@ -62,6 +62,8 @@
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
 #define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL          0x116B
+#define HOSTCMD_CMD_GET_FW_REGION_CODE_SC4      0x118A
+#define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
 
 /* Define general result code for each command */
@@ -87,6 +89,7 @@
 #define CH_20_MHZ_WIDTH                         0x2
 #define CH_40_MHZ_WIDTH                         0x4
 #define CH_80_MHZ_WIDTH                         0x5
+#define CH_160_MHZ_WIDTH                        0x6
 #define EXT_CH_ABOVE_CTRL_CH                    0x1
 #define EXT_CH_AUTO                             0x2
 #define EXT_CH_BELOW_CTRL_CH                    0x3
@@ -96,6 +99,10 @@
 #define ACT_PRIMARY_CHAN_1                      1
 #define ACT_PRIMARY_CHAN_2                      2
 #define ACT_PRIMARY_CHAN_3                      3
+#define ACT_PRIMARY_CHAN_4                      4
+#define ACT_PRIMARY_CHAN_5                      5
+#define ACT_PRIMARY_CHAN_6                      6
+#define ACT_PRIMARY_CHAN_7                      7
 
 /* Define rate related constants */
 #define HOSTCMD_ACT_NOT_USE_FIXED_RATE          0x0002

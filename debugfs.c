@@ -49,6 +49,12 @@ static const struct file_operations mwl_debugfs_##name##_fops = { \
 	.open = simple_open, \
 }
 
+static const char chipname[MWLUNKNOWN][8] = {
+	"88W8864",
+	"88W8897",
+	"88W8964"
+};
+
 static void dump_data(char *p, int size, int *len, u8 *data,
 		      int data_len, char *title)
 {
@@ -91,7 +97,7 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len,
 			 "driver name: %s\n", MWL_DRV_NAME);
 	len += scnprintf(p + len, size - len, "chip type: %s\n",
-			 (priv->chip_type == MWL8864) ? "88W8864" : "88W8897");
+			 chipname[priv->chip_type]);
 	len += scnprintf(p + len, size - len,
 			 "hw version: %X\n", priv->hw_data.hw_version);
 	len += scnprintf(p + len, size - len,

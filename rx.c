@@ -45,6 +45,7 @@
 #define RX_RATE_INFO_HT20             0
 #define RX_RATE_INFO_HT40             1
 #define RX_RATE_INFO_HT80             2
+#define RX_RATE_INFO_HT160            3
 
 #define RX_RATE_INFO_LONG_INTERVAL    0
 #define RX_RATE_INFO_SHORT_INTERVAL   1
@@ -234,6 +235,8 @@ static inline void mwl_rx_prepare_status(struct mwl_rx_desc *pdesc,
 			status->flag |= RX_FLAG_40MHZ;
 		if (bw == RX_RATE_INFO_HT80)
 			status->vht_flag |= RX_VHT_FLAG_80MHZ;
+		if (bw == RX_RATE_INFO_HT160)
+			status->vht_flag |= RX_VHT_FLAG_160MHZ;
 		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
 			status->flag |= RX_FLAG_SHORT_GI;
 		status->vht_nss = (nss + 1);

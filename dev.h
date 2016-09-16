@@ -125,6 +125,7 @@
 enum {
 	MWL8864 = 0,
 	MWL8897,
+	MWL8964,
 	MWLUNKNOWN,
 };
 
