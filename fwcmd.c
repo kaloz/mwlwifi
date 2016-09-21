@@ -406,6 +406,30 @@ static u8 mwl_fwcmd_get_160m_pri_chnl(u8 channel)
 	case 128:
 		act_primary = ACT_PRIMARY_CHAN_7;
 		break;
+	case 149:
+		act_primary = ACT_PRIMARY_CHAN_0;
+		break;
+	case 153:
+		act_primary = ACT_PRIMARY_CHAN_1;
+		break;
+	case 157:
+		act_primary = ACT_PRIMARY_CHAN_2;
+		break;
+	case 161:
+		act_primary = ACT_PRIMARY_CHAN_3;
+		break;
+	case 165:
+		act_primary = ACT_PRIMARY_CHAN_4;
+		break;
+	case 169:
+		act_primary = ACT_PRIMARY_CHAN_5;
+		break;
+	case 173:
+		act_primary = ACT_PRIMARY_CHAN_6;
+		break;
+	case 177:
+		act_primary = ACT_PRIMARY_CHAN_7;
+		break;
 	}
 
 	return act_primary;
