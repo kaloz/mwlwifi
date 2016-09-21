@@ -466,6 +466,11 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN;
 
+	if (priv->chip_type == MWL8964) {
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
+	}
+
 	if (priv->antenna_rx == ANTENNA_RX_2)
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xfffa);
 	else
