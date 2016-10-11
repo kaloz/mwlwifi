@@ -150,7 +150,7 @@ struct mwl_chip_info {
 
 struct mwl_device_pwr_tbl {
 	u8 channel;
-	u8 tx_pwr[SYSADPT_TX_POWER_LEVEL_TOTAL];
+	u8 tx_pwr[SYSADPT_TX_PWR_LEVEL_TOTAL_SC4];
 	u8 dfs_capable;
 	u8 ax_ant;
 	u8 cdd;

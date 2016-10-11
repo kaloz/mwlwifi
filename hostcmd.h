@@ -907,6 +907,39 @@ struct hostcmd_cmd_get_device_pwr_tbl {
 	struct channel_power_tbl channel_pwr_tbl;
 } __packed;
 
+/* HOSTCMD_CMD_GET_FW_REGION_CODE_SC4 */
+struct hostcmd_cmd_get_fw_region_code_sc4 {
+	struct hostcmd_header cmd_hdr;
+	__le32 fw_region_code;
+} __packed;
+
+/* HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4 */
+#define HAL_TRPC_ID_MAX_SC4        32
+#define MAX_GROUP_PER_CHANNEL_5G   39
+#define MAX_GROUP_PER_CHANNEL_2G   21
+#define	MAX(a,b) (((a)>(b))?(a):(b))
+#define MAX_GROUP_PER_CHANNEL_RATE MAX(MAX_GROUP_PER_CHANNEL_5G, MAX_GROUP_PER_CHANNEL_2G)
+
+struct channel_power_tbl_sc4 {
+	u8 channel;
+	u8 grp_pwr[MAX_GROUP_PER_CHANNEL_RATE];
+	u8 tx_pwr[HAL_TRPC_ID_MAX_SC4];
+	u8 dfs_capable;
+	u8 ax_ant;
+	u8 cdd;
+	u8 rsvd;
+} __packed;
+
+struct hostcmd_cmd_get_device_pwr_tbl_sc4 {
+	struct hostcmd_header cmd_hdr;
+	__le16 status; /* 0 = Found, 1 = Error */
+	u8 region_code;
+	u8 number_of_channels;
+	__le32 current_channel_index;
+	/* Only for 1 channel, so, 1 channel at a time */
+	struct channel_power_tbl_sc4 channel_pwr_tbl;
+} __packed;
+
 /* HOSTCMD_CMD_QUIET_MODE */
 struct hostcmd_cmd_quiet_mode {
 	struct hostcmd_header cmd_hdr;

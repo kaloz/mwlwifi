@@ -536,26 +536,43 @@ static void mwl_set_caps(struct mwl_priv *priv)
 static void mwl_regd_init(struct mwl_priv *priv)
 {
 	u8 region_code;
+	int rc;
 	int i;
 
 	/* hook regulatory domain change notification */
 	priv->hw->wiphy->reg_notifier = mwl_reg_notifier;
 
-	if (mwl_fwcmd_get_device_pwr_tbl(priv->hw,
-					 &priv->device_pwr_tbl[0],
-					 &region_code,
-					 &priv->number_of_channels,
-					 0))
+	if (priv->chip_type == MWL8964)
+		rc = mwl_fwcmd_get_device_pwr_tbl_sc4(priv->hw,
+						      &priv->device_pwr_tbl[0],
+						      &region_code,
+						      &priv->number_of_channels,
+						      0);
+	else
+		rc = mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+						  &priv->device_pwr_tbl[0],
+						  &region_code,
+						  &priv->number_of_channels,
+						  0);
+	if (rc)
 		return;
 
 	priv->forbidden_setting = true;
 
-	for (i = 0; i < priv->number_of_channels; i++)
-		mwl_fwcmd_get_device_pwr_tbl(priv->hw,
-					     &priv->device_pwr_tbl[i],
-					     &region_code,
-					     &priv->number_of_channels,
-					     i);
+	for (i = 1; i < priv->number_of_channels; i++) {
+		if (priv->chip_type == MWL8964)
+			mwl_fwcmd_get_device_pwr_tbl_sc4(priv->hw,
+							 &priv->device_pwr_tbl[i],
+							 &region_code,
+							 &priv->number_of_channels,
+							 i);
+		else
+			mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+						     &priv->device_pwr_tbl[i],
+						     &region_code,
+						     &priv->number_of_channels,
+					             i);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(regmap); i++)
 		if (regmap[i].region_code == priv->fw_region_code) {
@@ -727,7 +744,12 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	wiphy_info(hw->wiphy,
 		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
 
-	if (!mwl_fwcmd_get_fw_region_code(hw, &priv->fw_region_code)) {
+	if (priv->chip_type == MWL8964)
+		rc = mwl_fwcmd_get_fw_region_code_sc4(hw,
+						      &priv->fw_region_code);
+	else
+		rc = mwl_fwcmd_get_fw_region_code(hw, &priv->fw_region_code);
+	if (!rc) {
 		priv->fw_device_pwrtbl = true;
 		mwl_regd_init(priv);
 		wiphy_info(hw->wiphy,

@@ -215,6 +215,15 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 				 u8 *number_of_channels,
 				 u32 channel_index);
 
+int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
+				     u32 *fw_region_code);
+
+int mwl_fwcmd_get_device_pwr_tbl_sc4(struct ieee80211_hw *hw,
+				     struct mwl_device_pwr_tbl *device_ch_pwrtbl,
+				     u8 *region_code,
+				     u8 *number_of_channels,
+				     u32 channel_index);
+
 int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 			 u32 duration, u32 next_offset);
 
