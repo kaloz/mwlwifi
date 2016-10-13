@@ -17,4 +17,26 @@ c. make package/kernel/mwlwifi/clean
 
 d. make V=s (-jx)
 
-* For driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
+* After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
+
+* Hostpad must include following commit for 160 MHz operation:
+
+    commit 03a72eacda5d9a1837a74387081596a0d5466ec1
+    Author: Jouni Malinen <jouni@qca.qualcomm.com>
+    Date:   Thu Dec 17 18:39:19 2015 +0200
+    
+    VHT: Add an interoperability workaround for 80+80 and 160 MHz channels
+ 
+    Number of deployed 80 MHz capable VHT stations that do not support 80+80
+    and 160 MHz bandwidths seem to misbehave when trying to connect to an AP
+    that advertises 80+80 or 160 MHz channel bandwidth in the VHT Operation
+    element. To avoid such issues with deployed devices, modify the design
+    based on newly proposed IEEE 802.11 standard changes.
+ 
+    This allows poorly implemented VHT 80 MHz stations to connect with the
+    AP in 80 MHz mode. 80+80 and 160 MHz capable stations need to support
+    the new workaround mechanism to allow full bandwidth to be used.
+    However, there are more or less no impacted station with 80+80/160
+    capability deployed.
+ 
+    Signed-off-by: Jouni Malinen jouni@qca.qualcomm.com
