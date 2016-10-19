@@ -3,6 +3,8 @@
 patch for OpenWrt hostapd package 2016-01-15 for following commit
 (move it to package/network/services/hostapd/patches).
 
+Note: After hostapd package 2016-06-15, this commit is already included.
+
 commit 03a72eacda5d9a1837a74387081596a0d5466ec1
 Author: Jouni Malinen <jouni@qca.qualcomm.com>
 Date:   Thu Dec 17 18:39:19 2015 +0200
