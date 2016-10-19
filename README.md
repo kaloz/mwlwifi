@@ -40,3 +40,5 @@ d. make V=s (-jx)
     capability deployed.
  
     Signed-off-by: Jouni Malinen jouni@qca.qualcomm.com
+
+* In order to let STA mode to support 160 MHz operation, mac80211 package should be 2016-05-12 or later.
