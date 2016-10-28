@@ -43,4 +43,4 @@ d. make V=s (-jx)
 
     Note: After hostapd package 2016-06-15, this commit is already included.
 
-* In order to let STA mode to support 160 MHz operation, mac80211 package should be 2016-05-12 or later.
+* In order to let STA mode to support 160 MHz operation, mac80211 package should be 2016-10-08 or later.
