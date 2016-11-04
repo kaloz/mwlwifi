@@ -436,6 +436,7 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SM_PS;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SGI_20;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SGI_40;
+	band->ht_cap.cap |= IEEE80211_HT_CAP_DSSSCCK40;
 
 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
