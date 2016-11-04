@@ -455,6 +455,8 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 static void mwl_set_vht_caps(struct mwl_priv *priv,
 			     struct ieee80211_supported_band *band)
 {
+	u32 antenna_num = 4;
+
 	band->vht_cap.vht_supported = 1;
 
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
@@ -477,10 +479,27 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	else
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xffea);
 
-	if (priv->antenna_tx == ANTENNA_TX_2)
+	if (priv->antenna_tx == ANTENNA_TX_2) {
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffa);
-	else
+		antenna_num = 2;
+	} else
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xffea);
+
+	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
+	    IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
+		band->vht_cap.cap |=
+			((antenna_num - 1) <<
+			IEEE80211_VHT_CAP_BEAMFORMEE_STS_SHIFT) &
+			IEEE80211_VHT_CAP_BEAMFORMEE_STS_MASK;
+	}
+
+	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE |
+	    IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE)) {
+		band->vht_cap.cap |=
+			((antenna_num - 1) <<
+			IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_SHIFT) &
+			IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK;
+	}
 }
 
 static void mwl_set_caps(struct mwl_priv *priv)
@@ -572,7 +591,7 @@ static void mwl_regd_init(struct mwl_priv *priv)
 						     &priv->device_pwr_tbl[i],
 						     &region_code,
 						     &priv->number_of_channels,
-					             i);
+						     i);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(regmap); i++)
