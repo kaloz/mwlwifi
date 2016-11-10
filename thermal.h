@@ -18,7 +18,9 @@
 #ifndef _THERMAL_H_
 #define _THERMAL_H_
 
-#ifdef CONFIG_THERMAL
+#include <linux/kconfig.h>
+
+#if IS_ENABLED(CONFIG_THERMAL)
 int mwl_thermal_register(struct mwl_priv *priv);
 void mwl_thermal_unregister(struct mwl_priv *priv);
 void mwl_thermal_set_throttling(struct mwl_priv *priv);

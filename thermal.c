@@ -147,7 +147,7 @@ int mwl_thermal_register(struct mwl_priv *priv)
 	priv->cdev = cdev;
 	priv->quiet_period = SYSADPT_QUIET_PERIOD_DEFAULT;
 
-	if (!config_enabled(CONFIG_HWMON))
+	if (!IS_ENABLED(CONFIG_HWMON))
 		return 0;
 
 	hwmon_dev =
