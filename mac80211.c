@@ -569,8 +569,16 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 		return -ENOENT;
 
 	survey->channel = conf->chandef.chan;
-	survey->filled = SURVEY_INFO_NOISE_DBM;
-	survey->noise = priv->noise;
+	mwl_fwcmd_get_survey(hw, false);
+	survey->filled = SURVEY_INFO_TIME |
+			 SURVEY_INFO_TIME_BUSY |
+			 SURVEY_INFO_TIME_TX;
+	survey->time = priv->time_period / 1000;
+	survey->time_busy = priv->time_busy / 1000;
+	survey->time_tx = priv->time_tx / 1000;
+
+	if (!(hw->conf.flags & IEEE80211_CONF_OFFCHANNEL))
+		survey->filled |= SURVEY_INFO_IN_USE;
 
 	return 0;
 }

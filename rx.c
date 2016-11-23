@@ -439,8 +439,6 @@ void mwl_rx_recv(unsigned long data)
 
 		mwl_rx_prepare_status(curr_hndl->pdesc, &status);
 
-		priv->noise = -curr_hndl->pdesc->noise_floor;
-
 		wh = &((struct mwl_dma_data *)prx_skb->data)->wh;
 
 		if (ieee80211_has_protected(wh->frame_control)) {

@@ -29,6 +29,13 @@
 #define MWL_DRV_NAME     KBUILD_MODNAME
 #define MWL_DRV_VERSION	 "10.3.2.0-20161123"
 
+#define MAC_REG_ADDR(offset)      (offset)
+#define MAC_REG_ADDR_PCI(offset)  ((priv->iobase1 + 0xA000) + offset)
+
+#define MCU_CCA_CNT               MAC_REG_ADDR(0x06A0)
+#define MCU_TXPE_CNT              MAC_REG_ADDR(0x06A4)
+#define MCU_LAST_READ             MAC_REG_ADDR(0x06A8)
+
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
 #define MACREG_REG_H2A_INTERRUPT_CAUSE       0x00000C1C /* (From host to ARM) */
@@ -273,8 +280,6 @@ struct mwl_ampdu_stream {
 };
 
 #ifdef CONFIG_DEBUG_FS
-#define MAC_REG_ADDR_PCI(offset)      ((priv->iobase1 + 0xA000) + offset)
-
 #define MWL_ACCESS_MAC                1
 #define MWL_ACCESS_RF                 2
 #define MWL_ACCESS_BBP                3
@@ -347,7 +352,10 @@ struct mwl_priv {
 
 	struct timer_list period_timer;
 
-	s8 noise;                    /* Most recently reported noise in dBm */
+	/* keep survey information */
+	u32 time_period;
+	u32 time_busy;
+	u32 time_tx;
 	struct ieee80211_supported_band band_24;
 	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
 	struct ieee80211_rate rates_24[BAND_24_RATE_NUM];

@@ -883,6 +883,11 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
+static u32 pci_read_mac_reg(struct mwl_priv *priv, u32 offset)
+{
+	return le32_to_cpu(*(volatile unsigned long *)(MAC_REG_ADDR_PCI(offset)));
+}
+
 void mwl_fwcmd_reset(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -1456,6 +1461,8 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
+
+	mwl_fwcmd_get_survey(hw, true);
 
 	return 0;
 }
@@ -2982,30 +2989,17 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 	return 0;
 }
 
-int mwl_fwcmd_send_mfg_cmd(struct mwl_priv *priv, char *mfgcmd)
+void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, bool clean)
 {
-	struct hostcmd_header *pcmd;
-	struct cmd_header *cmd_hd = (struct cmd_header *)(mfgcmd + 4);
-	u16 len;
-	u16 cmd;
+	struct mwl_priv *priv = hw->priv;
 
-	pcmd = (struct hostcmd_header *)&priv->pcmd_buf[0];
+	priv->time_period += pci_read_mac_reg(priv, MCU_LAST_READ);
+	priv->time_busy += pci_read_mac_reg(priv, MCU_CCA_CNT);
+	priv->time_tx += pci_read_mac_reg(priv, MCU_TXPE_CNT);
 
-	mutex_lock(&priv->fwcmd_mutex);
-
-	len = le16_to_cpu(cmd_hd->len);
-	memset(pcmd, 0x00, len + 4);
-	memcpy((char *)pcmd, mfgcmd, len + 4);
-	cmd = le16_to_cpu(cmd_hd->command);
-	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
-		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution");
-		return -EIO;
+	if (clean) {
+		priv->time_period = 0;
+		priv->time_busy = 0;
+		priv->time_tx = 0;
 	}
-	cmd_hd = (struct cmd_header *)&priv->pcmd_buf[2];
-	len = le16_to_cpu(cmd_hd->len);
-	memcpy(mfgcmd, (char *)&priv->pcmd_buf[2], len);
-	mutex_unlock(&priv->fwcmd_mutex);
-
-	return 0;
 }
