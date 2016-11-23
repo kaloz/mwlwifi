@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.2.0-20161123"
+#define MWL_DRV_VERSION	 "10.3.2.0-20161123-1"
 
 #define MAC_REG_ADDR(offset)      (offset)
 #define MAC_REG_ADDR_PCI(offset)  ((priv->iobase1 + 0xA000) + offset)
