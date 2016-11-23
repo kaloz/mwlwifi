@@ -2879,7 +2879,6 @@ int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_fw_region_code_sc4 *pcmd;
 	u16 cmd;
-	int status;
 
 	pcmd = (struct hostcmd_cmd_get_fw_region_code_sc4 *)&priv->pcmd_buf[0];
 
