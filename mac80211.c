@@ -633,6 +633,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	case IEEE80211_AMPDU_TX_STOP_FLUSH_CONT:
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
+				stream->state = AMPDU_STREAM_IN_PROGRESS;
 				mwl_tx_del_ampdu_pkts(hw, sta, tid);
 				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);
