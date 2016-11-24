@@ -885,7 +885,18 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 
 static u32 pci_read_mac_reg(struct mwl_priv *priv, u32 offset)
 {
-	return le32_to_cpu(*(volatile unsigned long *)(MAC_REG_ADDR_PCI(offset)));
+	u32 *addr_val = kmalloc(64 * sizeof(u32), GFP_ATOMIC);
+	u32 val;
+
+	if(addr_val)
+	{
+		mwl_fwcmd_get_addr_value(priv->hw, 0x8000a000 + offset, 4,
+					 addr_val, 0);
+		val = addr_val[0];
+		kfree(addr_val);
+		return val;
+	}
+	return 0;
 }
 
 void mwl_fwcmd_reset(struct ieee80211_hw *hw)
