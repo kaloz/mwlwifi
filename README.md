@@ -45,4 +45,20 @@ d. make V=s (-jx)
 
 * In order to let STA mode to support 160 MHz operation, mac80211 package should be 2016-10-08 or later.
 * WiFi device does not use HT rates when using TKIP as the encryption cipher.
-  If you want to have good performance, please use AES only. 
+  If you want to have good performance, please use AES only.
+* DTS parameters for mwlwifi driver (pcie@X,0):
+
+  marvell,2ghz = <0>; => Disable 2g band.
+  marvell,5ghz = <0>; => Disable 5g band.
+
+  marvell,chainmask = <4 4>; => Specify antenna number, default is 4x4. For WRT1200AC, you must set these values to 2x2.
+
+  marvell,powertable => Sprcify external power table. If your device needs external power table, you must provide the power table via this parameter, otherwise the Tx power will be pretty lower.
+
+root@lede:/# cat /sys/kernel/debug/ieee80211/phy0/mwlwifi/info
+
+power table loaded from dts: no
+
+  => If it is "no", it does not allow you to load external power table (for new device).
+
+  => If it is "yes", you must provide power table in DTS file (for old device).
