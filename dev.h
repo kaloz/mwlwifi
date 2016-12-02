@@ -109,8 +109,10 @@
 /* Antenna control */
 #define ANTENNA_TX_4_AUTO                   0
 #define ANTENNA_TX_2                        3
+#define ANTENNA_TX_3                        7
 #define ANTENNA_RX_4_AUTO                   0
 #define ANTENNA_RX_2                        2
+#define ANTENNA_RX_3                        3
 
 /* Band related constants */
 #define BAND_24_CHANNEL_NUM                 14

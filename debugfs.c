@@ -86,6 +86,7 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 {
 	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	int tx_num = 4, rx_num = 4;
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
 	ssize_t ret;
@@ -115,9 +116,15 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 "2g: %s\n", priv->disable_2g ? "disable" : "enable");
 	len += scnprintf(p + len, size - len,
 			 "5g: %s\n", priv->disable_5g ? "disable" : "enable");
-	len += scnprintf(p + len, size - len, "antenna: %d %d\n",
-			 (priv->antenna_tx == ANTENNA_TX_4_AUTO) ? 4 : 2,
-			 (priv->antenna_rx == ANTENNA_TX_4_AUTO) ? 4 : 2);
+	if (priv->antenna_tx == ANTENNA_TX_2)
+		tx_num = 2;
+	else if (priv->antenna_tx == ANTENNA_TX_3)
+		tx_num = 3;
+	if (priv->antenna_rx == ANTENNA_RX_2)
+		rx_num = 2;
+	else if (priv->antenna_rx == ANTENNA_RX_3)
+		rx_num = 3;
+	len += scnprintf(p + len, size - len, "antenna: %d %d\n", tx_num, rx_num);
 	len += scnprintf(p + len, size - len, "irq number: %d\n", priv->irq);
 	len += scnprintf(p + len, size - len, "iobase0: %p\n", priv->iobase0);
 	len += scnprintf(p + len, size - len, "iobase1: %p\n", priv->iobase1);

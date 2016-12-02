@@ -409,11 +409,15 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 			prop_value = be32_to_cpu(*((__be32 *)prop->value));
 			if (prop_value == 2)
 				priv->antenna_tx = ANTENNA_TX_2;
+			else if (prop_value == 3)
+				priv->antenna_tx = ANTENNA_TX_3;
 
 			prop_value = be32_to_cpu(*((__be32 *)
 						 (prop->value + 4)));
 			if (prop_value == 2)
 				priv->antenna_rx = ANTENNA_RX_2;
+			else if (prop_value == 3)
+				priv->antenna_rx = ANTENNA_RX_3;
 		}
 	}
 
@@ -860,6 +864,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	const char *fw_name;
+	int tx_num = 4, rx_num = 4;
 	int rc = 0;
 
 	if (id->driver_data >= MWLUNKNOWN)
@@ -942,9 +947,16 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		   priv->disable_2g ? "disabled" : "enabled",
 		   priv->disable_5g ? "disabled" : "enabled");
 
-	wiphy_info(priv->hw->wiphy, "%s TX antennas, %s RX antennas\n",
-		   (priv->antenna_tx == ANTENNA_TX_4_AUTO) ? "4" : "2",
-		   (priv->antenna_rx == ANTENNA_RX_4_AUTO) ? "4" : "2");
+	if (priv->antenna_tx == ANTENNA_TX_2)
+		tx_num = 2;
+	else if (priv->antenna_tx == ANTENNA_TX_3)
+		tx_num = 3;
+	if (priv->antenna_rx == ANTENNA_RX_2)
+		rx_num = 2;
+	else if (priv->antenna_rx == ANTENNA_RX_3)
+		rx_num = 3;
+	wiphy_info(priv->hw->wiphy, "%d TX antennas, %d RX antennas\n",
+		   tx_num, rx_num);
 
 #ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_init(hw);
