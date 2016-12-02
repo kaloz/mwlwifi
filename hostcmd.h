@@ -24,6 +24,8 @@
 #define HOSTCMD_CMD_GET_HW_SPEC                 0x0003
 #define HOSTCMD_CMD_SET_HW_SPEC                 0x0004
 #define HOSTCMD_CMD_802_11_GET_STAT             0x0014
+#define HOSTCMD_CMD_BBP_REG_ACCESS              0x001a
+#define HOSTCMD_CMD_RF_REG_ACCESS               0x001b
 #define HOSTCMD_CMD_802_11_RADIO_CONTROL        0x001c
 #define HOSTCMD_CMD_MEM_ADDR_ACCESS             0x001d
 #define HOSTCMD_CMD_802_11_TX_POWER             0x001f
@@ -59,6 +61,7 @@
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
+#define HOSTCMD_CMD_CAU_REG_ACCESS              0x1157
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
 #define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL          0x116B
@@ -283,6 +286,24 @@ struct hostcmd_cmd_802_11_get_stat {
 	__le32 rx_errors;
 	__le32 rx_rts_count;
 	__le32 tx_cts_count;
+} __packed;
+
+/* HOSTCMD_CMD_BBP_REG_ACCESS */
+struct hostcmd_cmd_bbp_reg_access {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 offset;
+	u8 value;
+	u8 reserverd[3];
+} __packed;
+
+/* HOSTCMD_CMD_RF_REG_ACCESS */
+struct hostcmd_cmd_rf_reg_access {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 offset;
+	u8 value;
+	u8 reserverd[3];
 } __packed;
 
 /* HOSTCMD_CMD_802_11_RADIO_CONTROL */

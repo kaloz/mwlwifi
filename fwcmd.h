@@ -72,6 +72,10 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw);
 int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		       struct ieee80211_low_level_stats *stats);
 
+int mwl_fwcmd_reg_bb(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
+
+int mwl_fwcmd_reg_rf(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
+
 int mwl_fwcmd_radio_enable(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_radio_disable(struct ieee80211_hw *hw);
@@ -203,6 +207,8 @@ int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value);
 
 int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw);
+
+int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val);
 
 int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp);
 

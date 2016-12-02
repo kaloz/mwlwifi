@@ -677,6 +677,18 @@ static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
 	set = write ? WL_SET : WL_GET;
 
 	switch (priv->reg_type) {
+	case MWL_ACCESS_RF:
+		ret = mwl_fwcmd_reg_rf(hw, set, priv->reg_offset,
+				       &priv->reg_value);
+		break;
+	case MWL_ACCESS_BBP:
+		ret = mwl_fwcmd_reg_bb(hw, set, priv->reg_offset,
+				       &priv->reg_value);
+		break;
+	case MWL_ACCESS_CAU:
+		ret = mwl_fwcmd_reg_cau(hw, set, priv->reg_offset,
+					&priv->reg_value);
+		break;
 	case MWL_ACCESS_ADDR0:
 		if (set == WL_GET)
 			priv->reg_value =

@@ -65,6 +65,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_HW_SPEC, "GetHwSpecifications" },
 		{ HOSTCMD_CMD_SET_HW_SPEC, "SetHwSepcifications" },
 		{ HOSTCMD_CMD_802_11_GET_STAT, "80211GetStat" },
+		{ HOSTCMD_CMD_BBP_REG_ACCESS, "BBPRegAccess" },
+		{ HOSTCMD_CMD_RF_REG_ACCESS, "RFRegAccess" },
 		{ HOSTCMD_CMD_802_11_RADIO_CONTROL, "80211RadioControl" },
 		{ HOSTCMD_CMD_MEM_ADDR_ACCESS, "MEMAddrAccess" },
 		{ HOSTCMD_CMD_802_11_TX_POWER, "80211TxPower" },
@@ -100,6 +102,7 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_DWDS_ENABLE, "DwdsEnable" },
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
+		{ HOSTCMD_CMD_CAU_REG_ACCESS, "CAURegAccess" },
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
@@ -1045,6 +1048,63 @@ int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		le32_to_cpu(pcmd->rx_fcs_errors);
 	stats->dot11RTSSuccessCount =
 		le32_to_cpu(pcmd->rts_successes);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_reg_bb(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_bbp_reg_access *pcmd;
+
+	pcmd = (struct hostcmd_cmd_bbp_reg_access *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_BBP_REG_ACCESS);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->offset = cpu_to_le16(reg);
+	pcmd->action = cpu_to_le16(flag);
+	pcmd->value = *val;
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BBP_REG_ACCESS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	*val = pcmd->value;
+
+	mutex_unlock(&priv->fwcmd_mutex);
+	return 0;
+}
+
+int mwl_fwcmd_reg_rf(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_rf_reg_access *pcmd;
+
+	pcmd = (struct hostcmd_cmd_rf_reg_access *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_RF_REG_ACCESS);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->offset = cpu_to_le16(reg);
+	pcmd->action = cpu_to_le16(flag);
+	pcmd->value = *val;
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_RF_REG_ACCESS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	*val = pcmd->value;
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
@@ -2778,6 +2838,35 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw)
 		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_bbp_reg_access *pcmd;
+
+	pcmd = (struct hostcmd_cmd_bbp_reg_access *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_CAU_REG_ACCESS);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->offset = cpu_to_le16(reg);
+	pcmd->action = cpu_to_le16(flag);
+	pcmd->value = *val;
+
+	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_CAU_REG_ACCESS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	*val = pcmd->value;
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
