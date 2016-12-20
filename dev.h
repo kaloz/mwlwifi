@@ -357,6 +357,8 @@ struct mwl_priv {
 	u32 time_period;
 	u32 time_busy;
 	u32 time_tx;
+	s8 noise;                    /* Most recently reported noise in dBm */
+
 	struct ieee80211_supported_band band_24;
 	struct ieee80211_channel channels_24[BAND_24_CHANNEL_NUM];
 	struct ieee80211_rate rates_24[BAND_24_RATE_NUM];
