@@ -30,6 +30,7 @@
 #define MWL_DRV_VERSION	 "10.3.2.0-20161220"
 
 #define MAC_REG_ADDR(offset)      (offset)
+#define MAC_REG_ADDR_PCI(offset)  ((priv->iobase1 + 0xA000) + offset)
 
 #define MCU_CCA_CNT               MAC_REG_ADDR(0x06A0)
 #define MCU_TXPE_CNT              MAC_REG_ADDR(0x06A4)
