@@ -162,7 +162,7 @@ struct region_code_mapping {
 static const struct region_code_mapping regmap[] = {
 	{"US", 0x10}, /* US FCC */
 	{"CA", 0x20}, /* Canada */
-	{"EU", 0x30}, /* ETSI   */
+	{"FR", 0x30}, /* France */
 	{"ES", 0x31}, /* Spain  */
 	{"FR", 0x32}, /* France */
 	{"JP", 0x40}, /* Japan  */
