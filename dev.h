@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2016, Marvell International Ltd.
+ * Copyright (C) 2006-2017, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define MWL_DRV_NAME     KBUILD_MODNAME
-#define MWL_DRV_VERSION	 "10.3.2.0-20161222"
+#define MWL_DRV_VERSION	 "10.3.2.0-20170103"
 
 #define MAC_REG_ADDR(offset)      (offset)
 #define MAC_REG_ADDR_PCI(offset)  ((priv->iobase1 + 0xA000) + offset)
