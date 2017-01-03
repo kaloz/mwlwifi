@@ -871,21 +871,21 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return -ENODEV;
 
 	if (!printed_version) {
-		pr_info("<<%s version %s>>",
+		pr_info("<<%s version %s>>\n",
 			MWL_DESC, MWL_DRV_VERSION);
 		printed_version = true;
 	}
 
 	rc = pci_enable_device(pdev);
 	if (rc) {
-		pr_err("%s: cannot enable new PCI device",
+		pr_err("%s: cannot enable new PCI device\n",
 		       MWL_DRV_NAME);
 		return rc;
 	}
 
 	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (rc) {
-		pr_err("%s: 32-bit PCI DMA not supported",
+		pr_err("%s: 32-bit PCI DMA not supported\n",
 		       MWL_DRV_NAME);
 		goto err_pci_disable_device;
 	}
@@ -894,7 +894,7 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	hw = ieee80211_alloc_hw(sizeof(*priv), &mwl_mac80211_ops);
 	if (!hw) {
-		pr_err("%s: ieee80211 alloc failed",
+		pr_err("%s: ieee80211 alloc failed\n",
 		       MWL_DRV_NAME);
 		rc = -ENOMEM;
 		goto err_pci_disable_device;
