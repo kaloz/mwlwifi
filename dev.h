@@ -281,6 +281,15 @@ struct mwl_ampdu_stream {
 	u8 idx;
 };
 
+struct mwl_survey_info {
+	struct ieee80211_channel channel;
+	u32 filled;
+	u32 time_period;
+	u32 time_busy;
+	u32 time_tx;
+	s8 noise;
+};
+
 #ifdef CONFIG_DEBUG_FS
 #define MWL_ACCESS_MAC                1
 #define MWL_ACCESS_RF                 2
@@ -355,9 +364,11 @@ struct mwl_priv {
 	struct timer_list period_timer;
 
 	/* keep survey information */
-	u32 time_period;
-	u32 time_busy;
-	u32 time_tx;
+	bool sw_scanning;
+	int survey_info_idx;
+	struct mwl_survey_info survey_info[SYSADPT_MAX_NUM_CHANNELS];
+	struct mwl_survey_info cur_survey_info;
+
 	s8 noise;                    /* Most recently reported noise in dBm */
 
 	struct ieee80211_supported_band band_24;

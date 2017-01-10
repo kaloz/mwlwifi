@@ -233,6 +233,6 @@ int mwl_fwcmd_get_device_pwr_tbl_sc4(struct ieee80211_hw *hw,
 int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 			 u32 duration, u32 next_offset);
 
-void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, bool clean);
+void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx);
 
 #endif /* _FWCMD_H_ */

@@ -1538,7 +1538,13 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
-	mwl_fwcmd_get_survey(hw, true);
+	if (priv->sw_scanning) {
+		priv->survey_info_idx++;
+		mwl_fwcmd_get_survey(hw, priv->survey_info_idx);
+	} else {
+		mwl_fwcmd_get_survey(hw, 0);
+		memset(&priv->cur_survey_info, 0, sizeof(struct mwl_survey_info));
+	}
 
 	return 0;
 }
@@ -3094,17 +3100,25 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 	return 0;
 }
 
-void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, bool clean)
+void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx)
 {
 	struct mwl_priv *priv = hw->priv;
+	struct ieee80211_conf *conf = &hw->conf;
+	struct mwl_survey_info *survey_info;
 
-	priv->time_period += pci_read_mac_reg(priv, MCU_LAST_READ);
-	priv->time_busy += pci_read_mac_reg(priv, MCU_CCA_CNT);
-	priv->time_tx += pci_read_mac_reg(priv, MCU_TXPE_CNT);
+	if (idx)
+		survey_info = &priv->survey_info[idx - 1];
+	else
+		survey_info = &priv->cur_survey_info;
 
-	if (clean) {
-		priv->time_period = 0;
-		priv->time_busy = 0;
-		priv->time_tx = 0;
-	}
+	memcpy(&survey_info->channel, conf->chandef.chan,
+	       sizeof(struct ieee80211_channel));
+	survey_info->filled = SURVEY_INFO_TIME |
+			      SURVEY_INFO_TIME_BUSY |
+			      SURVEY_INFO_TIME_TX |
+			      SURVEY_INFO_NOISE_DBM;
+	survey_info->time_period += pci_read_mac_reg(priv, MCU_LAST_READ);
+	survey_info->time_busy += pci_read_mac_reg(priv, MCU_CCA_CNT);
+	survey_info->time_tx += pci_read_mac_reg(priv, MCU_TXPE_CNT);
+	survey_info->noise = priv->noise;
 }
