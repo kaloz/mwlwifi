@@ -563,24 +563,29 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 				   struct survey_info *survey)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct ieee80211_conf *conf = &hw->conf;
+	struct mwl_survey_info *survey_info;
 
-	if (idx != 0)
-		return -ENOENT;
+	if (priv->survey_info_idx) {
+		if (idx >= priv->survey_info_idx) {
+			priv->survey_info_idx = 0;
+			return -ENOENT;
+		}
+		survey_info = &priv->survey_info[idx];
+	} else {
+		if (idx != 0)
+			return -ENOENT;
+		mwl_fwcmd_get_survey(hw, 0);
+		survey_info = &priv->cur_survey_info;
+		if (!(hw->conf.flags & IEEE80211_CONF_OFFCHANNEL))
+			survey->filled |= SURVEY_INFO_IN_USE;
+	}
 
-	survey->channel = conf->chandef.chan;
-	mwl_fwcmd_get_survey(hw, false);
-	survey->filled = SURVEY_INFO_TIME |
-			 SURVEY_INFO_TIME_BUSY |
-			 SURVEY_INFO_TIME_TX;
-	survey->time = priv->time_period / 1000;
-	survey->time_busy = priv->time_busy / 1000;
-	survey->time_tx = priv->time_tx / 1000;
-	survey->filled |= SURVEY_INFO_NOISE_DBM;
-	survey->noise = priv->noise;
-
-	if (!(hw->conf.flags & IEEE80211_CONF_OFFCHANNEL))
-		survey->filled |= SURVEY_INFO_IN_USE;
+	survey->channel = &survey_info->channel;
+	survey->filled |= survey_info->filled;
+	survey->time = survey_info->time_period / 1000;
+	survey->time_busy = survey_info->time_busy / 1000;
+	survey->time_tx = survey_info->time_tx / 1000;
+	survey->noise = survey_info->noise;
 
 	return 0;
 }
@@ -709,6 +714,24 @@ static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 	return rc;
 }
 
+static void mwl_mac80211_sw_scan_start(struct ieee80211_hw *hw,
+				       struct ieee80211_vif *vif,
+				       const u8 *mac_addr)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	priv->sw_scanning = true;
+	priv->survey_info_idx = 0;
+}
+
+static void mwl_mac80211_sw_scan_complete(struct ieee80211_hw *hw,
+					  struct ieee80211_vif *vif)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	priv->sw_scanning = false;
+}
+
 const struct ieee80211_ops mwl_mac80211_ops = {
 	.tx                 = mwl_mac80211_tx,
 	.start              = mwl_mac80211_start,
@@ -727,4 +750,6 @@ const struct ieee80211_ops mwl_mac80211_ops = {
 	.get_survey         = mwl_mac80211_get_survey,
 	.ampdu_action       = mwl_mac80211_ampdu_action,
 	.pre_channel_switch = mwl_mac80211_chnl_switch,
+	.sw_scan_start      = mwl_mac80211_sw_scan_start,
+	.sw_scan_complete   = mwl_mac80211_sw_scan_complete,
 };
