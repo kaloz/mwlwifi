@@ -892,8 +892,7 @@ static u32 pci_read_mac_reg(struct mwl_priv *priv, u32 offset)
 		u32 *addr_val = kmalloc(64 * sizeof(u32), GFP_ATOMIC);
 		u32 val;
 
-		if(addr_val)
-		{
+		if (addr_val) {
 			mwl_fwcmd_get_addr_value(priv->hw,
 						 0x8000a000 + offset, 4,
 						 addr_val, 0);
@@ -903,7 +902,7 @@ static u32 pci_read_mac_reg(struct mwl_priv *priv, u32 offset)
 		}
 		return 0;
 	} else
-		return le32_to_cpu(*(volatile unsigned long *)
+		return le32_to_cpu(*(unsigned long *)
 		       (MAC_REG_ADDR_PCI(offset)));
 }
 
@@ -1543,7 +1542,8 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 		mwl_fwcmd_get_survey(hw, priv->survey_info_idx);
 	} else {
 		mwl_fwcmd_get_survey(hw, 0);
-		memset(&priv->cur_survey_info, 0, sizeof(struct mwl_survey_info));
+		memset(&priv->cur_survey_info, 0,
+		       sizeof(struct mwl_survey_info));
 	}
 
 	return 0;
@@ -3025,11 +3025,11 @@ int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 	return 0;
 }
 
-int mwl_fwcmd_get_device_pwr_tbl_sc4(struct ieee80211_hw *hw,
-				     struct mwl_device_pwr_tbl *device_ch_pwrtbl,
-				     u8 *region_code,
-				     u8 *number_of_channels,
-				     u32 channel_index)
+int mwl_fwcmd_get_pwr_tbl_sc4(struct ieee80211_hw *hw,
+			      struct mwl_device_pwr_tbl *device_ch_pwrtbl,
+			      u8 *region_code,
+			      u8 *number_of_channels,
+			      u32 channel_index)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_device_pwr_tbl_sc4 *pcmd;

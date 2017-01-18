@@ -567,11 +567,11 @@ static void mwl_regd_init(struct mwl_priv *priv)
 	priv->hw->wiphy->reg_notifier = mwl_reg_notifier;
 
 	if (priv->chip_type == MWL8964)
-		rc = mwl_fwcmd_get_device_pwr_tbl_sc4(priv->hw,
-						      &priv->device_pwr_tbl[0],
-						      &region_code,
-						      &priv->number_of_channels,
-						      0);
+		rc = mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
+					       &priv->device_pwr_tbl[0],
+					       &region_code,
+					       &priv->number_of_channels,
+					       0);
 	else
 		rc = mwl_fwcmd_get_device_pwr_tbl(priv->hw,
 						  &priv->device_pwr_tbl[0],
@@ -585,11 +585,11 @@ static void mwl_regd_init(struct mwl_priv *priv)
 
 	for (i = 1; i < priv->number_of_channels; i++) {
 		if (priv->chip_type == MWL8964)
-			mwl_fwcmd_get_device_pwr_tbl_sc4(priv->hw,
-							 &priv->device_pwr_tbl[i],
-							 &region_code,
-							 &priv->number_of_channels,
-							 i);
+			mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
+						  &priv->device_pwr_tbl[i],
+						  &region_code,
+						  &priv->number_of_channels,
+						  i);
 		else
 			mwl_fwcmd_get_device_pwr_tbl(priv->hw,
 						     &priv->device_pwr_tbl[i],

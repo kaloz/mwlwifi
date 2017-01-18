@@ -345,6 +345,37 @@ static inline int mwl_tx_tid_queue_mapping(u8 tid)
 	return -1;
 }
 
+static inline void mwl_tx_add_basic_rates(int band, struct sk_buff *skb)
+{
+	struct ieee80211_mgmt *mgmt;
+	int len;
+	u8 *pos;
+
+	mgmt = (struct ieee80211_mgmt *)skb->data;
+	len = skb->len - ieee80211_hdrlen(mgmt->frame_control);
+	len -= 4;
+	pos = (u8 *)cfg80211_find_ie(WLAN_EID_SUPP_RATES,
+				     mgmt->u.assoc_req.variable,
+				     len);
+	if (pos) {
+		pos++;
+		len = *pos++;
+		while (len) {
+			if (band == NL80211_BAND_2GHZ) {
+				if ((*pos == 2) || (*pos == 4) ||
+				    (*pos == 11) || (*pos == 22))
+					*pos |= 0x80;
+			} else {
+				if ((*pos == 12) || (*pos == 24) ||
+				    (*pos == 48))
+					*pos |= 0x80;
+			}
+			pos++;
+			len--;
+		}
+	}
+}
+
 static inline void mwl_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
 {
 	struct mwl_sta *sta_info;
@@ -829,37 +860,9 @@ void mwl_tx_xmit(struct ieee80211_hw *hw,
 			index = mwl_tx_tid_queue_mapping(tid);
 		}
 
-		if (unlikely(ieee80211_is_assoc_req(wh->frame_control))) {
-			int len;
-			u8 *pos;
-
-			len = skb->len - ieee80211_hdrlen(wh->frame_control);
-			len -= 4;
-			pos = (u8 *)cfg80211_find_ie(WLAN_EID_SUPP_RATES,
-						     mgmt->u.assoc_req.variable,
-						     len);
-			if (pos) {
-				pos++;
-				len = *pos++;
-				while (len) {
-					if (hw->conf.chandef.chan->band
-					    == NL80211_BAND_2GHZ) {
-						if ((*pos == 2) ||
-						    (*pos == 4) ||
-						    (*pos == 11) ||
-						    (*pos == 22))
-							*pos |= 0x80;
-					} else {
-						if ((*pos == 12) ||
-						    (*pos == 24) ||
-						    (*pos == 48))
-							*pos |= 0x80;
-					}
-					pos++;
-					len--;
-				}
-			}
-		}
+		if (unlikely(ieee80211_is_assoc_req(wh->frame_control)))
+			mwl_tx_add_basic_rates(hw->conf.chandef.chan->band,
+					       skb);
 	}
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;

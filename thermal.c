@@ -91,7 +91,7 @@ out:
 	return ret;
 }
 
-static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, mwl_thermal_show_temp,
+static SENSOR_DEVICE_ATTR(temp1_input, 0444, mwl_thermal_show_temp,
 			  NULL, 0);
 
 static struct attribute *mwl_hwmon_attrs[] = {

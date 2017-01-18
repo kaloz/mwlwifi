@@ -124,7 +124,8 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 		rx_num = 2;
 	else if (priv->antenna_rx == ANTENNA_RX_3)
 		rx_num = 3;
-	len += scnprintf(p + len, size - len, "antenna: %d %d\n", tx_num, rx_num);
+	len += scnprintf(p + len, size - len, "antenna: %d %d\n",
+			 tx_num, rx_num);
 	len += scnprintf(p + len, size - len, "irq number: %d\n", priv->irq);
 	len += scnprintf(p + len, size - len, "iobase0: %p\n", priv->iobase0);
 	len += scnprintf(p + len, size - len, "iobase1: %p\n", priv->iobase1);
