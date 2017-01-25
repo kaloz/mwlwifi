@@ -21,6 +21,7 @@
 
 #include "sysadpt.h"
 #include "dev.h"
+#include "sc4_ddr.h"
 #include "fwcmd.h"
 #include "fwdl.h"
 
@@ -47,6 +48,75 @@ static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv)
 
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
 	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+}
+
+static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
+{
+	u32 size_ddr_init = sizeof(sc4_ddr_init);
+	u8 *p = (u8 *)&sc4_ddr_init[0];
+	u32 curr_iteration = 0;
+	u32 size_ddr_init_downloaded = 0;
+	u32 int_code = 0;
+	u32 len = 0;
+
+	/* download ddr init code */
+	wiphy_debug(priv->hw->wiphy, "ddr init: download start\n");
+
+	while (size_ddr_init_downloaded < size_ddr_init) {
+		len = readl(priv->iobase1 + 0xc40);
+
+		if (!len)
+			break;
+
+		/* this copies the next chunk of fw binary to be delivered */
+		memcpy((char *)&priv->pcmd_buf[0], p, len);
+		/* this is arbitrary per your platform; we use 0xffff */
+		curr_iteration = (FW_MAX_NUM_CHECKS * 500);
+		/* this function writes pdata to c10, then write 2 to c18 */
+		mwl_fwdl_trig_pcicmd_bootcode(priv);
+
+		/* NOTE: the following back to back checks on C1C is time
+		 * sensitive, hence may need to be tweaked dependent on host
+		 * processor. Time for SC2 to go from the write of event 2 to
+		 * C1C == 2 is ~1300 nSec. Hence the checkings on host has to
+		 * consider how efficient your code can be to meet this timing,
+		 * or you can alternatively tweak this routines to fit your
+		 * platform
+		 */
+		do {
+			int_code = readl(priv->iobase1 + 0xc1c);
+			if (int_code != 0)
+				break;
+			cond_resched();
+			curr_iteration--;
+		} while (curr_iteration);
+
+		do {
+			int_code = readl(priv->iobase1 + 0xc1c);
+			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
+			    MACREG_H2ARIC_BIT_DOOR_BELL)
+				break;
+			cond_resched();
+			curr_iteration--;
+		} while (curr_iteration);
+
+		if (curr_iteration == 0) {
+			/* This limited loop check allows you to exit gracefully
+			 * without locking up your entire system just because fw
+			 * download failed
+			 */
+			wiphy_err(priv->hw->wiphy,
+				  "Exhausted curr_iteration during download\n");
+			return false;
+		}
+
+		p += len;
+		size_ddr_init_downloaded += len;
+	}
+
+	wiphy_debug(priv->hw->wiphy, "ddr init: download complete\n");
+
+	return true;
 }
 
 int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
@@ -88,6 +158,14 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
 	while (readl(priv->iobase1 + 0xc40) == 0)
 		cond_resched();
+
+	if (priv->chip_type == MWL8964) {
+		if (!mwl_fwdl_download_ddr_init(priv)) {
+			wiphy_err(hw->wiphy,
+				  "ddr init: code download failed\n");
+			goto err_download;
+		}
+	}
 
 	while (size_fw_downloaded < fw->size) {
 		len = readl(priv->iobase1 + 0xc40);
