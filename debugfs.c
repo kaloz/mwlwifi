@@ -18,10 +18,10 @@
 #include <linux/debugfs.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "hostcmd.h"
-#include "fwcmd.h"
+#include "core.h"
 #include "thermal.h"
+#include "hif/fwcmd.h"
+#include "hif/hif-ops.h"
 #include "debugfs.h"
 
 #define MWLWIFI_DEBUGFS_ADD_FILE(name) do { \
@@ -96,13 +96,15 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 
 	len += scnprintf(p + len, size - len, "\n");
 	len += scnprintf(p + len, size - len,
-			 "driver name: %s\n", MWL_DRV_NAME);
+			 "driver name: %s\n",
+			 mwl_hif_get_driver_name(priv->hw));
 	len += scnprintf(p + len, size - len, "chip type: %s\n",
 			 chipname[priv->chip_type]);
 	len += scnprintf(p + len, size - len,
 			 "hw version: %X\n", priv->hw_data.hw_version);
 	len += scnprintf(p + len, size - len,
-			 "driver version: %s\n", MWL_DRV_VERSION);
+			 "driver version: %s\n",
+			 mwl_hif_get_driver_version(priv->hw));
 	len += scnprintf(p + len, size - len, "firmware version: 0x%08x\n",
 			 priv->hw_data.fw_release_num);
 	len += scnprintf(p + len, size - len,
@@ -127,20 +129,13 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len, "antenna: %d %d\n",
 			 tx_num, rx_num);
 	len += scnprintf(p + len, size - len, "irq number: %d\n", priv->irq);
-	len += scnprintf(p + len, size - len, "iobase0: %p\n", priv->iobase0);
-	len += scnprintf(p + len, size - len, "iobase1: %p\n", priv->iobase1);
-	len += scnprintf(p + len, size - len,
-			 "tx limit: %d\n", priv->txq_limit);
-	len += scnprintf(p + len, size - len,
-			 "rx limit: %d\n", priv->recv_limit);
 	len += scnprintf(p + len, size - len, "ap macid support: %08x\n",
 			 priv->ap_macids_supported);
 	len += scnprintf(p + len, size - len, "sta macid support: %08x\n",
 			 priv->sta_macids_supported);
 	len += scnprintf(p + len, size - len,
 			 "macid used: %08x\n", priv->macids_used);
-	len += scnprintf(p + len, size - len,
-			 "qe trigger number: %d\n", priv->qe_trigger_num);
+	len += mwl_hif_get_info(priv->hw, p + len, size - len);
 	len += scnprintf(p + len, size - len, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
@@ -390,79 +385,6 @@ static ssize_t mwl_debugfs_device_pwrtbl_read(struct file *file,
 	return ret;
 }
 
-static ssize_t mwl_debugfs_tx_desc_read(struct file *file,
-					char __user *ubuf,
-					size_t count, loff_t *ppos)
-{
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
-	unsigned long page = get_zeroed_page(GFP_KERNEL);
-	char *p = (char *)page;
-	int len = 0, size = PAGE_SIZE;
-	struct mwl_desc_data *desc;
-	int i, num, write_item = -1, free_item = -1;
-	ssize_t ret;
-
-	spin_lock_bh(&priv->tx_desc_lock);
-	num = priv->tx_desc_num;
-	desc = &priv->desc_data[num];
-	len += scnprintf(p + len, size - len, "num: %i fw_desc_cnt:%i\n",
-			 num, priv->fw_desc_cnt[num]);
-	for (i = 0; i < SYSADPT_MAX_NUM_TX_DESC; i++) {
-		len += scnprintf(p + len, size - len, "%3i %x\n", i,
-				 desc->tx_hndl[i].pdesc->status);
-		if (desc->pnext_tx_hndl == &desc->tx_hndl[i])
-			write_item = i;
-		if (desc->pstale_tx_hndl == &desc->tx_hndl[i])
-			free_item = i;
-	}
-	len += scnprintf(p + len, size - len, "next:%i stale:%i\n",
-			 write_item, free_item);
-	len += scnprintf(p + len, size - len, "\n");
-	spin_unlock_bh(&priv->tx_desc_lock);
-
-	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
-	free_page(page);
-
-	return ret;
-}
-
-static ssize_t mwl_debugfs_tx_desc_write(struct file *file,
-					 const char __user *ubuf,
-					 size_t count, loff_t *ppos)
-{
-	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
-	unsigned long addr = get_zeroed_page(GFP_KERNEL);
-	char *buf = (char *)addr;
-	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
-	int tx_desc_num = 0;
-	ssize_t ret;
-
-	if (!buf)
-		return -ENOMEM;
-
-	if (copy_from_user(buf, ubuf, buf_size)) {
-		ret = -EFAULT;
-		goto err;
-	}
-
-	if (kstrtoint(buf, 0, &tx_desc_num)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	if ((tx_desc_num < 0) || (tx_desc_num >= SYSADPT_NUM_OF_DESC_DATA)) {
-		ret = -EINVAL;
-		goto err;
-	}
-
-	priv->tx_desc_num = tx_desc_num;
-	ret = count;
-
-err:
-	free_page(addr);
-	return ret;
-}
-
 static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 					    char __user *ubuf,
 					    size_t count, loff_t *ppos)
@@ -674,67 +596,6 @@ err:
 	return ret;
 }
 
-
-static int mwl_debugfs_reg_access(struct mwl_priv *priv, bool write)
-{
-	struct ieee80211_hw *hw = priv->hw;
-	u8 set;
-	u32 *addr_val;
-	int ret = 0;
-
-	set = write ? WL_SET : WL_GET;
-
-	switch (priv->reg_type) {
-	case MWL_ACCESS_RF:
-		ret = mwl_fwcmd_reg_rf(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_BBP:
-		ret = mwl_fwcmd_reg_bb(hw, set, priv->reg_offset,
-				       &priv->reg_value);
-		break;
-	case MWL_ACCESS_CAU:
-		ret = mwl_fwcmd_reg_cau(hw, set, priv->reg_offset,
-					&priv->reg_value);
-		break;
-	case MWL_ACCESS_ADDR0:
-		if (set == WL_GET)
-			priv->reg_value =
-				readl(priv->iobase0 + priv->reg_offset);
-		else
-			writel(priv->reg_value,
-			       priv->iobase0 + priv->reg_offset);
-		break;
-	case MWL_ACCESS_ADDR1:
-		if (set == WL_GET)
-			priv->reg_value =
-				readl(priv->iobase1 + priv->reg_offset);
-		else
-			writel(priv->reg_value,
-			       priv->iobase1 + priv->reg_offset);
-		break;
-	case MWL_ACCESS_ADDR:
-		addr_val = kmalloc(64 * sizeof(u32), GFP_KERNEL);
-		if (addr_val) {
-			memset(addr_val, 0, 64 * sizeof(u32));
-			addr_val[0] = priv->reg_value;
-			ret = mwl_fwcmd_get_addr_value(hw, priv->reg_offset,
-						       4, addr_val, set);
-			if ((!ret) && (set == WL_GET))
-				priv->reg_value = addr_val[0];
-			kfree(addr_val);
-		} else {
-			ret = -ENOMEM;
-		}
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
-}
-
 static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
@@ -755,11 +616,11 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 
 	/* Set command has been given */
 	if (priv->reg_value != UINT_MAX) {
-		ret = mwl_debugfs_reg_access(priv, true);
+		ret = mwl_hif_reg_access(priv->hw, true);
 		goto done;
 	}
 	/* Get command has been given */
-	ret = mwl_debugfs_reg_access(priv, false);
+	ret = mwl_hif_reg_access(priv->hw, false);
 
 done:
 	if (!ret)
@@ -821,7 +682,6 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
-MWLWIFI_DEBUGFS_FILE_OPS(tx_desc);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
@@ -843,7 +703,6 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(sta);
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
 	MWLWIFI_DEBUGFS_ADD_FILE(device_pwrtbl);
-	MWLWIFI_DEBUGFS_ADD_FILE(tx_desc);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);

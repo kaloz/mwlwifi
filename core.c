@@ -13,58 +13,17 @@
  * this warranty disclaimer.
  */
 
-/* Description:  This file implements main functions of this module. */
-
-#include <linux/module.h>
-#ifdef CONFIG_OF
-#include <linux/of.h>
-#endif
+/* Description:  This file implements core layer related functions. */
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "fwdl.h"
-#include "fwcmd.h"
-#include "tx.h"
-#include "rx.h"
-#include "isr.h"
+#include "core.h"
 #include "thermal.h"
-#ifdef CONFIG_DEBUG_FS
 #include "debugfs.h"
-#endif
+#include "hif/fwcmd.h"
+#include "hif/hif-ops.h"
 
-#define MWL_DESC         "Marvell 802.11ac Wireless Network Driver"
-#define MWL_DEV_NAME     "Marvell 802.11ac Adapter"
-
-#define FILE_PATH_LEN    64
 #define CMD_BUF_SIZE     0x4000
-
-static struct pci_device_id mwl_pci_id_tbl[] = {
-	{ PCI_VDEVICE(MARVELL, 0x2a55), .driver_data = MWL8864, },
-	{ PCI_VDEVICE(MARVELL, 0x2b38), .driver_data = MWL8897, },
-	{ PCI_VDEVICE(MARVELL, 0x2b40), .driver_data = MWL8964, },
-	{ },
-};
-
-static struct mwl_chip_info mwl_chip_tbl[] = {
-	[MWL8864] = {
-		.part_name	= "88W8864",
-		.fw_image	= "mwlwifi/88W8864.bin",
-		.antenna_tx	= ANTENNA_TX_4_AUTO,
-		.antenna_rx	= ANTENNA_RX_4_AUTO,
-	},
-	[MWL8897] = {
-		.part_name	= "88W8897",
-		.fw_image	= "mwlwifi/88W8897.bin",
-		.antenna_tx	= ANTENNA_TX_2,
-		.antenna_rx	= ANTENNA_RX_2,
-	},
-	[MWL8964] = {
-		.part_name	= "88W8964",
-		.fw_image	= "mwlwifi/88W8964.bin",
-		.antenna_tx	= ANTENNA_TX_4_AUTO,
-		.antenna_rx	= ANTENNA_RX_4_AUTO,
-	},
-};
+#define INVALID_WATCHDOG 0xAA
 
 static const struct ieee80211_channel mwl_channels_24[] = {
 	{ .band = NL80211_BAND_2GHZ, .center_freq = 2412, .hw_value = 1, },
@@ -171,36 +130,8 @@ static const struct region_code_mapping regmap[] = {
 	{"CN", 0x90}, /* China (Asia) */
 };
 
-static int mwl_alloc_pci_resource(struct mwl_priv *priv)
+static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 {
-	struct pci_dev *pdev = priv->pdev;
-	void __iomem *addr;
-
-	priv->next_bar_num = 1;	/* 32-bit */
-	if (pci_resource_flags(pdev, 0) & 0x04)
-		priv->next_bar_num = 2;	/* 64-bit */
-
-	addr = devm_ioremap_resource(priv->dev, &pdev->resource[0]);
-	if (IS_ERR(addr)) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 0\n",
-			  MWL_DRV_NAME);
-		goto err;
-	}
-	priv->iobase0 = addr;
-	wiphy_debug(priv->hw->wiphy, "priv->iobase0 = %p\n", priv->iobase0);
-
-	addr = devm_ioremap_resource(priv->dev,
-				     &pdev->resource[priv->next_bar_num]);
-	if (IS_ERR(addr)) {
-		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot reserve PCI memory region 1\n",
-			  MWL_DRV_NAME);
-		goto err;
-	}
-	priv->iobase1 = addr;
-	wiphy_debug(priv->hw->wiphy, "priv->iobase1 = %p\n", priv->iobase1);
-
 	priv->pcmd_buf =
 		(unsigned short *)dmam_alloc_coherent(priv->dev,
 						      CMD_BUF_SIZE,
@@ -208,8 +139,7 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 						      GFP_KERNEL);
 	if (!priv->pcmd_buf) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot alloc memory for command buffer\n",
-			  MWL_DRV_NAME);
+			  "cannot alloc memory for command buffer\n");
 		goto err;
 	}
 	wiphy_debug(priv->hw->wiphy,
@@ -221,7 +151,7 @@ static int mwl_alloc_pci_resource(struct mwl_priv *priv)
 	return 0;
 
 err:
-	wiphy_err(priv->hw->wiphy, "pci alloc fail\n");
+	wiphy_err(priv->hw->wiphy, "command buffer alloc fail\n");
 
 	return -EIO;
 }
@@ -235,16 +165,14 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot find firmware image <%s>\n",
-				  MWL_DRV_NAME, fw_name);
+			  "cannot find firmware image <%s>\n", fw_name);
 		goto err_load_fw;
 	}
 
-	rc = mwl_fwdl_download_firmware(priv->hw);
+	rc = mwl_hif_download_firmware(priv->hw);
 	if (rc) {
 		wiphy_err(priv->hw->wiphy,
-			  "%s: cannot download firmware image <%s>\n",
-			  MWL_DRV_NAME, fw_name);
+			  "cannot download firmware image <%s>\n", fw_name);
 		goto err_download_fw;
 	}
 
@@ -259,6 +187,45 @@ err_load_fw:
 	wiphy_err(priv->hw->wiphy, "firmware init fail\n");
 
 	return rc;
+}
+
+static void mwl_process_of_dts(struct mwl_priv *priv)
+{
+#ifdef CONFIG_OF
+	struct property *prop;
+	u32 prop_value;
+
+	priv->dt_node =
+		of_find_node_by_name(mwl_hif_device_node(priv->hw),
+				     "mwlwifi");
+	if (!priv->dt_node)
+		return;
+
+	/* look for all matching property names */
+	for_each_property_of_node(priv->dt_node, prop) {
+		if (strcmp(prop->name, "marvell,2ghz") == 0)
+			priv->disable_2g = true;
+		if (strcmp(prop->name, "marvell,5ghz") == 0)
+			priv->disable_5g = true;
+		if (strcmp(prop->name, "marvell,chainmask") == 0) {
+			prop_value = be32_to_cpu(*((__be32 *)prop->value));
+			if (prop_value == 2)
+				priv->antenna_tx = ANTENNA_TX_2;
+			else if (prop_value == 3)
+				priv->antenna_tx = ANTENNA_TX_3;
+
+			prop_value = be32_to_cpu(*((__be32 *)
+						 (prop->value + 4)));
+			if (prop_value == 2)
+				priv->antenna_rx = ANTENNA_RX_2;
+			else if (prop_value == 3)
+				priv->antenna_rx = ANTENNA_RX_3;
+		}
+	}
+
+	priv->pwr_node = of_find_node_by_name(priv->dt_node,
+					      "marvell,powertable");
+#endif
 }
 
 static void mwl_reg_notifier(struct wiphy *wiphy,
@@ -387,43 +354,52 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 #endif
 }
 
-static void mwl_process_of_dts(struct mwl_priv *priv)
+static void mwl_regd_init(struct mwl_priv *priv)
 {
-#ifdef CONFIG_OF
-	struct property *prop;
-	u32 prop_value;
+	u8 region_code;
+	int rc;
+	int i;
 
-	priv->dt_node =
-		of_find_node_by_name(pci_bus_to_OF_node(priv->pdev->bus),
-				     "mwlwifi");
-	if (!priv->dt_node)
+	/* hook regulatory domain change notification */
+	priv->hw->wiphy->reg_notifier = mwl_reg_notifier;
+
+	if (priv->chip_type == MWL8964)
+		rc = mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
+					       &priv->device_pwr_tbl[0],
+					       &region_code,
+					       &priv->number_of_channels,
+					       0);
+	else
+		rc = mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+						  &priv->device_pwr_tbl[0],
+						  &region_code,
+						  &priv->number_of_channels,
+						  0);
+	if (rc)
 		return;
 
-	/* look for all matching property names */
-	for_each_property_of_node(priv->dt_node, prop) {
-		if (strcmp(prop->name, "marvell,2ghz") == 0)
-			priv->disable_2g = true;
-		if (strcmp(prop->name, "marvell,5ghz") == 0)
-			priv->disable_5g = true;
-		if (strcmp(prop->name, "marvell,chainmask") == 0) {
-			prop_value = be32_to_cpu(*((__be32 *)prop->value));
-			if (prop_value == 2)
-				priv->antenna_tx = ANTENNA_TX_2;
-			else if (prop_value == 3)
-				priv->antenna_tx = ANTENNA_TX_3;
+	priv->forbidden_setting = true;
 
-			prop_value = be32_to_cpu(*((__be32 *)
-						 (prop->value + 4)));
-			if (prop_value == 2)
-				priv->antenna_rx = ANTENNA_RX_2;
-			else if (prop_value == 3)
-				priv->antenna_rx = ANTENNA_RX_3;
-		}
+	for (i = 1; i < priv->number_of_channels; i++) {
+		if (priv->chip_type == MWL8964)
+			mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
+						  &priv->device_pwr_tbl[i],
+						  &region_code,
+						  &priv->number_of_channels,
+						  i);
+		else
+			mwl_fwcmd_get_device_pwr_tbl(priv->hw,
+						     &priv->device_pwr_tbl[i],
+						     &region_code,
+						     &priv->number_of_channels,
+						     i);
 	}
 
-	priv->pwr_node = of_find_node_by_name(priv->dt_node,
-					      "marvell,powertable");
-#endif
+	for (i = 0; i < ARRAY_SIZE(regmap); i++)
+		if (regmap[i].region_code == priv->fw_region_code) {
+			memcpy(priv->fw_alpha2, regmap[i].alpha2, 2);
+			break;
+		}
 }
 
 static void mwl_set_ht_caps(struct mwl_priv *priv,
@@ -557,83 +533,96 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	}
 }
 
-static void mwl_regd_init(struct mwl_priv *priv)
+static void mwl_chnl_switch_event(struct work_struct *work)
 {
-	u8 region_code;
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, chnl_switch_handle);
+	struct mwl_vif *mwl_vif;
+	struct ieee80211_vif *vif;
+
+	if (!priv->csa_active) {
+		wiphy_err(priv->hw->wiphy,
+			  "csa is not active (got channel switch event)\n");
+		return;
+	}
+
+	spin_lock_bh(&priv->vif_lock);
+	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
+		vif = container_of((char *)mwl_vif, struct ieee80211_vif,
+				   drv_priv[0]);
+
+		if (vif->csa_active)
+			ieee80211_csa_finish(vif);
+	}
+	spin_unlock_bh(&priv->vif_lock);
+
+	wiphy_info(priv->hw->wiphy, "channel switch is done\n");
+
+	priv->csa_active = false;
+}
+
+static void mwl_watchdog_ba_events(struct work_struct *work)
+{
 	int rc;
-	int i;
+	u8 bitmap = 0, stream_index;
+	struct mwl_ampdu_stream *streams;
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, watchdog_ba_handle);
 
-	/* hook regulatory domain change notification */
-	priv->hw->wiphy->reg_notifier = mwl_reg_notifier;
+	rc = mwl_fwcmd_get_watchdog_bitmap(priv->hw, &bitmap);
 
-	if (priv->chip_type == MWL8964)
-		rc = mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
-					       &priv->device_pwr_tbl[0],
-					       &region_code,
-					       &priv->number_of_channels,
-					       0);
-	else
-		rc = mwl_fwcmd_get_device_pwr_tbl(priv->hw,
-						  &priv->device_pwr_tbl[0],
-						  &region_code,
-						  &priv->number_of_channels,
-						  0);
 	if (rc)
 		return;
 
-	priv->forbidden_setting = true;
+	spin_lock_bh(&priv->stream_lock);
 
-	for (i = 1; i < priv->number_of_channels; i++) {
-		if (priv->chip_type == MWL8964)
-			mwl_fwcmd_get_pwr_tbl_sc4(priv->hw,
-						  &priv->device_pwr_tbl[i],
-						  &region_code,
-						  &priv->number_of_channels,
-						  i);
+	/* the bitmap is the hw queue number.  Map it to the ampdu queue. */
+	if (bitmap != INVALID_WATCHDOG) {
+		if (bitmap == SYSADPT_TX_AMPDU_QUEUES)
+			stream_index = 0;
+		else if (bitmap > SYSADPT_TX_AMPDU_QUEUES)
+			stream_index = bitmap - SYSADPT_TX_AMPDU_QUEUES;
 		else
-			mwl_fwcmd_get_device_pwr_tbl(priv->hw,
-						     &priv->device_pwr_tbl[i],
-						     &region_code,
-						     &priv->number_of_channels,
-						     i);
+			stream_index = bitmap + 3; /** queue 0 is stream 3*/
+
+		if (bitmap != 0xFF) {
+			/* Check if the stream is in use before disabling it */
+			streams = &priv->ampdu[stream_index];
+
+			if (streams->state == AMPDU_STREAM_ACTIVE)
+				ieee80211_stop_tx_ba_session(streams->sta,
+							     streams->tid);
+		} else {
+			for (stream_index = 0;
+			     stream_index < SYSADPT_TX_AMPDU_QUEUES;
+			     stream_index++) {
+				streams = &priv->ampdu[stream_index];
+
+				if (streams->state != AMPDU_STREAM_ACTIVE)
+					continue;
+
+				ieee80211_stop_tx_ba_session(streams->sta,
+							     streams->tid);
+			}
+		}
 	}
 
-	for (i = 0; i < ARRAY_SIZE(regmap); i++)
-		if (regmap[i].region_code == priv->fw_region_code) {
-			memcpy(priv->fw_alpha2, regmap[i].alpha2, 2);
-			break;
-		}
+	spin_unlock_bh(&priv->stream_lock);
+}
+
+static irqreturn_t mwl_isr(int irq, void *dev_id)
+{
+	struct ieee80211_hw *hw = dev_id;
+
+	return mwl_hif_irq_handler(hw);
 }
 
 static void timer_routine(unsigned long data)
 {
-	struct mwl_priv *priv = (struct mwl_priv *)data;
-	struct mwl_ampdu_stream *stream;
-	struct mwl_sta *sta_info;
-	struct mwl_tx_info *tx_stats;
-	int i;
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
+	struct mwl_priv *priv = hw->priv;
 
-	spin_lock_bh(&priv->stream_lock);
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
-
-		if (stream->state == AMPDU_STREAM_ACTIVE) {
-			sta_info = mwl_dev_get_sta(stream->sta);
-			tx_stats = &sta_info->tx_stats[stream->tid];
-
-			if ((jiffies - tx_stats->start_time > HZ) &&
-			    (tx_stats->pkts < SYSADPT_AMPDU_PACKET_THRESHOLD)) {
-				ieee80211_stop_tx_ba_session(stream->sta,
-							     stream->tid);
-			}
-
-			if (jiffies - tx_stats->start_time > HZ) {
-				tx_stats->pkts = 0;
-				tx_stats->start_time = jiffies;
-			}
-		}
-	}
-	spin_unlock_bh(&priv->stream_lock);
+	mwl_hif_timer_routine(hw);
 
 	mod_timer(&priv->period_timer, jiffies +
 		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
@@ -641,13 +630,10 @@ static void timer_routine(unsigned long data)
 
 static int mwl_wl_init(struct mwl_priv *priv)
 {
-	struct ieee80211_hw *hw;
+	struct ieee80211_hw *hw = priv->hw;
 	int rc;
-	int i;
 
-	hw = priv->hw;
-
-	hw->extra_tx_headroom = SYSADPT_MIN_BYTES_HEADROOM;
+	hw->extra_tx_headroom = mwl_hif_get_tx_head_room(hw);
 	hw->queues = SYSADPT_TX_WMM_QUEUES;
 
 	/* Set rssi values to dBm */
@@ -680,9 +666,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->radio_on = false;
 	priv->radio_short_preamble = false;
 	priv->wmm_enabled = false;
-
 	priv->powinited = 0;
-
 	priv->csa_active = false;
 	priv->dfs_chirp_count_min = 5;
 	priv->dfs_chirp_time_interval = 1000;
@@ -694,76 +678,24 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
 	INIT_WORK(&priv->chnl_switch_handle, mwl_chnl_switch_event);
 
-	tasklet_init(&priv->tx_task, (void *)mwl_tx_skbs, (unsigned long)hw);
-	tasklet_disable(&priv->tx_task);
-	tasklet_init(&priv->tx_done_task,
-		     (void *)mwl_tx_done, (unsigned long)hw);
-	tasklet_disable(&priv->tx_done_task);
-	tasklet_init(&priv->rx_task, (void *)mwl_rx_recv, (unsigned long)hw);
-	tasklet_disable(&priv->rx_task);
-	tasklet_init(&priv->qe_task,
-		     (void *)mwl_tx_flush_amsdu, (unsigned long)hw);
-	tasklet_disable(&priv->qe_task);
-	priv->txq_limit = SYSADPT_TX_QUEUE_LIMIT;
-	priv->is_tx_done_schedule = false;
-	priv->recv_limit = SYSADPT_RECEIVE_LIMIT;
-	priv->is_rx_schedule = false;
-	priv->is_qe_schedule = false;
-	priv->qe_trigger_num = 0;
-	priv->qe_trigger_time = jiffies;
-
 	mutex_init(&priv->fwcmd_mutex);
-	spin_lock_init(&priv->tx_desc_lock);
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
 	spin_lock_init(&priv->stream_lock);
 
 	rc = mwl_thermal_register(priv);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to register thermal framework\n",
-			  MWL_DRV_NAME);
+		wiphy_err(hw->wiphy, "fail to register thermal framework\n");
 		goto err_thermal_register;
 	}
 
-	rc = mwl_tx_init(hw);
+	rc = mwl_hif_init(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
-			  MWL_DRV_NAME);
-		goto err_mwl_tx_init;
-	}
-
-	rc = mwl_rx_init(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
-			  MWL_DRV_NAME);
-		goto err_mwl_rx_init;
-	}
-
-	rc = mwl_fwcmd_get_hw_specs(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n",
-			  MWL_DRV_NAME);
-		goto err_get_hw_specs;
+		wiphy_err(hw->wiphy, "fail to initialize host interface\n");
+		goto err_hif_init;
 	}
 
 	SET_IEEE80211_PERM_ADDR(hw, priv->hw_data.mac_addr);
-
-	writel(priv->desc_data[0].pphys_tx_ring,
-	       priv->iobase0 + priv->desc_data[0].wcb_base);
-	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
-		writel(priv->desc_data[i].pphys_tx_ring,
-		       priv->iobase0 + priv->desc_data[i].wcb_base);
-	writel(priv->desc_data[0].pphys_rx_ring,
-	       priv->iobase0 + priv->desc_data[0].rx_desc_read);
-	writel(priv->desc_data[0].pphys_rx_ring,
-	       priv->iobase0 + priv->desc_data[0].rx_desc_write);
-
-	rc = mwl_fwcmd_set_hw_specs(hw);
-	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
-			  MWL_DRV_NAME);
-		goto err_set_hw_specs;
-	}
 
 	wiphy_info(hw->wiphy,
 		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
@@ -781,9 +713,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	}
 
 	mwl_fwcmd_radio_disable(hw);
-
 	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, priv->antenna_tx);
-
 	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_RX, priv->antenna_rx);
 
 	hw->wiphy->interface_modes = 0;
@@ -796,38 +726,30 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	rc = ieee80211_register_hw(hw);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to register device\n",
-			  MWL_DRV_NAME);
+		wiphy_err(hw->wiphy, "fail to register device\n");
 		goto err_register_hw;
 	}
 
-	rc = request_irq(priv->pdev->irq, mwl_isr,
-			 IRQF_SHARED, MWL_DRV_NAME, hw);
+	priv->irq = mwl_hif_get_irq_num(hw);
+	rc = request_irq(priv->irq, mwl_isr, IRQF_SHARED,
+			 mwl_hif_get_driver_name(hw), hw);
 	if (rc) {
 		priv->irq = -1;
 		wiphy_err(hw->wiphy, "fail to register IRQ handler\n");
 		goto err_register_irq;
 	}
-	priv->irq = priv->pdev->irq;
 
-	setup_timer(&priv->period_timer, timer_routine, (unsigned long)priv);
+	setup_timer(&priv->period_timer, timer_routine, (unsigned long)hw);
 	mod_timer(&priv->period_timer, jiffies +
 		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
 
 	return rc;
 
-err_register_irq:
 err_register_hw:
-err_set_hw_specs:
-err_get_hw_specs:
+err_register_irq:
+	mwl_hif_deinit(hw);
 
-	mwl_rx_deinit(hw);
-
-err_mwl_rx_init:
-
-	mwl_tx_deinit(hw);
-
-err_mwl_tx_init:
+err_hif_init:
 err_thermal_register:
 
 	wiphy_err(hw->wiphy, "init fail\n");
@@ -842,93 +764,74 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	del_timer_sync(&priv->period_timer);
 
 	if (priv->irq != -1) {
-		free_irq(priv->pdev->irq, hw);
+		free_irq(priv->irq, hw);
 		priv->irq = -1;
 	}
 
 	ieee80211_unregister_hw(hw);
 	mwl_thermal_unregister(priv);
-	mwl_rx_deinit(hw);
-	mwl_tx_deinit(hw);
-	tasklet_kill(&priv->qe_task);
-	tasklet_kill(&priv->rx_task);
-	tasklet_kill(&priv->tx_done_task);
-	tasklet_kill(&priv->tx_task);
 	cancel_work_sync(&priv->watchdog_ba_handle);
-	mwl_fwcmd_reset(hw);
+	mwl_hif_deinit(hw);
 }
 
-static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+struct ieee80211_hw *mwl_alloc_hw(int bus_type,
+				  int chip_type,
+				  struct device *dev,
+				  const struct mwl_hif_ops *ops,
+				  size_t hif_data_len)
 {
-	static bool printed_version;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
-	const char *fw_name;
-	int tx_num = 4, rx_num = 4;
-	int rc = 0;
+	int priv_size;
 
-	if (id->driver_data >= MWLUNKNOWN)
-		return -ENODEV;
+	priv_size = ALIGN(sizeof(*priv), NETDEV_ALIGN) + hif_data_len;
 
-	if (!printed_version) {
-		pr_info("<<%s version %s>>\n",
-			MWL_DESC, MWL_DRV_VERSION);
-		printed_version = true;
-	}
-
-	rc = pci_enable_device(pdev);
-	if (rc) {
-		pr_err("%s: cannot enable new PCI device\n",
-		       MWL_DRV_NAME);
-		return rc;
-	}
-
-	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-	if (rc) {
-		pr_err("%s: 32-bit PCI DMA not supported\n",
-		       MWL_DRV_NAME);
-		goto err_pci_disable_device;
-	}
-
-	pci_set_master(pdev);
-
-	hw = ieee80211_alloc_hw(sizeof(*priv), &mwl_mac80211_ops);
+	hw = ieee80211_alloc_hw(priv_size, &mwl_mac80211_ops);
 	if (!hw) {
-		pr_err("%s: ieee80211 alloc failed\n",
-		       MWL_DRV_NAME);
-		rc = -ENOMEM;
-		goto err_pci_disable_device;
+		pr_err("ieee80211 alloc failed\n");
+		return NULL;
 	}
-
-	pci_set_drvdata(pdev, hw);
 
 	priv = hw->priv;
 	priv->hw = hw;
-	priv->pdev = pdev;
-	priv->dev = &pdev->dev;
-	priv->chip_type = id->driver_data;
+	priv->dev = dev;
+	priv->chip_type = chip_type;
 	priv->fw_device_pwrtbl = false;
 	priv->forbidden_setting = false;
 	priv->regulatory_set = false;
 	priv->disable_2g = false;
 	priv->disable_5g = false;
-	priv->antenna_tx = mwl_chip_tbl[priv->chip_type].antenna_tx;
-	priv->antenna_rx = mwl_chip_tbl[priv->chip_type].antenna_rx;
+	priv->hif.bus = bus_type;
+	priv->hif.ops = ops;
+	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
 
-	SET_IEEE80211_DEV(hw, priv->dev);
+	SET_IEEE80211_DEV(hw, dev);
 
-	rc = mwl_alloc_pci_resource(priv);
-	if (rc)
-		goto err_alloc_pci_resource;
+	return hw;
+}
 
-	fw_name = mwl_chip_tbl[priv->chip_type].fw_image;
+void mwl_free_hw(struct ieee80211_hw *hw)
+{
+	ieee80211_free_hw(hw);
+}
+
+int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name)
+{
+	struct mwl_priv *priv = hw->priv;
+	int rc;
+	int tx_num = 4, rx_num = 4;
+
+
+	rc = mwl_prepare_cmd_buf(priv);
+	if (rc) {
+		wiphy_err(hw->wiphy, "fail to prepare command buffer\n");
+		return -ENOMEM;
+	}
 
 	rc = mwl_init_firmware(priv, fw_name);
-
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize firmware\n",
-			  MWL_DRV_NAME);
-		goto err_init_firmware;
+		wiphy_err(hw->wiphy, "fail to initialize firmware\n");
+		return -EIO;
 	}
 
 	/* firmware is loaded to H/W, it can be released now */
@@ -938,9 +841,8 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	rc = mwl_wl_init(priv);
 	if (rc) {
-		wiphy_err(hw->wiphy, "%s: fail to initialize wireless lan\n",
-			  MWL_DRV_NAME);
-		goto err_wl_init;
+		wiphy_err(hw->wiphy, "fail to initialize wireless lan\n");
+		return -EIO;
 	}
 
 	wiphy_info(priv->hw->wiphy, "2G %s, 5G %s\n",
@@ -962,57 +864,14 @@ static int mwl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mwl_debugfs_init(hw);
 #endif
 
-	return rc;
-
-err_wl_init:
-err_init_firmware:
-
-	mwl_fwcmd_reset(hw);
-
-err_alloc_pci_resource:
-
-	pci_set_drvdata(pdev, NULL);
-	ieee80211_free_hw(hw);
-
-err_pci_disable_device:
-
-	pci_disable_device(pdev);
-
-	return rc;
+	return 0;
 }
 
-static void mwl_remove(struct pci_dev *pdev)
+void mwl_deinit_hw(struct ieee80211_hw *hw)
 {
-	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
-	struct mwl_priv *priv;
-
-	if (!hw)
-		return;
-
-	priv = hw->priv;
-
-	mwl_wl_deinit(priv);
-	pci_set_drvdata(pdev, NULL);
-	ieee80211_free_hw(hw);
-	pci_disable_device(pdev);
+	mwl_wl_deinit(hw->priv);
 
 #ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_remove(hw);
 #endif
 }
-
-static struct pci_driver mwl_pci_driver = {
-	.name     = MWL_DRV_NAME,
-	.id_table = mwl_pci_id_tbl,
-	.probe    = mwl_probe,
-	.remove   = mwl_remove
-};
-
-module_pci_driver(mwl_pci_driver);
-
-MODULE_DESCRIPTION(MWL_DESC);
-MODULE_VERSION(MWL_DRV_VERSION);
-MODULE_AUTHOR("Marvell Semiconductor, Inc.");
-MODULE_LICENSE("GPL v2");
-MODULE_SUPPORTED_DEVICE(MWL_DEV_NAME);
-MODULE_DEVICE_TABLE(pci, mwl_pci_id_tbl);

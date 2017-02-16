@@ -13,13 +13,12 @@
  * this warranty disclaimer.
  */
 
-/* Description:  This file defines receive related functions. */
+/* Description:  This file defines firmware download related functions. */
 
-#ifndef _RX_H_
-#define _RX_H_
+#ifndef _FWDL_H_
+#define _FWDL_H_
 
-int mwl_rx_init(struct ieee80211_hw *hw);
-void mwl_rx_deinit(struct ieee80211_hw *hw);
-void mwl_rx_recv(unsigned long data);
+void pcie_reset(struct ieee80211_hw *hw);
+int pcie_download_firmware(struct ieee80211_hw *hw);
 
-#endif /* _RX_H_ */
+#endif /* _FWDL_H_ */

@@ -20,6 +20,8 @@
 #ifndef _FWCMD_H_
 #define _FWCMD_H_
 
+#include "hif/hostcmd.h"
+
 /*  Define OpMode for SoftAP/Station mode
  *
  *  The following mode signature has to be written to PCI scratch register#0
@@ -59,15 +61,13 @@ enum encr_type {
 	ENCR_TYPE_MIX = 7,
 };
 
-void mwl_fwcmd_reset(struct ieee80211_hw *hw);
+char *mwl_fwcmd_get_cmd_string(unsigned short cmd);
 
-void mwl_fwcmd_int_enable(struct ieee80211_hw *hw);
+const struct hostcmd_get_hw_spec
+*mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw);
 
-void mwl_fwcmd_int_disable(struct ieee80211_hw *hw);
-
-int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw);
-
-int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw);
+int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw,
+			   struct hostcmd_set_hw_spec *spec);
 
 int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		       struct ieee80211_low_level_stats *stats);

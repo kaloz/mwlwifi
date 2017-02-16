@@ -22,8 +22,8 @@
 #include <linux/hwmon-sysfs.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "fwcmd.h"
+#include "core.h"
+#include "hif/fwcmd.h"
 #include "thermal.h"
 
 static int

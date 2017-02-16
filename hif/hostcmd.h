@@ -197,8 +197,7 @@ struct hostcmd_header {
 } __packed;
 
 /* HOSTCMD_CMD_GET_HW_SPEC */
-struct hostcmd_cmd_get_hw_spec {
-	struct hostcmd_header cmd_hdr;
+struct hostcmd_get_hw_spec {
 	u8 version;                  /* version of the HW                    */
 	u8 host_if;                  /* host interface                       */
 	__le16 num_wcb;              /* Max. number of WCB FW can handle     */
@@ -214,9 +213,13 @@ struct hostcmd_cmd_get_hw_spec {
 	__le32 wcb_base[SYSADPT_TOTAL_TX_QUEUES - 1];
 } __packed;
 
-/* HOSTCMD_CMD_SET_HW_SPEC */
-struct hostcmd_cmd_set_hw_spec {
+struct hostcmd_cmd_get_hw_spec {
 	struct hostcmd_header cmd_hdr;
+	struct hostcmd_get_hw_spec hw_spec;
+} __packed;
+
+/* HOSTCMD_CMD_SET_HW_SPEC */
+struct hostcmd_set_hw_spec {
 	/* HW revision */
 	u8 version;
 	/* Host interface */
@@ -240,13 +243,18 @@ struct hostcmd_cmd_set_hw_spec {
 	/* Actual number of TX queues in WcbBase array */
 	__le32 num_tx_queues;
 	/* TX WCB Rings */
-	__le32 wcb_base[SYSADPT_NUM_OF_DESC_DATA];
+	__le32 wcb_base[4 + SYSADPT_NUM_OF_AP];
 	/* Max AMSDU size (00 - AMSDU Disabled,
 	 * 01 - 4K, 10 - 8K, 11 - not defined)
 	 */
 	__le32 features;
 	__le32 tx_wcb_num_per_queue;
 	__le32 total_rx_wcb;
+} __packed;
+
+struct hostcmd_cmd_set_hw_spec {
+	struct hostcmd_header cmd_hdr;
+	struct hostcmd_set_hw_spec hw_spec;
 } __packed;
 
 /* HOSTCMD_CMD_802_11_GET_STAT */

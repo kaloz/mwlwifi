@@ -18,11 +18,9 @@
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "fwcmd.h"
-#include "tx.h"
-
-#define MWL_DRV_NAME        KBUILD_MODNAME
+#include "core.h"
+#include "hif/fwcmd.h"
+#include "hif/hif-ops.h"
 
 #define MAX_AMPDU_ATTEMPTS  5
 
@@ -66,22 +64,18 @@ static void mwl_mac80211_tx(struct ieee80211_hw *hw,
 		return;
 	}
 
-	mwl_tx_xmit(hw, control, skb);
+	mwl_hif_tx_xmit(hw, control, skb);
 }
 
 static int mwl_mac80211_start(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv = hw->priv;
 	int rc;
 
 	/* Enable TX and RX tasklets. */
-	tasklet_enable(&priv->tx_task);
-	tasklet_enable(&priv->tx_done_task);
-	tasklet_enable(&priv->rx_task);
-	tasklet_enable(&priv->qe_task);
+	mwl_hif_enable_data_tasks(hw);
 
 	/* Enable interrupts */
-	mwl_fwcmd_int_enable(hw);
+	mwl_hif_irq_enable(hw);
 
 	rc = mwl_fwcmd_radio_enable(hw);
 	if (rc)
@@ -109,34 +103,26 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	return 0;
 
 fwcmd_fail:
-	mwl_fwcmd_int_disable(hw);
-	tasklet_disable(&priv->tx_task);
-	tasklet_disable(&priv->tx_done_task);
-	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
+	mwl_hif_irq_disable(hw);
+	mwl_hif_disable_data_tasks(hw);
 
 	return rc;
 }
 
 static void mwl_mac80211_stop(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv = hw->priv;
-
 	mwl_fwcmd_radio_disable(hw);
 
 	ieee80211_stop_queues(hw);
 
 	/* Disable interrupts */
-	mwl_fwcmd_int_disable(hw);
+	mwl_hif_irq_disable(hw);
 
-	/* Disable TX reclaim and RX tasklets. */
-	tasklet_disable(&priv->tx_task);
-	tasklet_disable(&priv->tx_done_task);
-	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
+	/* Disable TX and RX tasklets. */
+	mwl_hif_disable_data_tasks(hw);
 
 	/* Return all skbs to mac80211 */
-	mwl_tx_done((unsigned long)hw);
+	mwl_hif_tx_return_pkts(hw);
 }
 
 static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
@@ -208,7 +194,7 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 	if (!priv->macids_used)
 		return;
 
-	mwl_tx_del_pkts_via_vif(priv->hw, vif);
+	mwl_hif_tx_del_pkts_via_vif(priv->hw, vif);
 
 	priv->macids_used &= ~(1 << mwl_vif->macid);
 	spin_lock_bh(&priv->vif_lock);
@@ -506,13 +492,13 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	int rc;
 	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 
-	mwl_tx_del_sta_amsdu_pkts(sta);
+	mwl_hif_tx_del_sta_amsdu_pkts(hw, sta);
 
 	spin_lock_bh(&priv->stream_lock);
 	mwl_fwcmd_del_sta_streams(hw, sta);
 	spin_unlock_bh(&priv->stream_lock);
 
-	mwl_tx_del_pkts_via_sta(hw, sta);
+	mwl_hif_tx_del_pkts_via_sta(hw, sta);
 
 	rc = mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
@@ -649,7 +635,7 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
 				stream->state = AMPDU_STREAM_IN_PROGRESS;
-				mwl_tx_del_ampdu_pkts(hw, sta, tid);
+				mwl_hif_tx_del_ampdu_pkts(hw, sta, tid);
 				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, idx);

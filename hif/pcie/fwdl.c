@@ -20,38 +20,28 @@
 #include <linux/io.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "sc4_ddr.h"
-#include "fwcmd.h"
-#include "fwdl.h"
+#include "core.h"
+#include "hif/fwcmd.h"
+#include "hif/pcie/dev.h"
+#include "hif/pcie/sc4_ddr.h"
 
 #define FW_DOWNLOAD_BLOCK_SIZE          256
 #define FW_CHECK_MSECS                  3
 
 #define FW_MAX_NUM_CHECKS               0xffff
 
-static void mwl_fwdl_trig_pcicmd(struct mwl_priv *priv)
+static void pcie_trigger_pcicmd_bootcode(struct pcie_priv *pcie_priv)
 {
-	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
-
-	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-
+	writel(pcie_priv->mwl_priv->pphys_cmd_buf,
+	       pcie_priv->iobase1 + MACREG_REG_GEN_PTR);
+	writel(0x00, pcie_priv->iobase1 + MACREG_REG_INT_CODE);
 	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
-	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+	       pcie_priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
 }
 
-static void mwl_fwdl_trig_pcicmd_bootcode(struct mwl_priv *priv)
+static bool pcie_download_ddr_init(struct mwl_priv *priv)
 {
-	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
-
-	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
-
-	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
-	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-}
-
-static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
-{
+	struct pcie_priv *pcie_priv = (struct pcie_priv *)priv->hif.priv;
 	u32 size_ddr_init = sizeof(sc4_ddr_init);
 	u8 *p = (u8 *)&sc4_ddr_init[0];
 	u32 curr_iteration = 0;
@@ -63,7 +53,7 @@ static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
 	wiphy_debug(priv->hw->wiphy, "ddr init: download start\n");
 
 	while (size_ddr_init_downloaded < size_ddr_init) {
-		len = readl(priv->iobase1 + 0xc40);
+		len = readl(pcie_priv->iobase1 + 0xc40);
 
 		if (!len)
 			break;
@@ -73,7 +63,7 @@ static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
 		/* this is arbitrary per your platform; we use 0xffff */
 		curr_iteration = (FW_MAX_NUM_CHECKS * 500);
 		/* this function writes pdata to c10, then write 2 to c18 */
-		mwl_fwdl_trig_pcicmd_bootcode(priv);
+		pcie_trigger_pcicmd_bootcode(pcie_priv);
 
 		/* NOTE: the following back to back checks on C1C is time
 		 * sensitive, hence may need to be tweaked dependent on host
@@ -84,7 +74,7 @@ static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
 		 * platform
 		 */
 		do {
-			int_code = readl(priv->iobase1 + 0xc1c);
+			int_code = readl(pcie_priv->iobase1 + 0xc1c);
 			if (int_code != 0)
 				break;
 			cond_resched();
@@ -92,7 +82,7 @@ static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
 		} while (curr_iteration);
 
 		do {
-			int_code = readl(priv->iobase1 + 0xc1c);
+			int_code = readl(pcie_priv->iobase1 + 0xc1c);
 			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
 			    MACREG_H2ARIC_BIT_DOOR_BELL)
 				break;
@@ -119,19 +109,33 @@ static bool mwl_fwdl_download_ddr_init(struct mwl_priv *priv)
 	return true;
 }
 
-int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
+void pcie_reset(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
-	const struct firmware *fw;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	u32 regval;
+
+	regval = readl(pcie_priv->iobase1 + MACREG_REG_INT_CODE);
+	if (regval == 0xffffffff) {
+		wiphy_err(priv->hw->wiphy, "adapter does not exist\n");
+		return;
+	}
+
+	writel(ISR_RESET, pcie_priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
+}
+
+int pcie_download_firmware(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	const struct firmware *fw = priv->fw_ucode;
 	u32 curr_iteration = 0;
 	u32 size_fw_downloaded = 0;
 	u32 int_code = 0;
 	u32 len = 0;
 	u32 fwreadysignature = HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
 
-	fw = priv->fw_ucode;
-
-	mwl_fwcmd_reset(hw);
+	pcie_reset(hw);
 
 	/* FW before jumping to boot rom, it will enable PCIe transaction retry,
 	 * wait for boot code to stop it.
@@ -139,11 +143,11 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
 
 	writel(MACREG_A2HRIC_BIT_MASK,
-	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
-	writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
-	writel(0x00, priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
+	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
+	writel(0x00, pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
+	writel(0x00, pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
 	writel(MACREG_A2HRIC_BIT_MASK,
-	       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
 
 	/* this routine interacts with SC2 bootrom to download firmware binary
 	 * to the device. After DMA'd to SC2, the firmware could be deflated to
@@ -153,14 +157,14 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	wiphy_debug(hw->wiphy, "fw download start\n");
 
 	/* Disable PFU before FWDL */
-	writel(0x100, priv->iobase1 + 0xE0E4);
+	writel(0x100, pcie_priv->iobase1 + 0xE0E4);
 
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
-	while (readl(priv->iobase1 + 0xc40) == 0)
+	while (readl(pcie_priv->iobase1 + 0xc40) == 0)
 		cond_resched();
 
 	if (priv->chip_type == MWL8964) {
-		if (!mwl_fwdl_download_ddr_init(priv)) {
+		if (!pcie_download_ddr_init(priv)) {
 			wiphy_err(hw->wiphy,
 				  "ddr init: code download failed\n");
 			goto err_download;
@@ -168,7 +172,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	}
 
 	while (size_fw_downloaded < fw->size) {
-		len = readl(priv->iobase1 + 0xc40);
+		len = readl(pcie_priv->iobase1 + 0xc40);
 
 		if (!len)
 			break;
@@ -178,7 +182,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		       (fw->data + size_fw_downloaded), len);
 
 		/* this function writes pdata to c10, then write 2 to c18 */
-		mwl_fwdl_trig_pcicmd_bootcode(priv);
+		pcie_trigger_pcicmd_bootcode(pcie_priv);
 
 		/* this is arbitrary per your platform; we use 0xffff */
 		curr_iteration = FW_MAX_NUM_CHECKS;
@@ -192,7 +196,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		 * platform
 		 */
 		do {
-			int_code = readl(priv->iobase1 + 0xc1c);
+			int_code = readl(pcie_priv->iobase1 + 0xc1c);
 			if (int_code != 0)
 				break;
 			cond_resched();
@@ -200,7 +204,7 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 		} while (curr_iteration);
 
 		do {
-			int_code = readl(priv->iobase1 + 0xc1c);
+			int_code = readl(pcie_priv->iobase1 + 0xc1c);
 			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
 			    MACREG_H2ARIC_BIT_DOOR_BELL)
 				break;
@@ -232,14 +236,14 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	 * part is similar as SC1
 	 */
 	*((u32 *)&priv->pcmd_buf[1]) = 0;
-	mwl_fwdl_trig_pcicmd(priv);
+	pcie_trigger_pcicmd_bootcode(pcie_priv);
 	curr_iteration = FW_MAX_NUM_CHECKS;
 	do {
 		curr_iteration--;
 		writel(HOSTCMD_SOFTAP_MODE,
-		       priv->iobase1 + MACREG_REG_GEN_PTR);
+		       pcie_priv->iobase1 + MACREG_REG_GEN_PTR);
 		usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
-		int_code = readl(priv->iobase1 + MACREG_REG_INT_CODE);
+		int_code = readl(pcie_priv->iobase1 + MACREG_REG_INT_CODE);
 		if (!(curr_iteration % 0xff) && (int_code != 0))
 			wiphy_err(hw->wiphy, "%x;", int_code);
 	} while ((curr_iteration) &&
@@ -252,13 +256,13 @@ int mwl_fwdl_download_firmware(struct ieee80211_hw *hw)
 	}
 
 	wiphy_debug(hw->wiphy, "fw download complete\n");
-	writel(0x00, priv->iobase1 + MACREG_REG_INT_CODE);
+	writel(0x00, pcie_priv->iobase1 + MACREG_REG_INT_CODE);
 
 	return 0;
 
 err_download:
 
-	mwl_fwcmd_reset(hw);
+	pcie_reset(hw);
 
 	return -EIO;
 }
