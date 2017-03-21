@@ -18,6 +18,10 @@
 #ifndef _SYSADPT_H_
 #define _SYSADPT_H_
 
+#define SYSADPT_MAX_STA                64
+
+#define SYSADPT_MAX_STA_SC4            300
+
 #define SYSADPT_MAX_NUM_CHANNELS       64
 
 #define SYSADPT_MAX_DATA_RATES_G       14
@@ -28,14 +32,14 @@
 
 #define SYSADPT_TX_WMM_QUEUES          4
 
-#define SYSADPT_TX_AMPDU_QUEUES        4
+#define SYSADPT_NUM_OF_CLIENT          1
 
 #define SYSADPT_NUM_OF_AP              16
 
 #define SYSADPT_TOTAL_TX_QUEUES        (SYSADPT_TX_WMM_QUEUES + \
 					SYSADPT_NUM_OF_AP)
 
-#define SYSADPT_MAX_AGGR_SIZE          8192
+#define SYSADPT_MAX_AGGR_SIZE          4096
 
 #define SYSADPT_AMPDU_PACKET_THRESHOLD 64
 
@@ -61,6 +65,6 @@
 
 #define SYSADPT_THERMAL_THROTTLE_MAX   100
 
-#define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
+#define SYSADPT_TIMER_WAKEUP_TIME      50 /* ms */
 
 #endif /* _SYSADPT_H_ */

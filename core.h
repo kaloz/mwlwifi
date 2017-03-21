@@ -42,8 +42,9 @@
 /* vif and station */
 #define NUM_WEP_KEYS          4
 #define MWL_MAX_TID           8
-#define MWL_AMSDU_SIZE_4K     0
-#define MWL_AMSDU_SIZE_8K     1
+#define MWL_AMSDU_SIZE_4K     1
+#define MWL_AMSDU_SIZE_8K     2
+#define MWL_AMSDU_SIZE_11K    3
 
 /* power init */
 #define MWL_POWER_INIT_1      1
@@ -67,7 +68,7 @@ enum {
 };
 
 enum {
-	AMPDU_NO_STREAM,
+	AMPDU_NO_STREAM = 0,
 	AMPDU_STREAM_NEW,
 	AMPDU_STREAM_IN_PROGRESS,
 	AMPDU_STREAM_ACTIVE,
@@ -184,9 +185,10 @@ struct mwl_priv {
 
 	/* ampdu stream information */
 	/* for ampdu stream */
+	int ampdu_num;
 	struct {
 		spinlock_t stream_lock;      /* for BA stream               */
-		struct mwl_ampdu_stream ampdu[SYSADPT_TX_AMPDU_QUEUES];
+		struct mwl_ampdu_stream *ampdu;
 	} ____cacheline_aligned_in_smp;
 	struct work_struct watchdog_ba_handle;
 
@@ -242,6 +244,7 @@ struct beacon_info {
 
 struct mwl_vif {
 	struct list_head list;
+	enum nl80211_iftype type;
 	int macid;       /* Firmware macid for this vif.  */
 	u16 seqno;       /* Non AMPDU sequence number assigned by driver.  */
 	struct {         /* Saved WEP keys */
@@ -279,6 +282,8 @@ struct mwl_amsdu_ctrl {
 
 struct mwl_sta {
 	struct list_head list;
+	struct mwl_vif *mwl_vif;
+	bool wds;
 	bool is_mesh_node;
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];

@@ -38,6 +38,13 @@ static inline unsigned int mwl_hif_get_tx_head_room(struct ieee80211_hw *hw)
 	return priv->hif.ops->tx_head_room;
 }
 
+static inline unsigned int mwl_hif_get_ampdu_num(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	return priv->hif.ops->ampdu_num;
+}
+
 static inline void mwl_hif_reset(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -236,5 +243,15 @@ static inline int mwl_hif_reg_access(struct ieee80211_hw *hw, bool write)
 		return priv->hif.ops->reg_access(hw, write);
 	else
 		return -ENOTSUPP;
+}
+
+static inline void mwl_hif_set_sta_id(struct ieee80211_hw *hw,
+				      struct ieee80211_sta *sta,
+				      bool sta_mode, bool set)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->set_sta_id)
+		priv->hif.ops->set_sta_id(hw, sta, sta_mode, set);
 }
 #endif /* _HIF_OPS_H_ */

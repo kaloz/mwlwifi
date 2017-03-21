@@ -71,7 +71,7 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 
 	memset(desc->prx_ring, 0x00, MAX_NUM_RX_RING_BYTES);
 
-	desc->rx_hndl = kmalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
+	desc->rx_hndl = kzalloc(MAX_NUM_RX_HNDL_BYTES, GFP_KERNEL);
 
 	if (!desc->rx_hndl) {
 		dma_free_coherent(priv->dev,
@@ -80,8 +80,6 @@ static int pcie_rx_ring_alloc(struct mwl_priv *priv)
 				  desc->pphys_rx_ring);
 		return -ENOMEM;
 	}
-
-	memset(desc->rx_hndl, 0x00, MAX_NUM_RX_HNDL_BYTES);
 
 	return 0;
 }
@@ -305,28 +303,8 @@ static inline struct mwl_vif *pcie_rx_find_vif_bss(struct mwl_priv *priv,
 	return NULL;
 }
 
-static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
-{
-	struct pcie_dma_data *tr;
-	int hdrlen;
-
-	tr = (struct pcie_dma_data *)skb->data;
-	hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
-
-	if (hdrlen != sizeof(tr->wh)) {
-		if (ieee80211_is_data_qos(tr->wh.frame_control)) {
-			memmove(tr->data - hdrlen, &tr->wh, hdrlen - 2);
-			*((__le16 *)(tr->data - 2)) = qos;
-		} else {
-			memmove(tr->data - hdrlen, &tr->wh, hdrlen);
-		}
-	}
-
-	if (hdrlen != sizeof(*tr))
-		skb_pull(skb, sizeof(*tr) - hdrlen);
-}
-
-static int pcie_rx_refill(struct mwl_priv *priv, struct pcie_rx_hndl *rx_hndl)
+static inline int pcie_rx_refill(struct mwl_priv *priv,
+				 struct pcie_rx_hndl *rx_hndl)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data *desc;
@@ -485,11 +463,11 @@ void pcie_rx_recv(unsigned long data)
 				 * Measure of MMIC failure.
 				 */
 				if (status.flag & RX_FLAG_MMIC_ERROR) {
-					struct pcie_dma_data *tr;
+					struct pcie_dma_data *dma_data;
 
-					tr = (struct pcie_dma_data *)
+					dma_data = (struct pcie_dma_data *)
 					     prx_skb->data;
-					memset((void *)&tr->data, 0, 4);
+					memset((void *)&dma_data->data, 0, 4);
 					pkt_len += 4;
 				}
 

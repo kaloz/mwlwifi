@@ -24,6 +24,8 @@
 #include "hif/pcie/fwdl.h"
 #include "hif/pcie/tx.h"
 #include "hif/pcie/rx.h"
+#include "hif/pcie/tx_ndp.h"
+#include "hif/pcie/rx_ndp.h"
 
 #define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
 #define PCIE_DEV_NAME "Marvell 802.11ac PCIE Adapter"
@@ -185,6 +187,7 @@ static int pcie_init(struct ieee80211_hw *hw)
 		     (void *)pcie_tx_flush_amsdu, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->qe_task);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
+	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->is_tx_done_schedule = false;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
 	pcie_priv->is_rx_schedule = false;
@@ -479,7 +482,7 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 		return;
 	cnt = 0;
 	spin_lock_bh(&priv->stream_lock);
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
+	for (i = 0; i < priv->ampdu_num; i++) {
 		stream = &priv->ampdu[i];
 
 		if (stream->state == AMPDU_STREAM_ACTIVE) {
@@ -570,9 +573,8 @@ static int pcie_reg_access(struct ieee80211_hw *hw, bool write)
 			       pcie_priv->iobase1 + priv->reg_offset);
 		break;
 	case MWL_ACCESS_ADDR:
-		addr_val = kmalloc(64 * sizeof(u32), GFP_KERNEL);
+		addr_val = kzalloc(64 * sizeof(u32), GFP_KERNEL);
 		if (addr_val) {
-			memset(addr_val, 0, 64 * sizeof(u32));
 			addr_val[0] = priv->reg_value;
 			ret = mwl_fwcmd_get_addr_value(hw, priv->reg_offset,
 						       4, addr_val, set);
@@ -595,6 +597,7 @@ static const struct mwl_hif_ops pcie_hif_ops = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
 	.tx_head_room          = PCIE_MIN_BYTES_HEADROOM,
+	.ampdu_num             = PCIE_AMPDU_QUEUES,
 	.reset                 = pcie_reset,
 	.init                  = pcie_init,
 	.deinit                = pcie_deinit,
@@ -619,12 +622,261 @@ static const struct mwl_hif_ops pcie_hif_ops = {
 	.reg_access            = pcie_reg_access,
 };
 
+static int pcie_init_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	const struct hostcmd_get_hw_spec *get_hw_spec;
+	struct hostcmd_set_hw_spec set_hw_spec;
+	int rc;
+
+	tasklet_init(&pcie_priv->tx_task,
+		     (void *)pcie_tx_skbs_ndp, (unsigned long)hw);
+	tasklet_disable(&pcie_priv->tx_task);
+	spin_lock_init(&pcie_priv->tx_desc_lock);
+	tasklet_init(&pcie_priv->rx_task,
+		     (void *)pcie_rx_recv_ndp, (unsigned long)hw);
+	tasklet_disable(&pcie_priv->rx_task);
+	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
+	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
+	pcie_priv->recv_limit = MAX_NUM_RX_DESC;
+	pcie_priv->is_rx_schedule = false;
+
+	rc = pcie_tx_init_ndp(hw);
+	if (rc) {
+		wiphy_err(hw->wiphy, "%s: fail to initialize TX\n",
+			  PCIE_DRV_NAME);
+		goto err_mwl_tx_init;
+	}
+
+	rc = pcie_rx_init_ndp(hw);
+	if (rc) {
+		wiphy_err(hw->wiphy, "%s: fail to initialize RX\n",
+			  PCIE_DRV_NAME);
+		goto err_mwl_rx_init;
+	}
+
+	/* get and prepare HW specifications */
+	get_hw_spec = mwl_fwcmd_get_hw_specs(hw);
+	if (!get_hw_spec) {
+		wiphy_err(hw->wiphy, "%s: fail to get HW specifications\n",
+			  PCIE_DRV_NAME);
+		goto err_get_hw_specs;
+	}
+	ether_addr_copy(&priv->hw_data.mac_addr[0],
+			get_hw_spec->permanent_addr);
+	priv->hw_data.fw_release_num = le32_to_cpu(get_hw_spec->fw_release_num);
+	priv->hw_data.hw_version = get_hw_spec->version;
+
+	/* prepare and set HW specifications */
+	set_hw_spec.wcb_base[0] =
+		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_tx_ring);
+	set_hw_spec.wcb_base[1] =
+		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_tx_ring_done);
+	set_hw_spec.wcb_base[2] =
+		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_rx_ring);
+	set_hw_spec.wcb_base[3] =
+		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_rx_ring_done);
+	set_hw_spec.acnt_base_addr =
+		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_acnt_ring);
+	set_hw_spec.acnt_buf_size =
+		cpu_to_le32(pcie_priv->desc_data_ndp.acnt_ring_size);
+	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
+	if (rc) {
+		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
+			  PCIE_DRV_NAME);
+		goto err_set_hw_specs;
+	}
+
+	return rc;
+
+err_set_hw_specs:
+err_get_hw_specs:
+
+	pcie_rx_deinit_ndp(hw);
+
+err_mwl_rx_init:
+
+	pcie_tx_deinit_ndp(hw);
+
+err_mwl_tx_init:
+
+	wiphy_err(hw->wiphy, "%s: init fail\n", PCIE_DRV_NAME);
+
+	return rc;
+}
+
+static void pcie_deinit_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+
+	pcie_rx_deinit_ndp(hw);
+	pcie_tx_deinit_ndp(hw);
+	tasklet_kill(&pcie_priv->rx_task);
+	tasklet_kill(&pcie_priv->tx_task);
+	pcie_reset(hw);
+}
+
+static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	char *p = buf;
+	int len = 0;
+
+	len += scnprintf(p + len, size - len, "iobase0: %p\n",
+			 pcie_priv->iobase0);
+	len += scnprintf(p + len, size - len, "iobase1: %p\n",
+			 pcie_priv->iobase1);
+	len += scnprintf(p + len, size - len,
+			 "tx limit: %d\n", pcie_priv->txq_limit);
+	len += scnprintf(p + len, size - len,
+			 "rx limit: %d\n", pcie_priv->recv_limit);
+	return len;
+}
+
+static void pcie_enable_data_tasks_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+
+	tasklet_enable(&pcie_priv->tx_task);
+	tasklet_enable(&pcie_priv->rx_task);
+}
+
+static void pcie_disable_data_tasks_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+
+	tasklet_disable(&pcie_priv->tx_task);
+	tasklet_disable(&pcie_priv->rx_task);
+}
+
+static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	void __iomem *int_status_mask;
+	u32 int_status;
+	u32 status;
+
+	int_status_mask = pcie_priv->iobase1 +
+		MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
+	int_status = readl(pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
+
+	if (int_status == 0x00000000)
+		return IRQ_NONE;
+
+	if (int_status == 0xffffffff) {
+		wiphy_warn(hw->wiphy, "card unplugged?\n");
+	} else {
+		writel(~int_status,
+		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
+
+		if (int_status & MACREG_A2HRIC_ACNT_HEAD_RDY) {
+		}
+
+		if (int_status & MACREG_A2HRIC_RX_DONE_HEAD_RDY) {
+			if (!pcie_priv->is_rx_schedule) {
+				status = readl(int_status_mask);
+				writel((status &
+				       ~MACREG_A2HRIC_RX_DONE_HEAD_RDY),
+				       int_status_mask);
+				tasklet_schedule(&pcie_priv->rx_task);
+				pcie_priv->is_rx_schedule = true;
+			}
+		}
+
+		if (int_status & MACREG_A2HRIC_NEWDP_DFS) {
+		}
+
+		if (int_status & MACREG_A2HRIC_NEWDP_CHANNEL_SWITCH)
+			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
+	}
+
+	return IRQ_HANDLED;
+}
+
+static void pcie_irq_enable_ndp(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+
+	if (pcie_chk_adapter(pcie_priv)) {
+		writel(0x00,
+		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
+		writel(MACREG_A2HRIC_BIT_MASK_NDP,
+		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
+	}
+}
+
+static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
+{
+	pcie_tx_done_ndp(hw, false);
+}
+
+static void pcie_tx_return_pkts_ndp(struct ieee80211_hw *hw)
+{
+	pcie_tx_done_ndp(hw, true);
+}
+
+static void pcie_set_sta_id(struct ieee80211_hw *hw,
+			    struct ieee80211_sta *sta,
+			    bool sta_mode, bool set)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	u16 aid;
+
+	if (!sta_mode)
+		aid = sta->aid;
+	else
+		aid = 0;
+
+	if (aid > SYSADPT_MAX_STA_SC4)
+		return;
+
+	if (set)
+		pcie_priv->sta_link[aid] = sta;
+	else
+		pcie_priv->sta_link[aid] = NULL;
+}
+
+static const struct mwl_hif_ops pcie_hif_ops_ndp = {
+	.driver_name           = PCIE_DRV_NAME,
+	.driver_version        = PCIE_DRV_VERSION,
+	.tx_head_room          = PCIE_MIN_BYTES_HEADROOM,
+	.ampdu_num             = AMPDU_QUEUES_NDP,
+	.reset                 = pcie_reset,
+	.init                  = pcie_init_ndp,
+	.deinit                = pcie_deinit_ndp,
+	.get_info              = pcie_get_info_ndp,
+	.enable_data_tasks     = pcie_enable_data_tasks_ndp,
+	.disable_data_tasks    = pcie_disable_data_tasks_ndp,
+	.exec_cmd              = pcie_exec_cmd,
+	.get_irq_num           = pcie_get_irq_num,
+	.irq_handler           = pcie_isr_ndp,
+	.irq_enable            = pcie_irq_enable_ndp,
+	.irq_disable           = pcie_irq_disable,
+	.download_firmware     = pcie_download_firmware,
+	.timer_routine         = pcie_timer_routine_ndp,
+	.tx_xmit               = pcie_tx_xmit_ndp,
+	.tx_return_pkts        = pcie_tx_return_pkts_ndp,
+	.get_device_node       = pcie_get_device_node,
+	.get_survey            = pcie_get_survey,
+	.reg_access            = pcie_reg_access,
+	.set_sta_id            = pcie_set_sta_id,
+};
+
 static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	static bool printed_version;
 	struct ieee80211_hw *hw;
 	struct mwl_priv *priv;
 	struct pcie_priv *pcie_priv;
+	const struct mwl_hif_ops *hif_ops;
 	int rc = 0;
 
 	if (id->driver_data >= MWLUNKNOWN)
@@ -652,9 +904,12 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	pci_set_master(pdev);
 
-	hw = mwl_alloc_hw(MWL_BUS_PCIE, id->driver_data,
-			  &pdev->dev, &pcie_hif_ops,
-			  sizeof(*pcie_priv));
+	if (id->driver_data == MWL8964)
+		hif_ops = &pcie_hif_ops_ndp;
+	else
+		hif_ops = &pcie_hif_ops;
+	hw = mwl_alloc_hw(MWL_BUS_PCIE, id->driver_data, &pdev->dev,
+			  hif_ops, sizeof(*pcie_priv));
 	if (!hw) {
 		pr_err("%s: mwlwifi hw alloc failed\n",
 		       PCIE_DRV_NAME);

@@ -21,6 +21,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/hif-ops.h"
 
@@ -84,6 +85,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
+		{ HOSTCMD_CMD_NEWDP_DMATHREAD_START, "NewdpDMAThreadStart" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE_SC4, "GetFwRegionCodeSC4" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
@@ -1809,6 +1811,8 @@ int mwl_fwcmd_bss_start(struct ieee80211_hw *hw,
 		else
 			pcmd->enable = cpu_to_le32(WL_DISABLE_VMAC);
 	}
+	if (priv->chip_type == MWL8964)
+		pcmd->amsdu = MWL_AMSDU_SIZE_11K;
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BSS_START)) {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -1973,6 +1977,100 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif,
+				  struct ieee80211_sta *sta,
+				  u32 wds)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_new_stn_sc4 *pcmd;
+	u32 rates;
+
+	mwl_vif = mwl_dev_get_vif(vif);
+
+	pcmd = (struct hostcmd_cmd_set_new_stn_sc4 *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+
+	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
+	if (vif->type == NL80211_IFTYPE_STATION) {
+		pcmd->aid = 1;
+		pcmd->stn_id = 1;
+		pcmd->reserved = 1;
+	} else {
+		pcmd->aid = cpu_to_le16(sta->aid);
+		pcmd->stn_id = cpu_to_le16(sta->aid);
+	}
+	ether_addr_copy(pcmd->mac_addr, sta->addr);
+
+	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
+		rates = sta->supp_rates[NL80211_BAND_2GHZ];
+	else
+		rates = sta->supp_rates[NL80211_BAND_5GHZ] << 5;
+	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
+
+	if (sta->ht_cap.ht_supported) {
+		int i;
+
+		for (i = 0; i < 4; i++) {
+			if (i < sta->rx_nss) {
+				pcmd->peer_info.ht_rates[i] =
+					sta->ht_cap.mcs.rx_mask[i];
+			} else {
+				pcmd->peer_info.ht_rates[i] = 0;
+			}
+		}
+		pcmd->peer_info.ht_cap_info = cpu_to_le16(sta->ht_cap.cap);
+		pcmd->peer_info.mac_ht_param_info =
+			(sta->ht_cap.ampdu_factor & 3) |
+			((sta->ht_cap.ampdu_density & 7) << 2);
+	}
+
+	if (sta->vht_cap.vht_supported) {
+		u32 rx_mcs_map_mask = 0;
+
+		rx_mcs_map_mask = ((0x0000FFFF) >> (sta->rx_nss * 2))
+			<< (sta->rx_nss * 2);
+		pcmd->peer_info.vht_max_rx_mcs =
+			cpu_to_le32((*((u32 *)
+			&sta->vht_cap.vht_mcs.rx_mcs_map)) | rx_mcs_map_mask);
+		pcmd->peer_info.vht_cap = cpu_to_le32(sta->vht_cap.cap);
+		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
+	}
+
+	pcmd->is_qos_sta = sta->wme;
+	pcmd->qos_info = ((sta->uapsd_queues << 4) | (sta->max_sp << 1));
+	pcmd->wds = cpu_to_le32(wds);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	if (vif->type == NL80211_IFTYPE_STATION) {
+		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
+		pcmd->aid = 2;
+		pcmd->stn_id = 2;
+		pcmd->reserved = 0;
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
+			mutex_unlock(&priv->fwcmd_mutex);
+			wiphy_err(hw->wiphy, "failed execution\n");
+			return -EIO;
+		}
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif)
 {
@@ -1986,9 +2084,15 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8964) {
+		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+		pcmd->cmd_hdr.len =
+			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
@@ -2018,9 +2122,15 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8964) {
+		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+		pcmd->cmd_hdr.len =
+			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_REMOVE);
@@ -2336,7 +2446,8 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 		       struct mwl_ampdu_stream *stream,
-		       struct ieee80211_vif *vif)
+		       struct ieee80211_vif *vif,
+		       u32 direction)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -2359,8 +2470,8 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 	ether_addr_copy(&pcmd->ba_info.create_params.peer_mac_addr[0],
 			stream->sta->addr);
 	pcmd->ba_info.create_params.tid = stream->tid;
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
+	ba_type = BA_FLAG_IMMEDIATE_TYPE;
+	ba_direction = direction;
 	ba_flags = (ba_type & BA_TYPE_MASK) |
 		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
@@ -2384,7 +2495,8 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
-			u8 buf_size, struct ieee80211_vif *vif)
+			struct ieee80211_vif *vif,
+			u32 direction, u8 buf_size, bool amsdu)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -2406,13 +2518,22 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 	pcmd->action_type = cpu_to_le32(BA_CREATE_STREAM);
 	pcmd->ba_info.create_params.bar_thrs = cpu_to_le32(buf_size);
 	pcmd->ba_info.create_params.window_size = cpu_to_le32(buf_size);
+	pcmd->ba_info.create_params.idle_thrs = cpu_to_le32(0x22000);
 	ether_addr_copy(&pcmd->ba_info.create_params.peer_mac_addr[0],
 			stream->sta->addr);
 	pcmd->ba_info.create_params.tid = stream->tid;
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
-	ba_flags = (ba_type & BA_TYPE_MASK) |
-		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
+	ba_direction = direction;
+	if (priv->chip_type == MWL8964) {
+		ba_type = amsdu ? MWL_AMSDU_SIZE_11K : 0;
+		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
+			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
+			BA_DIRECTION_MASK_NDP);
+	} else {
+		ba_type = BA_FLAG_IMMEDIATE_TYPE;
+		ba_flags = (ba_type & BA_TYPE_MASK) |
+			((ba_direction << BA_DIRECTION_SHIFT) &
+			BA_DIRECTION_MASK);
+	}
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.create_params.queue_id = stream->idx;
 	pcmd->ba_info.create_params.param_info =
@@ -2422,6 +2543,13 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 		 IEEE80211_HT_AMPDU_PARM_DENSITY);
 	pcmd->ba_info.create_params.reset_seq_no = 1;
 	pcmd->ba_info.create_params.current_seq = cpu_to_le16(0);
+	if (priv->chip_type == MWL8964 &&
+	    stream->sta->vht_cap.vht_supported) {
+		pcmd->ba_info.create_params.vht_rx_factor =
+			cpu_to_le32((stream->sta->vht_cap.cap  &
+			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
+			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
+	}
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BASTREAM)) {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -2442,7 +2570,8 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 }
 
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
-			 u8 idx)
+			 struct mwl_ampdu_stream *stream,
+			 u32 direction)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_bastream *pcmd;
@@ -2457,12 +2586,22 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
 	pcmd->action_type = cpu_to_le32(BA_DESTROY_STREAM);
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
-	ba_flags = (ba_type & BA_TYPE_MASK) |
-		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
+	ba_type = 0;
+	ba_direction = direction;
+	if (priv->chip_type == MWL8964)
+		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
+			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
+			BA_DIRECTION_MASK_NDP);
+	else
+		ba_flags = (ba_type & BA_TYPE_MASK) |
+			((ba_direction << BA_DIRECTION_SHIFT) &
+			BA_DIRECTION_MASK);
 	pcmd->ba_info.destroy_params.flags = cpu_to_le32(ba_flags);
-	pcmd->ba_info.destroy_params.fw_ba_context.context = cpu_to_le32(idx);
+	pcmd->ba_info.destroy_params.fw_ba_context.context =
+		cpu_to_le32(stream->idx);
+	pcmd->ba_info.destroy_params.tid = stream->tid;
+	ether_addr_copy(&pcmd->ba_info.destroy_params.peer_mac_addr[0],
+			stream->sta->addr);
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BASTREAM)) {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -2482,17 +2621,30 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	if (priv->chip_type == MWL8964) {
+		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
 
-		if (stream->state == AMPDU_NO_STREAM) {
+		if (idx < priv->ampdu_num) {
+			stream = &priv->ampdu[idx];
 			stream->sta = sta;
 			stream->state = AMPDU_STREAM_NEW;
 			stream->tid = tid;
-			stream->idx = i;
+			stream->idx = idx;
 			return stream;
+		}
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+
+			if (stream->state == AMPDU_NO_STREAM) {
+				stream->sta = sta;
+				stream->state = AMPDU_STREAM_NEW;
+				stream->tid = tid;
+				stream->idx = idx;
+				return stream;
+			}
 		}
 	}
 
@@ -2504,14 +2656,28 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int i, idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	if (priv->chip_type == MWL8964) {
+		idx = (sta->aid - 1) * SYSADPT_MAX_TID;
+		for (i = 0; i < SYSADPT_MAX_TID; i++) {
+			stream = &priv->ampdu[idx + i];
 
-		if (stream->sta == sta) {
-			mwl_fwcmd_destroy_ba(hw, stream->idx);
-			mwl_fwcmd_remove_stream(hw, stream);
+			if (stream->sta == sta) {
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
+				mwl_fwcmd_remove_stream(hw, stream);
+			}
+		}
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+
+			if (stream->sta == sta) {
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
+				mwl_fwcmd_remove_stream(hw, stream);
+			}
 		}
 	}
 }
@@ -2533,21 +2699,26 @@ void mwl_fwcmd_remove_stream(struct ieee80211_hw *hw,
 }
 
 struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
-						 u8 *addr, u8 tid)
+						 struct ieee80211_sta *sta,
+						 u8 tid)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	if (priv->chip_type == MWL8964) {
+		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
+		if (idx < priv->ampdu_num)
+			return &priv->ampdu[idx];
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+			if (stream->state == AMPDU_NO_STREAM)
+				continue;
 
-		if (stream->state == AMPDU_NO_STREAM)
-			continue;
-
-		if (ether_addr_equal(stream->sta->addr, addr) &&
-		    stream->tid == tid)
-			return stream;
+			if ((stream->sta == sta) && (stream->tid == tid))
+				return stream;
+		}
 	}
 
 	return NULL;
@@ -2838,6 +3009,33 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 
 	return status;
 }
+
+int mwl_fwcmd_newdp_dmathread_start(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_newdp_dmathread_start *pcmd;
+	u16 cmd;
+
+	pcmd = (struct hostcmd_cmd_newdp_dmathread_start *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	cmd = HOSTCMD_CMD_NEWDP_DMATHREAD_START;
+	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		wiphy_err(hw->wiphy, "failed execution\n");
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 
 int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 				     u32 *fw_region_code)

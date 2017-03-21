@@ -20,6 +20,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/tx.h"
@@ -29,6 +30,9 @@
 
 #define MAX_NUM_TX_HNDL_BYTES  (PCIE_MAX_NUM_TX_DESC * \
 				sizeof(struct pcie_tx_hndl))
+
+#define TOTAL_HW_QUEUES        (SYSADPT_TX_WMM_QUEUES + \
+				PCIE_AMPDU_QUEUES)
 
 #define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* Use multicast data rate */
 
@@ -43,25 +47,6 @@
 	if ((iv16) == 0) \
 		(iv32)++; \
 }
-
-/* Transmit rate information constants */
-#define TX_RATE_FORMAT_LEGACY         0
-#define TX_RATE_FORMAT_11N            1
-#define TX_RATE_FORMAT_11AC           2
-
-#define TX_RATE_BANDWIDTH_20          0
-#define TX_RATE_BANDWIDTH_40          1
-#define TX_RATE_BANDWIDTH_80          2
-#define TX_RATE_BANDWIDTH_160         3
-
-#define TX_RATE_INFO_STD_GI           0
-#define TX_RATE_INFO_SHORT_GI         1
-
-enum {
-	IEEE_TYPE_MANAGEMENT = 0,
-	IEEE_TYPE_CONTROL,
-	IEEE_TYPE_DATA
-};
 
 /* Transmission information to transmit a socket buffer. */
 struct pcie_tx_ctrl {
@@ -116,7 +101,7 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 		       MAX_NUM_TX_RING_BYTES);
 	}
 
-	mem = kmalloc(MAX_NUM_TX_HNDL_BYTES * PCIE_NUM_OF_DESC_DATA,
+	mem = kzalloc(MAX_NUM_TX_HNDL_BYTES * PCIE_NUM_OF_DESC_DATA,
 		      GFP_KERNEL);
 
 	if (!mem) {
@@ -134,9 +119,6 @@ static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 
 		desc->tx_hndl = (struct pcie_tx_hndl *)
 			(mem + num * MAX_NUM_TX_HNDL_BYTES);
-
-		memset(desc->tx_hndl, 0x00,
-		       MAX_NUM_TX_HNDL_BYTES);
 	}
 
 	return 0;
@@ -250,86 +232,6 @@ static void pcie_tx_ring_free(struct mwl_priv *priv)
 	kfree(pcie_priv->desc_data[0].tx_hndl);
 }
 
-static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
-					 struct sk_buff *skb,
-					 int head_pad,
-					 int tail_pad)
-{
-	struct ieee80211_hdr *wh;
-	int hdrlen;
-	int reqd_hdrlen;
-	struct pcie_dma_data *tr;
-
-	/* Add a firmware DMA header; the firmware requires that we
-	 * present a 2-byte payload length followed by a 4-address
-	 * header (without QoS field), followed (optionally) by any
-	 * WEP/ExtIV header (but only filled in for CCMP).
-	 */
-	wh = (struct ieee80211_hdr *)skb->data;
-
-	hdrlen = ieee80211_hdrlen(wh->frame_control);
-
-	reqd_hdrlen = sizeof(*tr) + head_pad;
-
-	if (hdrlen != reqd_hdrlen)
-		skb_push(skb, reqd_hdrlen - hdrlen);
-
-	if (ieee80211_is_data_qos(wh->frame_control))
-		hdrlen -= IEEE80211_QOS_CTL_LEN;
-
-	tr = (struct pcie_dma_data *)skb->data;
-
-	if (wh != &tr->wh)
-		memmove(&tr->wh, wh, hdrlen);
-
-	if (hdrlen != sizeof(tr->wh))
-		memset(((void *)&tr->wh) + hdrlen, 0, sizeof(tr->wh) - hdrlen);
-
-	/* Firmware length is the length of the fully formed "802.11
-	 * payload".  That is, everything except for the 802.11 header.
-	 * This includes all crypto material including the MIC.
-	 */
-	tr->fwlen = cpu_to_le16(skb->len - sizeof(*tr) + tail_pad);
-}
-
-static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
-					     struct sk_buff *skb,
-					     struct ieee80211_key_conf *k_conf,
-					     bool *ccmp)
-{
-	int head_pad = 0;
-	int data_pad = 0;
-
-	/* Make sure the packet header is in the DMA header format (4-address
-	 * without QoS), and add head & tail padding when HW crypto is enabled.
-	 *
-	 * We have the following trailer padding requirements:
-	 * - WEP: 4 trailer bytes (ICV)
-	 * - TKIP: 12 trailer bytes (8 MIC + 4 ICV)
-	 * - CCMP: 8 trailer bytes (MIC)
-	 */
-
-	if (k_conf) {
-		head_pad = k_conf->iv_len;
-
-		switch (k_conf->cipher) {
-		case WLAN_CIPHER_SUITE_WEP40:
-		case WLAN_CIPHER_SUITE_WEP104:
-			data_pad = 4;
-			break;
-		case WLAN_CIPHER_SUITE_TKIP:
-			data_pad = 12;
-			break;
-		case WLAN_CIPHER_SUITE_CCMP:
-			data_pad = 8;
-			*ccmp = true;
-			break;
-		}
-	}
-
-	pcie_tx_add_dma_header(priv, skb, head_pad, data_pad);
-}
-
 static inline void pcie_tx_add_ccmp_hdr(u8 *pccmp_hdr,
 					u8 key_id, u16 iv16, u32 iv32)
 {
@@ -339,59 +241,6 @@ static inline void pcie_tx_add_ccmp_hdr(u8 *pccmp_hdr,
 	ccmp_h->rsvd = 0;
 	ccmp_h->key_id = EXT_IV | (key_id << 6);
 	ccmp_h->iv32 = cpu_to_le32(iv32);
-}
-
-static inline int pcie_tx_tid_queue_mapping(u8 tid)
-{
-	switch (tid) {
-	case 0:
-	case 3:
-		return IEEE80211_AC_BE;
-	case 1:
-	case 2:
-		return IEEE80211_AC_BK;
-	case 4:
-	case 5:
-		return IEEE80211_AC_VI;
-	case 6:
-	case 7:
-		return IEEE80211_AC_VO;
-	default:
-		break;
-	}
-
-	return -1;
-}
-
-static inline void pcie_tx_add_basic_rates(int band, struct sk_buff *skb)
-{
-	struct ieee80211_mgmt *mgmt;
-	int len;
-	u8 *pos;
-
-	mgmt = (struct ieee80211_mgmt *)skb->data;
-	len = skb->len - ieee80211_hdrlen(mgmt->frame_control);
-	len -= 4;
-	pos = (u8 *)cfg80211_find_ie(WLAN_EID_SUPP_RATES,
-				     mgmt->u.assoc_req.variable,
-				     len);
-	if (pos) {
-		pos++;
-		len = *pos++;
-		while (len) {
-			if (band == NL80211_BAND_2GHZ) {
-				if ((*pos == 2) || (*pos == 4) ||
-				    (*pos == 11) || (*pos == 22))
-					*pos |= 0x80;
-			} else {
-				if ((*pos == 12) || (*pos == 24) ||
-				    (*pos == 48))
-					*pos |= 0x80;
-			}
-			pos++;
-			len--;
-		}
-	}
 }
 
 static inline void pcie_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
@@ -827,7 +676,7 @@ void pcie_tx_skbs(unsigned long data)
 		}
 
 		if (skb_queue_len(&pcie_priv->txq[num]) <
-		    PCIE_TX_WAKE_Q_THRESHOLD) {
+		    pcie_priv->txq_wake_threshold) {
 			int queue;
 
 			queue = SYSADPT_TX_WMM_QUEUES - num - 1;
@@ -890,7 +739,7 @@ void pcie_tx_done(unsigned long data)
 	struct pcie_tx_desc *tx_desc;
 	struct sk_buff *done_skb;
 	u32 rate;
-	struct pcie_dma_data *tr;
+	struct pcie_dma_data *dma_data;
 	struct ieee80211_tx_info *info;
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
@@ -923,7 +772,7 @@ void pcie_tx_done(unsigned long data)
 			tx_desc->status =
 				cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
 			tx_hndl->psk_buff = NULL;
-			wmb(); /* memory barrier */
+			wmb(); /*Data Memory Barrier*/
 
 			skb_get(done_skb);
 			skb_queue_tail(&pcie_priv->delay_q, done_skb);
@@ -932,11 +781,11 @@ void pcie_tx_done(unsigned long data)
 				dev_kfree_skb_any(
 					skb_dequeue(&pcie_priv->delay_q));
 
-			tr = (struct pcie_dma_data *)done_skb->data;
+			dma_data = (struct pcie_dma_data *)done_skb->data;
 			info = IEEE80211_SKB_CB(done_skb);
 
-			if (ieee80211_is_data(tr->wh.frame_control) ||
-			    ieee80211_is_data_qos(tr->wh.frame_control)) {
+			if (ieee80211_is_data(dma_data->wh.frame_control) ||
+			    ieee80211_is_data_qos(dma_data->wh.frame_control)) {
 				tx_ctrl = (struct pcie_tx_ctrl *)&info->status;
 				amsdu_pkts = (struct sk_buff_head *)
 					tx_ctrl->amsdu_pkts;
@@ -954,9 +803,11 @@ void pcie_tx_done(unsigned long data)
 
 			if (done_skb) {
 				/* Remove H/W dma header */
-				hdrlen = ieee80211_hdrlen(tr->wh.frame_control);
-				memmove(tr->data - hdrlen, &tr->wh, hdrlen);
-				skb_pull(done_skb, sizeof(*tr) - hdrlen);
+				hdrlen = ieee80211_hdrlen(
+					dma_data->wh.frame_control);
+				memmove(dma_data->data - hdrlen,
+					&dma_data->wh, hdrlen);
+				skb_pull(done_skb, sizeof(*dma_data) - hdrlen);
 				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
 				info->flags |= IEEE80211_TX_STAT_ACK;
 				ieee80211_tx_status(hw, done_skb);
@@ -1077,12 +928,11 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 			     WLAN_ACTION_ADDBA_REQ)) {
 			capab = le16_to_cpu(mgmt->u.action.u.addba_req.capab);
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
-			index = pcie_tx_tid_queue_mapping(tid);
+			index = utils_tid_to_ac(tid);
 		}
 
 		if (unlikely(ieee80211_is_assoc_req(wh->frame_control)))
-			pcie_tx_add_basic_rates(hw->conf.chandef.chan->band,
-						skb);
+			utils_add_basic_rates(hw->conf.chandef.chan->band, skb);
 	}
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
@@ -1094,7 +944,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 		pcie_tx_count_packet(sta, tid);
 
 		spin_lock_bh(&priv->stream_lock);
-		stream = mwl_fwcmd_lookup_stream(hw, sta->addr, tid);
+		stream = mwl_fwcmd_lookup_stream(hw, sta, tid);
 
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
@@ -1107,7 +957,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 
 				txpriority =
 					(SYSADPT_TX_WMM_QUEUES + stream->idx) %
-					PCIE_TOTAL_HW_QUEUES;
+					TOTAL_HW_QUEUES;
 			} else if (stream->state == AMPDU_STREAM_NEW) {
 				/* We get here if the driver sends us packets
 				 * after we've initiated a stream, but before
@@ -1251,7 +1101,7 @@ void pcie_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
 
-	ac = pcie_tx_tid_queue_mapping(tid);
+	ac = utils_tid_to_ac(tid);
 	desc_num = SYSADPT_TX_WMM_QUEUES - ac - 1;
 	spin_lock_bh(&pcie_priv->txq[desc_num].lock);
 	skb_queue_walk_safe(&pcie_priv->txq[desc_num], skb, tmp) {

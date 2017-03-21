@@ -9,6 +9,8 @@ mwlwifi-objs			+= hif/pcie/pcie.o
 mwlwifi-objs			+= hif/pcie/fwdl.o
 mwlwifi-objs			+= hif/pcie/tx.o
 mwlwifi-objs			+= hif/pcie/rx.o
+mwlwifi-objs			+= hif/pcie/tx_ndp.o
+mwlwifi-objs			+= hif/pcie/rx_ndp.o
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld

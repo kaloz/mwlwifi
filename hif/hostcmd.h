@@ -65,6 +65,7 @@
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
 #define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL          0x116B
+#define HOSTCMD_CMD_NEWDP_DMATHREAD_START       0x1189
 #define HOSTCMD_CMD_GET_FW_REGION_CODE_SC4      0x118A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
@@ -131,8 +132,9 @@
 #define ENCR_KEY_FLAG_MICKEY_VALID              0x02000000
 
 /* Define block ack related constants */
-#define BASTREAM_FLAG_IMMEDIATE_TYPE            1
-#define BASTREAM_FLAG_DIRECTION_UPSTREAM        0
+#define BA_FLAG_IMMEDIATE_TYPE                  1
+#define BA_FLAG_DIRECTION_UP                    0
+#define BA_FLAG_DIRECTION_DOWN                  1
 
 /* Define general purpose action */
 #define HOSTCMD_ACT_GEN_SET                     0x0001
@@ -250,6 +252,8 @@ struct hostcmd_set_hw_spec {
 	__le32 features;
 	__le32 tx_wcb_num_per_queue;
 	__le32 total_rx_wcb;
+	__le32 acnt_buf_size;
+	__le32 acnt_base_addr;
 } __packed;
 
 struct hostcmd_cmd_set_hw_spec {
@@ -507,6 +511,7 @@ struct hostcmd_cmd_get_watchdog_bitmap {
 struct hostcmd_cmd_bss_start {
 	struct hostcmd_header cmd_hdr;
 	__le32 enable;                  /* FALSE: Disable or TRUE: Enable */
+	u8 amsdu;
 } __packed;
 
 /* HOSTCMD_CMD_AP_BEACON */
@@ -671,6 +676,46 @@ struct hostcmd_cmd_set_new_stn {
 	__le32 fw_sta_ptr;
 } __packed;
 
+struct retry_cnt_qos {
+	u8 retry_cfg_enable;
+	u8 retry_cnt_BK;
+	u8 retry_cnt_BE;
+	u8 retry_cnt_VI;
+	u8 retry_cnt_VO;
+} __packed;
+
+struct peer_info_sc4 {
+	__le32 legacy_rate_bitmap;
+	u8 ht_rates[4];
+	__le16 cap_info;
+	__le16 ht_cap_info;
+	u8 mac_ht_param_info;
+	u8 mrvl_sta;
+	struct add_ht_info add_ht_info;
+	__le32 tx_bf_capabilities;   /* EXBF_SUPPORT */
+	__le32 vht_max_rx_mcs;
+	__le32 vht_cap;
+	/* 0:20Mhz, 1:40Mhz, 2:80Mhz, 3:160 or 80+80Mhz */
+	u8 vht_rx_channel_width;
+	struct retry_cnt_qos retry_cnt_qos;
+	u8 assoc_rssi;
+} __packed;
+
+struct hostcmd_cmd_set_new_stn_sc4 {
+	struct hostcmd_header cmd_hdr;
+	__le16 aid;
+	u8 mac_addr[ETH_ALEN];
+	__le16 stn_id;
+	__le16 action;
+	__le16 reserved;
+	struct peer_info_sc4 peer_info;
+	/* UAPSD_SUPPORT */
+	u8 qos_info;
+	u8 is_qos_sta;
+	__le32 fw_sta_ptr;
+	__le32 wds;
+} __packed;
+
 /* HOSTCMD_CMD_SET_APMODE */
 struct hostcmd_cmd_set_apmode {
 	struct hostcmd_header cmd_hdr;
@@ -761,9 +806,13 @@ struct hostcmd_cmd_set_key {
 } __packed;
 
 /* HOSTCMD_CMD_BASTREAM */
-#define BA_TYPE_MASK       0x00000001
-#define BA_DIRECTION_MASK  0x00000006
-#define BA_DIRECTION_SHIFT 1
+#define BA_TYPE_MASK           0x00000001
+#define BA_DIRECTION_MASK      0x0000000e
+#define BA_DIRECTION_SHIFT     1
+
+#define BA_TYPE_MASK_NDP       0x00000003
+#define BA_DIRECTION_MASK_NDP  0x0000001c
+#define BA_DIRECTION_SHIFT_NDP 2
 
 struct ba_context {
 	__le32 context;
@@ -797,6 +846,7 @@ struct create_ba_params {
 	struct ba_context fw_ba_context;
 	u8 reset_seq_no;             /** 0 or 1**/
 	__le16 current_seq;
+	__le32 vht_rx_factor;
 	/* This is for virtual station in Sta proxy mode for V6FW */
 	u8 sta_src_mac_addr[ETH_ALEN];
 } __packed;
@@ -816,6 +866,8 @@ struct ba_stream_context {
 	__le32 flags;
 	/* returned by firmware in the create ba stream response */
 	struct ba_context fw_ba_context;
+	u8 tid;
+	u8 peer_mac_addr[ETH_ALEN];
 } __packed;
 
 union ba_info {
@@ -934,6 +986,11 @@ struct hostcmd_cmd_get_device_pwr_tbl {
 	__le32 current_channel_index;
 	/* Only for 1 channel, so, 1 channel at a time */
 	struct channel_power_tbl channel_pwr_tbl;
+} __packed;
+
+/* HOSTCMD_CMD_NEWDP_DMATHREAD_START */
+struct hostcmd_cmd_newdp_dmathread_start {
+	struct hostcmd_header cmd_hdr;
 } __packed;
 
 /* HOSTCMD_CMD_GET_FW_REGION_CODE_SC4 */

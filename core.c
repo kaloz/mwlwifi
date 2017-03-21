@@ -97,8 +97,8 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 };
 
 static const struct ieee80211_iface_limit ap_if_limits[] = {
-	{ .max = SYSADPT_NUM_OF_AP,	.types = BIT(NL80211_IFTYPE_AP) },
-	{ .max = 1,	.types = BIT(NL80211_IFTYPE_STATION) },
+	{ .max = SYSADPT_NUM_OF_AP,     .types = BIT(NL80211_IFTYPE_AP) },
+	{ .max = SYSADPT_NUM_OF_CLIENT, .types = BIT(NL80211_IFTYPE_STATION) },
 };
 
 static const struct ieee80211_iface_combination ap_if_comb = {
@@ -410,7 +410,8 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	hw = priv->hw;
 
 	band->ht_cap.ht_supported = 1;
-
+	if (priv->chip_type == MWL8964)
+		band->ht_cap.cap |= IEEE80211_HT_CAP_MAX_AMSDU;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_LDPC_CODING;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SM_PS;
@@ -439,7 +440,12 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 
 	band->vht_cap.vht_supported = 1;
 
-	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
+	if (priv->chip_type == MWL8964) {
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454;
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
+	} else
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_3895;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
@@ -448,11 +454,6 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN;
-
-	if (priv->chip_type == MWL8964) {
-		band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_160;
-		band->vht_cap.cap |= IEEE80211_VHT_CAP_SUPP_CHAN_WIDTH_160MHZ;
-	}
 
 	if (priv->antenna_rx == ANTENNA_RX_2)
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xfffa);
@@ -578,10 +579,10 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 
 	/* the bitmap is the hw queue number.  Map it to the ampdu queue. */
 	if (bitmap != INVALID_WATCHDOG) {
-		if (bitmap == SYSADPT_TX_AMPDU_QUEUES)
+		if (bitmap == priv->ampdu_num)
 			stream_index = 0;
-		else if (bitmap > SYSADPT_TX_AMPDU_QUEUES)
-			stream_index = bitmap - SYSADPT_TX_AMPDU_QUEUES;
+		else if (bitmap > priv->ampdu_num)
+			stream_index = bitmap - priv->ampdu_num;
 		else
 			stream_index = bitmap + 3; /** queue 0 is stream 3*/
 
@@ -594,7 +595,7 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 							     streams->tid);
 		} else {
 			for (stream_index = 0;
-			     stream_index < SYSADPT_TX_AMPDU_QUEUES;
+			     stream_index < priv->ampdu_num;
 			     stream_index++) {
 				streams = &priv->ampdu[stream_index];
 
@@ -788,7 +789,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 
 	hw = ieee80211_alloc_hw(priv_size, &mwl_mac80211_ops);
 	if (!hw) {
-		pr_err("ieee80211 alloc failed\n");
+		pr_err("ieee80211 alloc hw failed\n");
 		return NULL;
 	}
 
@@ -804,6 +805,15 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->hif.bus = bus_type;
 	priv->hif.ops = ops;
 	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
+	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
+
+	priv->ampdu =
+		kzalloc(priv->ampdu_num * sizeof(*priv->ampdu), GFP_KERNEL);
+	if (!priv->ampdu) {
+		ieee80211_free_hw(hw);
+		pr_err("alloc ampdu stream failed\n");
+		return NULL;
+	}
 
 	SET_IEEE80211_DEV(hw, dev);
 
@@ -812,6 +822,9 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 
 void mwl_free_hw(struct ieee80211_hw *hw)
 {
+	struct mwl_priv *priv = hw->priv;
+
+	kfree(priv->ampdu);
 	ieee80211_free_hw(hw);
 }
 

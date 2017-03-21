@@ -142,12 +142,24 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	 */
 	usleep_range(FW_CHECK_MSECS * 1000, FW_CHECK_MSECS * 2000);
 
-	writel(MACREG_A2HRIC_BIT_MASK,
-	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
+	if (priv->chip_type == MWL8964) {
+		writel(MACREG_A2HRIC_BIT_MASK_NDP,
+		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
+	} else {
+		writel(MACREG_A2HRIC_BIT_MASK,
+		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CLEAR_SEL);
+	}
 	writel(0x00, pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 	writel(0x00, pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
-	writel(MACREG_A2HRIC_BIT_MASK,
-	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	if (priv->chip_type == MWL8964) {
+		writel(MACREG_A2HRIC_BIT_MASK_NDP,
+		       pcie_priv->iobase1 +
+		       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	} else {
+		writel(MACREG_A2HRIC_BIT_MASK,
+		       pcie_priv->iobase1 +
+		       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
+	}
 
 	/* this routine interacts with SC2 bootrom to download firmware binary
 	 * to the device. After DMA'd to SC2, the firmware could be deflated to

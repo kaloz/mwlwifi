@@ -40,6 +40,7 @@ struct mwl_hif_ops {
 	const char *driver_name;
 	const char *driver_version;
 	unsigned int tx_head_room;
+	int ampdu_num;
 	void (*reset)(struct ieee80211_hw *hw);
 	int (*init)(struct ieee80211_hw *hw);
 	void (*deinit)(struct ieee80211_hw *hw);
@@ -69,5 +70,8 @@ struct mwl_hif_ops {
 	void (*get_survey)(struct ieee80211_hw *hw,
 			   struct mwl_survey_info *survey_info);
 	int (*reg_access)(struct ieee80211_hw *hw, bool write);
+	void (*set_sta_id)(struct ieee80211_hw *hw,
+			   struct ieee80211_sta *sta,
+			   bool sta_mode, bool set);
 };
 #endif /* _HIF_H_ */
