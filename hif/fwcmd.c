@@ -1245,14 +1245,29 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 	pcmd->action = cpu_to_le16(dir);
 
 	if (dir == WL_ANTENNATYPE_RX) {
-		u8 rx_antenna = 4; /* if auto, set 4 rx antennas in SC2 */
+		u8 rx_antenna;
 
-		if (antenna != 0)
-			pcmd->antenna_mode = cpu_to_le16(antenna);
-		else
+		if (priv->chip_type == MWL8964) {
+			if (antenna == ANTENNA_RX_4_AUTO)
+				rx_antenna = 0xf;
+			else if (antenna == ANTENNA_RX_3)
+				rx_antenna = 7;
+			else if (antenna == ANTENNA_RX_2)
+				rx_antenna = 4;
+			else
+				rx_antenna = 1;
+
 			pcmd->antenna_mode = cpu_to_le16(rx_antenna);
+		} else {
+			rx_antenna = 4;
+
+			if (antenna != 0)
+				pcmd->antenna_mode = cpu_to_le16(antenna);
+			else
+				pcmd->antenna_mode = cpu_to_le16(rx_antenna);
+		}
 	} else {
-		u8 tx_antenna = 0xf; /* if auto, set 4 tx antennas in SC2 */
+		u8 tx_antenna = 0xf;
 
 		if (antenna != 0)
 			pcmd->antenna_mode = cpu_to_le16(antenna);
