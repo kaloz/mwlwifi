@@ -39,19 +39,6 @@
 #define PCIE_MAX_NUM_RX_DESC      256
 #define PCIE_RECEIVE_LIMIT        64
 
-/* Transmit rate information constants */
-#define TX_RATE_FORMAT_LEGACY         0
-#define TX_RATE_FORMAT_11N            1
-#define TX_RATE_FORMAT_11AC           2
-
-#define TX_RATE_BANDWIDTH_20          0
-#define TX_RATE_BANDWIDTH_40          1
-#define TX_RATE_BANDWIDTH_80          2
-#define TX_RATE_BANDWIDTH_160         3
-
-#define TX_RATE_INFO_STD_GI           0
-#define TX_RATE_INFO_SHORT_GI         1
-
 enum {
 	IEEE_TYPE_MANAGEMENT = 0,
 	IEEE_TYPE_CONTROL,
@@ -135,14 +122,6 @@ enum {
 #define EAGLE_TXD_STATUS_IDLE               0x00000000
 #define EAGLE_TXD_STATUS_OK                 0x00000001
 #define EAGLE_TXD_STATUS_FW_OWNED           0x80000000
-
-#define MWL_TX_RATE_FORMAT_MASK             0x00000003
-#define MWL_TX_RATE_BANDWIDTH_MASK          0x00000030
-#define MWL_TX_RATE_BANDWIDTH_SHIFT         4
-#define MWL_TX_RATE_SHORTGI_MASK            0x00000040
-#define MWL_TX_RATE_SHORTGI_SHIFT           6
-#define MWL_TX_RATE_RATEIDMCS_MASK          0x00007F00
-#define MWL_TX_RATE_RATEIDMCS_SHIFT         8
 
 struct pcie_tx_desc {
 	u8 data_rate;

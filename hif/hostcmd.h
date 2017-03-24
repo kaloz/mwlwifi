@@ -58,6 +58,7 @@
 #define HOSTCMD_CMD_SET_COUNTRY_CODE            0x1130
 #define HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL      0x1133
 #define HOSTCMD_CMD_SET_WSC_IE                  0x1136 /* per-vif */
+#define HOSTCMD_CMD_GET_RATETABLE               0x1137
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
@@ -932,6 +933,15 @@ struct hostcmd_cmd_set_wsc_ie {
 	__le16 ie_type;              /* 0 -- beacon. or 1 -- probe response. */
 	__le16 len;
 	u8 data[WSC_IE_MAX_LENGTH];
+} __packed;
+
+/* HOSTCMD_CMD_GET_RATETABLE */
+struct hostcmd_cmd_get_ratetable {
+	struct hostcmd_header cmd_hdr;
+	u8 addr[ETH_ALEN];
+	u8 type;                     /* 0: SU, 1: MU */
+	/* multiply 2 because 2 DWORD in rate info   */
+	__le32 sorted_rates_idx_map[2 * SYSADPT_MAX_RATE_ADAPT_RATES];
 } __packed;
 
 /* HOSTCMD_CMD_DWDS_ENABLE */

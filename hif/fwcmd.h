@@ -211,6 +211,9 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level);
 
 int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data);
 
+int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
+			    u32 size, u8 type);
+
 int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 
 int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value);

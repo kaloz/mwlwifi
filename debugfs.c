@@ -19,6 +19,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "thermal.h"
 #include "hif/fwcmd.h"
 #include "hif/hif-ops.h"
@@ -404,8 +405,10 @@ static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 		return -ENOMEM;
 
 	sband = priv->hw->wiphy->bands[NL80211_BAND_5GHZ];
-	if (!sband)
-		return -EINVAL;
+	if (!sband) {
+		ret = -EINVAL;
+		goto err;
+	}
 
 	len += scnprintf(p + len, size - len, "\n");
 	for (i = 0; i < sband->n_channels; i++) {
@@ -424,8 +427,9 @@ static ssize_t mwl_debugfs_dfs_channel_read(struct file *file,
 	len += scnprintf(p + len, size - len, "\n");
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
-	free_page(page);
 
+err:
+	free_page(page);
 	return ret;
 }
 
@@ -605,7 +609,7 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
-	int ret = 0;
+	ssize_t ret;
 
 	if (!p)
 		return -ENOMEM;
@@ -638,7 +642,6 @@ done:
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
 none:
-
 	free_page(page);
 	return ret;
 }
@@ -651,7 +654,7 @@ static ssize_t mwl_debugfs_regrdwr_write(struct file *file,
 	unsigned long addr = get_zeroed_page(GFP_KERNEL);
 	char *buf = (char *)addr;
 	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
-	int ret;
+	ssize_t ret;
 	u32 reg_type = 0, reg_offset = 0, reg_value = UINT_MAX;
 
 	if (!buf)
@@ -659,22 +662,173 @@ static ssize_t mwl_debugfs_regrdwr_write(struct file *file,
 
 	if (copy_from_user(buf, ubuf, buf_size)) {
 		ret = -EFAULT;
-		goto done;
+		goto err;
 	}
 
 	ret = sscanf(buf, "%u %x %x", &reg_type, &reg_offset, &reg_value);
 
 	if (!reg_type) {
 		ret = -EINVAL;
-		goto done;
+		goto err;
 	} else {
 		priv->reg_type = reg_type;
 		priv->reg_offset = reg_offset;
 		priv->reg_value = reg_value;
 		ret = count;
 	}
-done:
 
+err:
+	free_page(addr);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
+					  size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct mwl_sta *sta_info;
+	struct ieee80211_sta *sta;
+	u8 addr[ETH_ALEN];
+	int table_size = (sizeof(__le32) * 2 * SYSADPT_MAX_RATE_ADAPT_RATES);
+	u8 *rate_table;
+	u32 rate_info;
+	u8 fmt, stbc, bw, sgi, mcs, preamble_gf, power_id, ldpc, bf, ant;
+	int idx, rate, nss;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	if (!priv->sta_aid) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		sta = container_of((char *)sta_info, struct ieee80211_sta,
+				   drv_priv[0]);
+		if (priv->sta_aid == sta->aid) {
+			ether_addr_copy(addr, sta->addr);
+			break;
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
+
+	rate_table = kzalloc(size, GFP_KERNEL);
+	if (!rate_table) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	ret = mwl_fwcmd_get_ratetable(priv->hw, addr, rate_table,
+				      table_size, 0);
+	if (ret)
+		goto err;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len,
+		"%3s %6s %5s %5s %5s %5s %5s %4s %2s %5s %4s %5s %5s\n",
+		"Num", "Fmt", "STBC", "BW", "SGI", "Nss", "RateId",
+		"GF/Pre", "PId", "LDPC", "BF", "TxAnt", "Rate");
+	idx = 0;
+	rate_info = le32_to_cpu(*(__le32 *)rate_table);
+	while (rate_info != 0) {
+		fmt = rate_info & MWL_TX_RATE_FORMAT_MASK;
+		stbc = (rate_info & MWL_TX_RATE_STBC_MASK) >>
+			MWL_TX_RATE_STBC_SHIFT;
+		bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
+			MWL_TX_RATE_BANDWIDTH_SHIFT;
+		sgi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
+			MWL_TX_RATE_SHORTGI_SHIFT;
+		mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
+			MWL_TX_RATE_RATEIDMCS_SHIFT;
+		preamble_gf = (rate_info & MWL_TX_RATE_PREAMBLE_MASK) >>
+			MWL_TX_RATE_PREAMBLE_SHIFT;
+		power_id = (rate_info & MWL_TX_RATE_POWERID_MASK) >>
+			MWL_TX_RATE_POWERID_SHIFT;
+		ldpc = (rate_info & MWL_TX_RATE_ADVCODING_MASK) >>
+			MWL_TX_RATE_ADVCODING_SHIFT;
+		bf = (rate_info & MWL_TX_RATE_BF_MASK) >>
+			MWL_TX_RATE_BF_SHIFT;
+		ant = (rate_info & MWL_TX_RATE_ANTSELECT_MASK) >>
+			MWL_TX_RATE_ANTSELECT_SHIFT;
+
+		if (fmt == TX_RATE_FORMAT_11AC) {
+			rate = mcs & 0xf; /* 11ac, mcs[3:0]: rate      */
+			nss = mcs >> 4;   /* 11ac, mcs[6:4] = nss code */
+			nss++;  /* ddd 1 to correct Nss representation */
+		} else {
+			rate = mcs;
+			nss = 0;
+			if (fmt == TX_RATE_FORMAT_11N) {
+				if ((mcs >= 0) && (mcs < 8))
+					nss = 1;
+				else if ((mcs >= 8) && (mcs < 16))
+					nss = 2;
+				else if ((mcs >= 16) && (mcs < 24))
+					nss = 3;
+			}
+		}
+
+		len += scnprintf(p + len, size - len,
+			"%3d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d %5d\n",
+			idx, (int)fmt, (int)stbc, (int)bw, (int)sgi, nss, rate,
+			(int)preamble_gf, (int)power_id, (int)ldpc, (int)bf,
+			(int)ant,
+			utils_get_phy_rate(fmt, bw, sgi, mcs));
+
+		idx++;
+		rate_table += (2 * sizeof(__le32));
+		rate_info = le32_to_cpu(*(__le32 *)rate_table);
+	}
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+
+err:
+	free_page(page);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_ratetable_write(struct file *file,
+					   const char __user *ubuf,
+					   size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int sta_aid;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &sta_aid)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if ((sta_aid <= 0) || (sta_aid > SYSADPT_MAX_STA_SC4)) {
+		wiphy_warn(priv->hw->wiphy,
+			   "station aid is exceeding the limit %d\n", sta_aid);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	priv->sta_aid = sta_aid;
+	ret = count;
+
+err:
 	free_page(addr);
 	return ret;
 }
@@ -688,6 +842,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
+MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
 {
@@ -709,6 +864,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
+	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
 }
 
 void mwl_debugfs_remove(struct ieee80211_hw *hw)
