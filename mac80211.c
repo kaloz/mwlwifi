@@ -173,7 +173,12 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
-		//mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		if (priv->chip_type == MWL8964) {
+			/* allow firmware to really set channel */
+			mwl_fwcmd_bss_start(hw, vif, true);
+			mwl_fwcmd_bss_start(hw, vif, false);
+		}
 		break;
 	case NL80211_IFTYPE_STATION:
 		ether_addr_copy(mwl_vif->sta_mac, vif->addr);

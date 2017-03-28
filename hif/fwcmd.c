@@ -1841,9 +1841,6 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 	if (mwl_fwcmd_set_ap_beacon(priv, mwl_vif, &vif->bss_conf))
 		goto err;
 
-	if (mwl_fwcmd_bss_start(hw, vif, true))
-		goto err;
-
 	if (b_inf->cap_info & WLAN_CAPABILITY_SPECTRUM_MGMT)
 		rc = mwl_fwcmd_set_spectrum_mgmt(priv, true);
 	else

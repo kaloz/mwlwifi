@@ -136,6 +136,8 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 priv->sta_macids_supported);
 	len += scnprintf(p + len, size - len,
 			 "macid used: %08x\n", priv->macids_used);
+	len += scnprintf(p + len, size - len,
+			 "radio: %s\n", priv->radio_on ? "enable" : "disable");
 	len += mwl_hif_get_info(priv->hw, p + len, size - len);
 	len += scnprintf(p + len, size - len, "\n");
 
@@ -610,6 +612,9 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
 	ssize_t ret;
+
+	if (*ppos)
+		return len;
 
 	if (!p)
 		return -ENOMEM;
