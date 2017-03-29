@@ -131,6 +131,22 @@ int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id)
 		return (phy_rate_11ac160M[rate_11ac][index] / 2);
 }
 
+struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
+{
+	struct mwl_vif *mwl_vif;
+
+	spin_lock_bh(&priv->vif_lock);
+	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
+		if (ether_addr_equal(bssid, mwl_vif->bssid)) {
+			spin_unlock_bh(&priv->vif_lock);
+			return mwl_vif;
+		}
+	}
+	spin_unlock_bh(&priv->vif_lock);
+
+	return NULL;
+}
+
 void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len)
 {
 	print_hex_dump(KERN_INFO, prefix_str, DUMP_PREFIX_OFFSET,

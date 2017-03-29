@@ -77,6 +77,8 @@ static inline void utils_add_basic_rates(int band, struct sk_buff *skb)
 
 int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);
 
+struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);
+
 void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
 
 void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len);

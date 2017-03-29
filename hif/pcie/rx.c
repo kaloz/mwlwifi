@@ -20,6 +20,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/rx.h"
 
@@ -286,23 +287,6 @@ static inline void pcie_rx_prepare_status(struct pcie_rx_desc *pdesc,
 	}
 }
 
-static inline struct mwl_vif *pcie_rx_find_vif_bss(struct mwl_priv *priv,
-						   u8 *bssid)
-{
-	struct mwl_vif *mwl_vif;
-
-	spin_lock_bh(&priv->vif_lock);
-	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		if (ether_addr_equal(bssid, mwl_vif->bssid)) {
-			spin_unlock_bh(&priv->vif_lock);
-			return mwl_vif;
-		}
-	}
-	spin_unlock_bh(&priv->vif_lock);
-
-	return NULL;
-}
-
 static inline int pcie_rx_refill(struct mwl_priv *priv,
 				 struct pcie_rx_hndl *rx_hndl)
 {
@@ -435,14 +419,14 @@ void pcie_rx_recv(unsigned long data)
 			 * accordingly
 			 */
 			if (ieee80211_has_tods(wh->frame_control)) {
-				mwl_vif = pcie_rx_find_vif_bss(priv, wh->addr1);
+				mwl_vif = utils_find_vif_bss(priv, wh->addr1);
 				if (!mwl_vif &&
 				    ieee80211_has_a4(wh->frame_control))
 					mwl_vif =
-						pcie_rx_find_vif_bss(priv,
-								     wh->addr2);
+						utils_find_vif_bss(priv,
+								   wh->addr2);
 			} else {
-				mwl_vif = pcie_rx_find_vif_bss(priv, wh->addr2);
+				mwl_vif = utils_find_vif_bss(priv, wh->addr2);
 			}
 
 			if  ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||

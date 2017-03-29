@@ -300,6 +300,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 {
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
+	struct mwl_vif *mwl_vif;
 
 	pcie_rx_remove_dma_header(skb, 0);
 	status = IEEE80211_SKB_RXCB(skb);
@@ -313,6 +314,16 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 		status->flag |= RX_FLAG_MMIC_ERROR;
 	else {
 		wh = (struct ieee80211_hdr *)skb->data;
+
+		if (ieee80211_has_tods(wh->frame_control))
+			mwl_vif = utils_find_vif_bss(priv, wh->addr1);
+		else
+			mwl_vif = utils_find_vif_bss(priv, wh->addr2);
+
+		if (mwl_vif) {
+			wh->seq_ctrl = cpu_to_le16(mwl_vif->seqno);
+			mwl_vif->seqno += 0x10;
+		}
 
 		if (ieee80211_is_mgmt(wh->frame_control) &&
 		    ieee80211_has_protected(wh->frame_control) &&
