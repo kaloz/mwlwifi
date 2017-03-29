@@ -18,118 +18,9 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
-static unsigned short phy_rate[][5] = {
-	{2,   13,  15,  27,  30},   /* 0  */
-	{4,   26,  29,  54,  60},   /* 1  */
-	{11,  39,  43,  81,  90},   /* 2  */
-	{22,  52,  58,  108, 120},  /* 3  */
-	{44,  78,  87,  162, 180},  /* 4  */
-	{12,  104, 115, 216, 240},  /* 5  */
-	{18,  117, 130, 243, 270},  /* 6  */
-	{24,  130, 144, 270, 300},  /* 7  */
-	{36,  26,  29,  54,  60},   /* 8  */
-	{48,  52,  58,  108, 120},  /* 9  */
-	{72,  78,  87,  162, 180},  /* 10 */
-	{96,  104, 116, 216, 240},  /* 11 */
-	{108, 156, 173, 324, 360},  /* 12 */
-	{0,   208, 231, 432, 480},  /* 13 */
-	{0,   234, 260, 486, 540},  /* 14 */
-	{0,   260, 289, 540, 600},  /* 15 */
-	{0,   39,  43,  81,  90},   /* 16 */
-	{0,   78,  87,  162, 180},  /* 17 */
-	{0,   117, 130, 243, 270},  /* 18 */
-	{0,   156, 173, 324, 360},  /* 19 */
-	{0,   234, 260, 486, 540},  /* 20 */
-	{0,   312, 347, 648, 720},  /* 21 */
-	{0,   351, 390, 729, 810},  /* 22 */
-	{0,   390, 433, 810, 900},  /* 23 */
-};
-
-/* 20Mhz: Nss1_LGI, Nss1_SGI, Nss2_LGI, Nss2_SGI, Nss3_LGI, Nss3_SGI */
-static unsigned short phy_rate_11ac20M[][6] = {
-	{13,  15,  26,  29,  39,  44},   /* 0 */
-	{26,  29,  52,  58,  78,  87},   /* 1 */
-	{39,  44,  78,  87,  117, 130},  /* 2 */
-	{52,  58,  104, 116, 156, 174},  /* 3 */
-	{78,  87,  156, 174, 234, 260},  /* 4 */
-	{104, 116, 208, 231, 312, 347},  /* 5 */
-	{117, 130, 234, 260, 351, 390},  /* 6 */
-	{130, 145, 260, 289, 390, 434},  /* 7 */
-	{156, 174, 312, 347, 468, 520},  /* 8 */
-	/* Nss 1 and Nss 2 mcs9 not valid */
-	{2,   2,   2,   2,   520, 578},  /* 9 */
-};
-
-/* 40Mhz: Nss1_LGI, Nss1_SGI, Nss2_LGI, Nss2_SGI, Nss3_LGI, Nss3_SGI */
-static unsigned short phy_rate_11ac40M[][6] = {
-	{27,  30,  54,  60,  81,   90},   /* 0 */
-	{54,  60,  108, 120, 162,  180},  /* 1 */
-	{81,  90,  162, 180, 243,  270},  /* 2 */
-	{108, 120, 216, 240, 324,  360},  /* 3 */
-	{162, 180, 324, 360, 486,  540},  /* 4 */
-	{216, 240, 432, 480, 648,  720},  /* 5 */
-	{243, 270, 486, 540, 729,  810},  /* 6 */
-	{270, 300, 540, 600, 810,  900},  /* 7 */
-	{324, 360, 648, 720, 972,  1080}, /* 8 */
-	{360, 400, 720, 800, 1080, 1200}, /* 9 */
-};
-
-/* 80Mhz: Nss1_LGI, Nss1_SGI, Nss2_LGI, Nss2_SGI, Nss3_LGI, Nss3_SGI */
-static unsigned short phy_rate_11ac80M[][6] = {
-	{59,  65,  117,  130,  175,  195},  /* 0 */
-	{117, 130, 234,  260,  351,  390},  /* 1 */
-	{175, 195, 351,  390,  527,  585},  /* 2 */
-	{234, 260, 468,  520,  702,  780},  /* 3 */
-	{351, 390, 702,  780,  1053, 1170}, /* 4 */
-	{468, 520, 936,  1040, 1404, 1560}, /* 5 */
-	{527, 585, 1053, 1170, 2,    2},    /* 6, Nss 3 mcs6 not valid */
-	{585, 650, 1170, 1300, 1755, 1950}, /* 7 */
-	{702, 780, 1404, 1560, 2106, 2340}, /* 8 */
-	{780, 867, 1560, 1733, 2340, 2600}, /* 9 */
-};
-
-/* 160Mhz: Nss1_LGI, Nss1_SGI, Nss2_LGI, Nss2_SGI, Nss3_LGI, Nss3_SGI */
-static unsigned short phy_rate_11ac160M[][6] = {
-	{117,   130,  234,  260,  351,  390},  /* 0 */
-	{234,   260,  468,  520,  702,  780},  /* 1 */
-	{351,   390,  702,  780,  1053, 1170}, /* 2 */
-	{468,   520,  936,  1040, 1404, 1560}, /* 3 */
-	{702,   780,  1404, 1560, 2106, 2340}, /* 4 */
-	{936,   1040, 1872, 2080, 2808, 3120}, /* 5 */
-	{1053,  1170, 2106, 2340, 3159, 3510}, /* 6 */
-	{1170,  1300, 2340, 2600, 3510, 3900}, /* 7 */
-	{1404,  1560, 2808, 3120, 4212, 4680}, /* 8 */
-	{1560,  1733, 2130, 3467, 4680, 5200}, /* 9 */
-};
-
-static inline int utils_get_phy_rate(u8 format, u8 bandwidth,
-				     u8 short_gi, u8 mcs_id)
-{
-	u8 index = 0;
-	u8 nss_11ac = 0;
-	u8 rate_11ac = 0;
-
-	if (format == TX_RATE_FORMAT_11N) {
-		index = (bandwidth << 1) | short_gi;
-		index++;
-	} else if (format == TX_RATE_FORMAT_11AC) {
-		rate_11ac = mcs_id & 0xf; /* 11ac, mcs_id[3:0]: rate     */
-		nss_11ac = mcs_id >> 4;	  /* 11ac, mcs_id[6:4]: nss code */
-		index = (nss_11ac << 1) | short_gi;
-	}
-
-	if (format != TX_RATE_FORMAT_11AC)
-		return (phy_rate[mcs_id][index] / 2);
-
-	if (bandwidth == TX_RATE_BANDWIDTH_20)
-		return (phy_rate_11ac20M[rate_11ac][index] / 2);
-	else if (bandwidth == TX_RATE_BANDWIDTH_40)
-		return (phy_rate_11ac40M[rate_11ac][index] / 2);
-	else if (bandwidth == TX_RATE_BANDWIDTH_80)
-		return (phy_rate_11ac80M[rate_11ac][index] / 2);
-	else
-		return (phy_rate_11ac160M[rate_11ac][index] / 2);
-}
+#include <net/arp.h>
+#include <net/ip.h>
+#include <net/icmp.h>
 
 static inline int utils_tid_to_ac(u8 tid)
 {
@@ -184,18 +75,18 @@ static inline void utils_add_basic_rates(int band, struct sk_buff *skb)
 	}
 }
 
-static inline void utils_dump_data_info(const char *prefix_str,
-					const void *buf, size_t len)
-{
-	print_hex_dump(KERN_INFO, prefix_str, DUMP_PREFIX_OFFSET,
-		       16, 1, buf, len, true);
-}
+int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);
 
-static inline void utils_dump_data_debug(const char *prefix_str,
-					 const void *buf, size_t len)
-{
-	print_hex_dump(KERN_DEBUG, prefix_str, DUMP_PREFIX_OFFSET,
-		       16, 1, buf, len, true);
-}
+void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
+
+void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len);
+
+bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
+
+bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);
+
+void utils_dump_arp(const void *packet, bool mac80211, size_t len);
+
+void utils_dump_icmp_echo(const void *packet, bool mac80211, size_t len);
 
 #endif /* _UTILS_H_ */
