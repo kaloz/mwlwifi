@@ -227,6 +227,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	ethertype = (skb->data[12] << 8) | skb->data[13];
 	fc = cpu_to_le16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA);
 
+	memset(&hdr, 0, sizeof(hdr));
 	switch (mwl_vif->type) {
 	case NL80211_IFTYPE_AP:
 		fc |= cpu_to_le16(IEEE80211_FCTL_TODS);
@@ -269,8 +270,6 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 
 	hdr.frame_control = fc;
 	hdr.duration_id = 0;
-	hdr.seq_ctrl = cpu_to_le16(mwl_vif->seqno);
-	mwl_vif->seqno += 0x10;
 
 	skb_pull(skb, ETH_HLEN);
 
@@ -286,6 +285,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	} else
 		memcpy(skb_push(skb, hdrlen), &hdr, hdrlen);
 
+	status->flag |= RX_FLAG_DUP_VALIDATED;
 	ieee80211_rx(priv->hw, skb);
 
 	return;
@@ -300,7 +300,6 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 {
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
-	struct mwl_vif *mwl_vif;
 
 	pcie_rx_remove_dma_header(skb, 0);
 	status = IEEE80211_SKB_RXCB(skb);
@@ -315,16 +314,6 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	else {
 		wh = (struct ieee80211_hdr *)skb->data;
 
-		if (ieee80211_has_tods(wh->frame_control))
-			mwl_vif = utils_find_vif_bss(priv, wh->addr1);
-		else
-			mwl_vif = utils_find_vif_bss(priv, wh->addr2);
-
-		if (mwl_vif) {
-			wh->seq_ctrl = cpu_to_le16(mwl_vif->seqno);
-			mwl_vif->seqno += 0x10;
-		}
-
 		if (ieee80211_is_mgmt(wh->frame_control) &&
 		    ieee80211_has_protected(wh->frame_control) &&
 		    !is_multicast_ether_addr(wh->addr1)) {
@@ -334,6 +323,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 		}
 	}
 
+	status->flag |= RX_FLAG_DUP_VALIDATED;
 	ieee80211_rx(priv->hw, skb);
 }
 
