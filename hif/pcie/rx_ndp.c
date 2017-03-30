@@ -279,9 +279,11 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 		qos_control = (__le16 *)skb_push(skb, 2);
 		memcpy(skb_push(skb, hdrlen - 2), &hdr, hdrlen - 2);
 		if (ethertype == ETH_P_PAE)
-			*qos_control = cpu_to_le16(7);
+			*qos_control = cpu_to_le16(
+				IEEE80211_QOS_CTL_ACK_POLICY_NOACK | 7);
 		else
-			*qos_control = 0;
+			*qos_control = cpu_to_le16(
+				IEEE80211_QOS_CTL_ACK_POLICY_NOACK);
 	} else
 		memcpy(skb_push(skb, hdrlen), &hdr, hdrlen);
 
