@@ -441,6 +441,14 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
 			if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
 				/* Remove H/W dma header */
 				dma_data = (struct pcie_dma_data *)skb->data;
+
+				if (ieee80211_is_assoc_resp(
+				    dma_data->wh.frame_control) ||
+				    ieee80211_is_reassoc_resp(
+				    dma_data->wh.frame_control)) {
+					dev_kfree_skb_any(skb);
+					goto bypass_ack;
+				}
 				hdrlen = ieee80211_hdrlen(
 					dma_data->wh.frame_control);
 				memmove(dma_data->data - hdrlen,
@@ -451,10 +459,10 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
 
 			ieee80211_tx_info_clear_status(tx_info);
 			tx_info->status.rates[0].idx = -1;
-			tx_info->status.rates[0].count = 0;
 			tx_info->flags |= IEEE80211_TX_STAT_ACK;
 			ieee80211_tx_status(hw, skb);
 
+bypass_ack:
 			if (++tx_done_tail >= MAX_TX_RING_DONE_SIZE)
 				tx_done_tail = 0;
 			desc->tx_desc_busy_cnt--;
@@ -553,6 +561,19 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 						(sta->aid + QUEUE_STAOFFSET)
 						+ 6;
 			}
+		}
+
+		if (ieee80211_is_assoc_resp(wh->frame_control) ||
+		    ieee80211_is_reassoc_resp(wh->frame_control)) {
+			struct sk_buff *ack_skb;
+			struct ieee80211_tx_info *ack_info;
+
+			ack_skb = skb_copy(skb, GFP_ATOMIC);
+			ack_info = IEEE80211_SKB_CB(ack_skb);
+			ieee80211_tx_info_clear_status(ack_info);
+			ack_info->status.rates[0].idx = -1;
+			ack_info->flags |= IEEE80211_TX_STAT_ACK;
+			ieee80211_tx_status(hw, ack_skb);
 		}
 
 		pcie_tx_encapsulate_frame(priv, skb, k_conf, NULL);
