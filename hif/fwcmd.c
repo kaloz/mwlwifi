@@ -79,6 +79,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL, "SetOptimizationLevel" },
 		{ HOSTCMD_CMD_SET_WSC_IE, "SetWscIE" },
 		{ HOSTCMD_CMD_GET_RATETABLE, "GetRateTable" },
+		{ HOSTCMD_CMD_GET_SEQNO, "GetSeqno" },
 		{ HOSTCMD_CMD_DWDS_ENABLE, "DwdsEnable" },
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
@@ -2464,7 +2465,7 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
 			struct ieee80211_vif *vif,
-			u32 direction, u8 buf_size, bool amsdu)
+			u32 direction, u8 buf_size, u16 seqno, bool amsdu)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -2509,8 +2510,13 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 		 IEEE80211_HT_AMPDU_PARM_FACTOR) |
 		((stream->sta->ht_cap.ampdu_density << 2) &
 		 IEEE80211_HT_AMPDU_PARM_DENSITY);
-	pcmd->ba_info.create_params.reset_seq_no = 1;
-	pcmd->ba_info.create_params.current_seq = cpu_to_le16(0);
+	if (direction == BA_FLAG_DIRECTION_UP) {
+		pcmd->ba_info.create_params.reset_seq_no = 0;
+		pcmd->ba_info.create_params.current_seq = cpu_to_le16(seqno);
+	} else {
+		pcmd->ba_info.create_params.reset_seq_no = 1;
+		pcmd->ba_info.create_params.current_seq = cpu_to_le16(0);
+	}
 	if (priv->chip_type == MWL8964 &&
 	    stream->sta->vht_cap.vht_supported) {
 		pcmd->ba_info.create_params.vht_rx_factor =
@@ -2785,6 +2791,34 @@ int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
 	}
 
 	memcpy(rate_table, &pcmd->sorted_rates_idx_map, size);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
+			struct mwl_ampdu_stream *stream, u16 *start_seqno)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_seqno *pcmd;
+
+	pcmd = (struct hostcmd_cmd_get_seqno *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_SEQNO);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	ether_addr_copy(pcmd->mac_addr, stream->sta->addr);
+	pcmd->tid = stream->tid;
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_SEQNO)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	*start_seqno = le16_to_cpu(pcmd->seq_no);
 
 	mutex_unlock(&priv->fwcmd_mutex);
 

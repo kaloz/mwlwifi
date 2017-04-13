@@ -182,7 +182,7 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
 			struct ieee80211_vif *vif,
-			u32 direction, u8 buf_size, bool amsdu);
+			u32 direction, u8 buf_size, u16 seqno, bool amsdu);
 
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 			 struct mwl_ampdu_stream *stream,
@@ -213,6 +213,9 @@ int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data);
 
 int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
 			    u32 size, u8 type);
+
+int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
+			struct mwl_ampdu_stream *stream, u16 *start_seqno);
 
 int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 

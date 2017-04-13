@@ -59,6 +59,7 @@
 #define HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL      0x1133
 #define HOSTCMD_CMD_SET_WSC_IE                  0x1136 /* per-vif */
 #define HOSTCMD_CMD_GET_RATETABLE               0x1137
+#define HOSTCMD_CMD_GET_SEQNO                   0x1143
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
@@ -942,6 +943,15 @@ struct hostcmd_cmd_get_ratetable {
 	u8 type;                     /* 0: SU, 1: MU */
 	/* multiply 2 because 2 DWORD in rate info   */
 	__le32 sorted_rates_idx_map[2 * SYSADPT_MAX_RATE_ADAPT_RATES];
+} __packed;
+
+/* HOSTCMD_CMD_GET_SEQNO */
+struct hostcmd_cmd_get_seqno {
+	struct hostcmd_header cmd_hdr;
+	u8 mac_addr[ETH_ALEN];
+	u8 tid;
+	__le16 seq_no;
+	u8 reserved;
 } __packed;
 
 /* HOSTCMD_CMD_DWDS_ENABLE */
