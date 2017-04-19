@@ -534,58 +534,6 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 	return NULL;
 }
 
-static inline void pcie_tx_prepare_info(struct ieee80211_hw *hw, u32 rate,
-					struct ieee80211_tx_info *info)
-{
-	u32 format, bandwidth, short_gi, rate_id;
-
-	ieee80211_tx_info_clear_status(info);
-
-	info->status.rates[0].idx = -1;
-	info->status.rates[0].count = 0;
-	info->status.rates[0].flags = 0;
-
-	if (rate) {
-		/* Prepare rate information */
-		format = rate & MWL_TX_RATE_FORMAT_MASK;
-		bandwidth =
-			(rate & MWL_TX_RATE_BANDWIDTH_MASK) >>
-			MWL_TX_RATE_BANDWIDTH_SHIFT;
-		short_gi = (rate & MWL_TX_RATE_SHORTGI_MASK) >>
-			MWL_TX_RATE_SHORTGI_SHIFT;
-		rate_id = (rate & MWL_TX_RATE_RATEIDMCS_MASK) >>
-			MWL_TX_RATE_RATEIDMCS_SHIFT;
-
-		info->status.rates[0].idx = rate_id;
-		if (format == TX_RATE_FORMAT_LEGACY) {
-			if (hw->conf.chandef.chan->hw_value >
-			    BAND_24_CHANNEL_NUM) {
-				info->status.rates[0].idx -= 5;
-			}
-		}
-		if (format == TX_RATE_FORMAT_11N)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_MCS;
-		if (format == TX_RATE_FORMAT_11AC)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_VHT_MCS;
-		if (bandwidth == TX_RATE_BANDWIDTH_40)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_40_MHZ_WIDTH;
-		if (bandwidth == TX_RATE_BANDWIDTH_80)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_80_MHZ_WIDTH;
-		if (bandwidth == TX_RATE_BANDWIDTH_160)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_160_MHZ_WIDTH;
-		if (short_gi == TX_RATE_INFO_SHORT_GI)
-			info->status.rates[0].flags |=
-				IEEE80211_TX_RC_SHORT_GI;
-		info->status.rates[0].count = 1;
-		info->status.rates[1].idx = -1;
-	}
-}
-
 static inline void pcie_tx_ack_amsdu_pkts(struct ieee80211_hw *hw, u32 rate,
 					  struct sk_buff_head *amsdu_pkts)
 {
@@ -595,9 +543,8 @@ static inline void pcie_tx_ack_amsdu_pkts(struct ieee80211_hw *hw, u32 rate,
 	while (skb_queue_len(amsdu_pkts) > 0) {
 		amsdu_pkt = skb_dequeue(amsdu_pkts);
 		info = IEEE80211_SKB_CB(amsdu_pkt);
-		pcie_tx_prepare_info(hw, rate, info);
+		pcie_tx_prepare_info(hw->priv, rate, info);
 		info->flags &= ~IEEE80211_TX_CTL_AMPDU;
-		info->flags |= IEEE80211_TX_STAT_ACK;
 		ieee80211_tx_status(hw, amsdu_pkt);
 	}
 
@@ -795,10 +742,10 @@ void pcie_tx_done(unsigned long data)
 					dev_kfree_skb_any(done_skb);
 					done_skb = NULL;
 				} else {
-					pcie_tx_prepare_info(hw, rate, info);
+					pcie_tx_prepare_info(priv, rate, info);
 				}
 			} else {
-				pcie_tx_prepare_info(hw, 0, info);
+				pcie_tx_prepare_info(priv, 0, info);
 			}
 
 			if (done_skb) {
@@ -809,7 +756,6 @@ void pcie_tx_done(unsigned long data)
 					&dma_data->wh, hdrlen);
 				skb_pull(done_skb, sizeof(*dma_data) - hdrlen);
 				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
-				info->flags |= IEEE80211_TX_STAT_ACK;
 				ieee80211_tx_status(hw, done_skb);
 			}
 

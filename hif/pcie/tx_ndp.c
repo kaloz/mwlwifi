@@ -209,7 +209,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	struct pcie_tx_ctrl_ndp *tx_ctrl;
 	struct pcie_tx_desc_ndp *pnext_tx_desc;
 	struct ieee80211_hdr *wh;
-	u32 ctrl;
+	u32 ctrl = 0;
 	dma_addr_t dma;
 
 	tx_send_tail = desc->tx_sent_tail;
@@ -227,7 +227,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	}
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)&tx_info->status;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
 	pnext_tx_desc = &desc->ptx_ring[tx_send_head_new];
 
 	if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
@@ -243,6 +243,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 			(TXRING_CTRL_TAG_MGMT << TXRING_CTRL_TAG_SHIFT));
 	} else {
 		wh = (struct ieee80211_hdr *)tx_skb->data;
+
 		skb_pull(tx_skb, tx_ctrl->hdrlen);
 		ether_addr_copy(pnext_tx_desc->u.sa,
 				ieee80211_get_SA(wh));
@@ -275,6 +276,14 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	pnext_tx_desc->data = cpu_to_le32(dma);
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
 	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb));
+
+	if (tx_ctrl->type == IEEE_TYPE_DATA) {
+		skb_push(tx_skb, tx_ctrl->hdrlen);
+		skb_get(tx_skb);
+		pcie_tx_prepare_info(priv, 0, tx_info);
+		tx_ctrl->type = IEEE_TYPE_DATA;
+		ieee80211_tx_status(priv->hw, tx_skb);
+	}
 
 	if (++tx_send_head_new >= MAX_NUM_TX_DESC)
 		tx_send_head_new = 0;
@@ -436,7 +445,8 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
 					 skb->len,
 					 PCI_DMA_TODEVICE);
 			tx_info = IEEE80211_SKB_CB(skb);
-			tx_ctrl = (struct pcie_tx_ctrl_ndp *)&tx_info->status;
+			tx_ctrl = (struct pcie_tx_ctrl_ndp *)
+				tx_info->status.status_driver_data;
 
 			if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
 				/* Remove H/W dma header */
@@ -454,12 +464,12 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
 				memmove(dma_data->data - hdrlen,
 					&dma_data->wh, hdrlen);
 				skb_pull(skb, sizeof(*dma_data) - hdrlen);
-			} else
-				skb_push(skb, tx_ctrl->hdrlen);
+			} else {
+				dev_kfree_skb_any(skb);
+				goto bypass_ack;
+			}
 
-			ieee80211_tx_info_clear_status(tx_info);
-			tx_info->status.rates[0].idx = -1;
-			tx_info->flags |= IEEE80211_TX_STAT_ACK;
+			pcie_tx_prepare_info(priv, 0, tx_info);
 			ieee80211_tx_status(hw, skb);
 
 bypass_ack:
@@ -570,9 +580,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 			ack_skb = skb_copy(skb, GFP_ATOMIC);
 			ack_info = IEEE80211_SKB_CB(ack_skb);
-			ieee80211_tx_info_clear_status(ack_info);
-			ack_info->status.rates[0].idx = -1;
-			ack_info->flags |= IEEE80211_TX_STAT_ACK;
+			pcie_tx_prepare_info(priv, 0, ack_info);
 			ieee80211_tx_status(hw, ack_skb);
 		}
 
@@ -624,7 +632,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
 
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)&tx_info->status;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
 	tx_ctrl->type = mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA;
 	tx_ctrl->eapol = eapol_frame ? 1 : 0;
 	tx_ctrl->tx_que_priority = tx_que_priority;

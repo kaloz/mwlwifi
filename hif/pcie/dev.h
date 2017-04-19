@@ -604,6 +604,59 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 	pcie_tx_add_dma_header(priv, skb, head_pad, data_pad);
 }
 
+static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,
+					struct ieee80211_tx_info *info)
+{
+	u32 format, bandwidth, short_gi, rate_id;
+
+	ieee80211_tx_info_clear_status(info);
+
+	info->status.rates[0].idx = -1;
+	info->status.rates[0].count = 0;
+	info->status.rates[0].flags = 0;
+	info->flags |= IEEE80211_TX_STAT_ACK;
+
+	if (rate) {
+		/* Prepare rate information */
+		format = rate & MWL_TX_RATE_FORMAT_MASK;
+		bandwidth =
+			(rate & MWL_TX_RATE_BANDWIDTH_MASK) >>
+			MWL_TX_RATE_BANDWIDTH_SHIFT;
+		short_gi = (rate & MWL_TX_RATE_SHORTGI_MASK) >>
+			MWL_TX_RATE_SHORTGI_SHIFT;
+		rate_id = (rate & MWL_TX_RATE_RATEIDMCS_MASK) >>
+			MWL_TX_RATE_RATEIDMCS_SHIFT;
+
+		info->status.rates[0].idx = rate_id;
+		if (format == TX_RATE_FORMAT_LEGACY) {
+			if (priv->hw->conf.chandef.chan->hw_value >
+			    BAND_24_CHANNEL_NUM) {
+				info->status.rates[0].idx -= 5;
+			}
+		}
+		if (format == TX_RATE_FORMAT_11N)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_MCS;
+		if (format == TX_RATE_FORMAT_11AC)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_VHT_MCS;
+		if (bandwidth == TX_RATE_BANDWIDTH_40)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_40_MHZ_WIDTH;
+		if (bandwidth == TX_RATE_BANDWIDTH_80)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_80_MHZ_WIDTH;
+		if (bandwidth == TX_RATE_BANDWIDTH_160)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_160_MHZ_WIDTH;
+		if (short_gi == TX_RATE_INFO_SHORT_GI)
+			info->status.rates[0].flags |=
+				IEEE80211_TX_RC_SHORT_GI;
+		info->status.rates[0].count = 1;
+		info->status.rates[1].idx = -1;
+	}
+}
+
 static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 {
 	struct pcie_dma_data *dma_data;
