@@ -405,11 +405,6 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	}
 
 	if (cmd_param == SET_KEY) {
-		rc = mwl_fwcmd_encryption_set_key(hw, vif, addr, key);
-
-		if (rc)
-			goto out;
-
 		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
 		    (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
 			encr_type = ENCR_TYPE_WEP;
@@ -427,6 +422,9 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 
 		rc = mwl_fwcmd_update_encryption_enable(hw, vif, addr,
 							encr_type);
+		if (rc)
+			goto out;
+		rc = mwl_fwcmd_encryption_set_key(hw, vif, addr, key);
 		if (rc)
 			goto out;
 
