@@ -2630,15 +2630,18 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 	struct mwl_ampdu_stream *stream;
 	int i, idx;
 
+	spin_lock_bh(&priv->stream_lock);
 	if (priv->chip_type == MWL8964) {
 		idx = (sta->aid - 1) * SYSADPT_MAX_TID;
 		for (i = 0; i < SYSADPT_MAX_TID; i++) {
 			stream = &priv->ampdu[idx + i];
 
 			if (stream->sta == sta) {
+				mwl_fwcmd_remove_stream(hw, stream);
+				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream,
 						     BA_FLAG_DIRECTION_UP);
-				mwl_fwcmd_remove_stream(hw, stream);
+				spin_lock_bh(&priv->stream_lock);
 			}
 		}
 	} else {
@@ -2646,12 +2649,15 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 			stream = &priv->ampdu[idx];
 
 			if (stream->sta == sta) {
+				mwl_fwcmd_remove_stream(hw, stream);
+				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream,
 						     BA_FLAG_DIRECTION_UP);
-				mwl_fwcmd_remove_stream(hw, stream);
+				spin_lock_bh(&priv->stream_lock);
 			}
 		}
 	}
+	spin_unlock_bh(&priv->stream_lock);
 }
 
 int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
