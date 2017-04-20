@@ -790,6 +790,8 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 		}
 
 		if (int_status & MACREG_A2HRIC_NEWDP_DFS) {
+			wiphy_info(hw->wiphy, "radar detected by firmware\n");
+			ieee80211_radar_detected(hw);
 		}
 
 		if (int_status & MACREG_A2HRIC_NEWDP_CHANNEL_SWITCH)
