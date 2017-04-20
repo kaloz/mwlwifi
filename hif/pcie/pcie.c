@@ -814,12 +814,12 @@ static void pcie_irq_enable_ndp(struct ieee80211_hw *hw)
 
 static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
 {
-	pcie_tx_done_ndp(hw, false);
+	pcie_tx_done_ndp(hw);
 }
 
 static void pcie_tx_return_pkts_ndp(struct ieee80211_hw *hw)
 {
-	pcie_tx_done_ndp(hw, true);
+	pcie_tx_done_ndp(hw);
 }
 
 static void pcie_set_sta_id(struct ieee80211_hw *hw,

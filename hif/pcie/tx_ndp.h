@@ -22,7 +22,7 @@
 int pcie_tx_init_ndp(struct ieee80211_hw *hw);
 void pcie_tx_deinit_ndp(struct ieee80211_hw *hw);
 void pcie_tx_skbs_ndp(unsigned long data);
-void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean);
+void pcie_tx_done_ndp(struct ieee80211_hw *hw);
 void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		      struct ieee80211_tx_control *control,
 		      struct sk_buff *skb);

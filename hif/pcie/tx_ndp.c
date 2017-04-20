@@ -365,7 +365,7 @@ void pcie_tx_skbs_ndp(unsigned long data)
 		while (skb_queue_len(&pcie_priv->txq[num]) > 0) {
 			if (pcie_priv->desc_data_ndp.tx_desc_busy_cnt >=
 			    (MAX_TX_RING_SEND_SIZE - 1)) {
-				pcie_tx_done_ndp(hw, false);
+				pcie_tx_done_ndp(hw);
 				break;
 			}
 
@@ -373,7 +373,7 @@ void pcie_tx_skbs_ndp(unsigned long data)
 
 			rc = pcie_tx_skb_ndp(priv, tx_skb);
 			if (rc) {
-				pcie_tx_done_ndp(hw, false);
+				pcie_tx_done_ndp(hw);
 				if (rc == -EAGAIN)
 					skb_queue_head(&pcie_priv->txq[num],
 						       tx_skb);
@@ -381,7 +381,7 @@ void pcie_tx_skbs_ndp(unsigned long data)
 			}
 
 			if (++pcie_priv->tx_done_cnt > TXDONE_THRESHOLD) {
-				pcie_tx_done_ndp(hw, false);
+				pcie_tx_done_ndp(hw);
 				pcie_priv->tx_done_cnt = 0;
 			}
 		}
@@ -397,7 +397,7 @@ void pcie_tx_skbs_ndp(unsigned long data)
 	}
 }
 
-void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
+void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
@@ -413,75 +413,71 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw, bool clean)
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
 
-	if (clean)
-		pcie_tx_ring_cleanup_ndp(priv);
-	else {
-		tx_done_head = readl(pcie_priv->iobase1 +
-				     MACREG_REG_TXDONEHEAD);
-		tx_done_tail = desc->tx_done_tail & (MAX_TX_RING_DONE_SIZE - 1);
-		tx_done_head &= (MAX_TX_RING_DONE_SIZE - 1);
+	tx_done_head = readl(pcie_priv->iobase1 +
+			     MACREG_REG_TXDONEHEAD);
+	tx_done_tail = desc->tx_done_tail & (MAX_TX_RING_DONE_SIZE - 1);
+	tx_done_head &= (MAX_TX_RING_DONE_SIZE - 1);
 
-		while (tx_done_head != tx_done_tail) {
-			ptx_ring_done = &desc->ptx_ring_done[tx_done_tail];
+	while (tx_done_head != tx_done_tail) {
+		ptx_ring_done = &desc->ptx_ring_done[tx_done_tail];
 
-			index = le32_to_cpu(ptx_ring_done->user);
-			if (index >= MAX_TX_RING_SEND_SIZE) {
-				wiphy_err(hw->wiphy,
-					  "corruption for index of buffer\n");
-				break;
-			}
-			skb = desc->tx_vbuflist[index];
-			desc->tx_vbuflist[index] = NULL;
-			ptx_ring_done->user = 0;
-			if (!skb) {
-				wiphy_err(hw->wiphy,
-					  "buffer is NULL for tx done ring\n");
-				break;
-			}
+		index = le32_to_cpu(ptx_ring_done->user);
+		if (index >= MAX_TX_RING_SEND_SIZE) {
+			wiphy_err(hw->wiphy,
+				  "corruption for index of buffer\n");
+			break;
+		}
+		skb = desc->tx_vbuflist[index];
+		desc->tx_vbuflist[index] = NULL;
+		ptx_ring_done->user = 0;
+		if (!skb) {
+			wiphy_err(hw->wiphy,
+				  "buffer is NULL for tx done ring\n");
+			break;
+		}
 
-			pci_unmap_single(pcie_priv->pdev,
-					 le32_to_cpu(
-					 desc->ptx_ring[index].data),
-					 skb->len,
-					 PCI_DMA_TODEVICE);
-			tx_info = IEEE80211_SKB_CB(skb);
-			tx_ctrl = (struct pcie_tx_ctrl_ndp *)
-				tx_info->status.status_driver_data;
+		pci_unmap_single(pcie_priv->pdev,
+				 le32_to_cpu(
+				 desc->ptx_ring[index].data),
+				 skb->len,
+				 PCI_DMA_TODEVICE);
+		tx_info = IEEE80211_SKB_CB(skb);
+		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
+			tx_info->status.status_driver_data;
 
-			if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
-				/* Remove H/W dma header */
-				dma_data = (struct pcie_dma_data *)skb->data;
+		if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
+			/* Remove H/W dma header */
+			dma_data = (struct pcie_dma_data *)skb->data;
 
-				if (ieee80211_is_assoc_resp(
-				    dma_data->wh.frame_control) ||
-				    ieee80211_is_reassoc_resp(
-				    dma_data->wh.frame_control)) {
-					dev_kfree_skb_any(skb);
-					goto bypass_ack;
-				}
-				hdrlen = ieee80211_hdrlen(
-					dma_data->wh.frame_control);
-				memmove(dma_data->data - hdrlen,
-					&dma_data->wh, hdrlen);
-				skb_pull(skb, sizeof(*dma_data) - hdrlen);
-			} else {
+			if (ieee80211_is_assoc_resp(
+			    dma_data->wh.frame_control) ||
+			    ieee80211_is_reassoc_resp(
+			    dma_data->wh.frame_control)) {
 				dev_kfree_skb_any(skb);
 				goto bypass_ack;
 			}
-
-			pcie_tx_prepare_info(priv, 0, tx_info);
-			ieee80211_tx_status(hw, skb);
-
-bypass_ack:
-			if (++tx_done_tail >= MAX_TX_RING_DONE_SIZE)
-				tx_done_tail = 0;
-			desc->tx_desc_busy_cnt--;
+			hdrlen = ieee80211_hdrlen(
+				dma_data->wh.frame_control);
+			memmove(dma_data->data - hdrlen,
+				&dma_data->wh, hdrlen);
+			skb_pull(skb, sizeof(*dma_data) - hdrlen);
+		} else {
+			dev_kfree_skb_any(skb);
+			goto bypass_ack;
 		}
 
-		writel(tx_done_tail, pcie_priv->iobase1 +
-		       MACREG_REG_TXDONETAIL);
-		desc->tx_done_tail = tx_done_tail;
+		pcie_tx_prepare_info(priv, 0, tx_info);
+		ieee80211_tx_status(hw, skb);
+
+bypass_ack:
+		if (++tx_done_tail >= MAX_TX_RING_DONE_SIZE)
+			tx_done_tail = 0;
+		desc->tx_desc_busy_cnt--;
 	}
+
+	writel(tx_done_tail, pcie_priv->iobase1 +
+	       MACREG_REG_TXDONETAIL);
+	desc->tx_done_tail = tx_done_tail;
 
 	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 }
