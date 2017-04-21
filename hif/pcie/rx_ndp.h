@@ -13,15 +13,14 @@
  * this warranty disclaimer.
  */
 
-/* Description:  This file defines interrupt related functions. */
+/* Description:  This file defines receive related functions for new data path.
+ */
 
-#ifndef _ISR_H_
-#define _ISR_H_
+#ifndef _RX_NDP_H_
+#define _RX_NDP_H_
 
-#include <linux/interrupt.h>
+int pcie_rx_init_ndp(struct ieee80211_hw *hw);
+void pcie_rx_deinit_ndp(struct ieee80211_hw *hw);
+void pcie_rx_recv_ndp(unsigned long data);
 
-irqreturn_t mwl_isr(int irq, void *dev_id);
-void mwl_chnl_switch_event(struct work_struct *work);
-void mwl_watchdog_ba_events(struct work_struct *work);
-
-#endif /* _ISR_H_ */
+#endif /* _RX_NDP_H_ */

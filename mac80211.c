@@ -18,11 +18,9 @@
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "fwcmd.h"
-#include "tx.h"
-
-#define MWL_DRV_NAME        KBUILD_MODNAME
+#include "core.h"
+#include "hif/fwcmd.h"
+#include "hif/hif-ops.h"
 
 #define MAX_AMPDU_ATTEMPTS  5
 
@@ -66,7 +64,7 @@ static void mwl_mac80211_tx(struct ieee80211_hw *hw,
 		return;
 	}
 
-	mwl_tx_xmit(hw, control, skb);
+	mwl_hif_tx_xmit(hw, control, skb);
 }
 
 static int mwl_mac80211_start(struct ieee80211_hw *hw)
@@ -75,13 +73,10 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	int rc;
 
 	/* Enable TX and RX tasklets. */
-	tasklet_enable(&priv->tx_task);
-	tasklet_enable(&priv->tx_done_task);
-	tasklet_enable(&priv->rx_task);
-	tasklet_enable(&priv->qe_task);
+	mwl_hif_enable_data_tasks(hw);
 
 	/* Enable interrupts */
-	mwl_fwcmd_int_enable(hw);
+	mwl_hif_irq_enable(hw);
 
 	rc = mwl_fwcmd_radio_enable(hw);
 	if (rc)
@@ -104,39 +99,36 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	rc = mwl_fwcmd_set_optimization_level(hw, 1);
 	if (rc)
 		goto fwcmd_fail;
+	if (priv->chip_type == MWL8964) {
+		rc = mwl_fwcmd_newdp_dmathread_start(hw);
+		if (rc)
+			goto fwcmd_fail;
+	}
 
 	ieee80211_wake_queues(hw);
 	return 0;
 
 fwcmd_fail:
-	mwl_fwcmd_int_disable(hw);
-	tasklet_disable(&priv->tx_task);
-	tasklet_disable(&priv->tx_done_task);
-	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
+	mwl_hif_irq_disable(hw);
+	mwl_hif_disable_data_tasks(hw);
 
 	return rc;
 }
 
 static void mwl_mac80211_stop(struct ieee80211_hw *hw)
 {
-	struct mwl_priv *priv = hw->priv;
-
 	mwl_fwcmd_radio_disable(hw);
 
 	ieee80211_stop_queues(hw);
 
 	/* Disable interrupts */
-	mwl_fwcmd_int_disable(hw);
+	mwl_hif_irq_disable(hw);
 
-	/* Disable TX reclaim and RX tasklets. */
-	tasklet_disable(&priv->tx_task);
-	tasklet_disable(&priv->tx_done_task);
-	tasklet_disable(&priv->rx_task);
-	tasklet_disable(&priv->qe_task);
+	/* Disable TX and RX tasklets. */
+	mwl_hif_disable_data_tasks(hw);
 
 	/* Return all skbs to mac80211 */
-	mwl_tx_done((unsigned long)hw);
+	mwl_hif_tx_return_pkts(hw);
 }
 
 static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
@@ -169,6 +161,7 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	/* Setup driver private area. */
 	mwl_vif = mwl_dev_get_vif(vif);
 	memset(mwl_vif, 0, sizeof(*mwl_vif));
+	mwl_vif->type = vif->type;
 	mwl_vif->macid = macid;
 	mwl_vif->seqno = 0;
 	mwl_vif->is_hw_crypto_enabled = false;
@@ -181,6 +174,11 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	case NL80211_IFTYPE_AP:
 		ether_addr_copy(mwl_vif->bssid, vif->addr);
 		mwl_fwcmd_set_new_stn_add_self(hw, vif);
+		if (priv->chip_type == MWL8964) {
+			/* allow firmware to really set channel */
+			mwl_fwcmd_bss_start(hw, vif, true);
+			mwl_fwcmd_bss_start(hw, vif, false);
+		}
 		break;
 	case NL80211_IFTYPE_STATION:
 		ether_addr_copy(mwl_vif->sta_mac, vif->addr);
@@ -208,7 +206,7 @@ static void mwl_mac80211_remove_vif(struct mwl_priv *priv,
 	if (!priv->macids_used)
 		return;
 
-	mwl_tx_del_pkts_via_vif(priv->hw, vif);
+	mwl_hif_tx_del_pkts_via_vif(priv->hw, vif);
 
 	priv->macids_used &= ~(1 << mwl_vif->macid);
 	spin_lock_bh(&priv->vif_lock);
@@ -407,11 +405,6 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	}
 
 	if (cmd_param == SET_KEY) {
-		rc = mwl_fwcmd_encryption_set_key(hw, vif, addr, key);
-
-		if (rc)
-			goto out;
-
 		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
 		    (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
 			encr_type = ENCR_TYPE_WEP;
@@ -429,6 +422,9 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 
 		rc = mwl_fwcmd_update_encryption_enable(hw, vif, addr,
 							encr_type);
+		if (rc)
+			goto out;
+		rc = mwl_fwcmd_encryption_set_key(hw, vif, addr, key);
 		if (rc)
 			goto out;
 
@@ -476,6 +472,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		if ((sta->tdls) && (!sta->wme))
 			sta->wme = true;
 	}
+	sta_info->mwl_vif = mwl_vif;
 	sta_info->iv16 = 1;
 	sta_info->iv32 = 0;
 	spin_lock_init(&sta_info->amsdu_lock);
@@ -486,7 +483,15 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	if (vif->type == NL80211_IFTYPE_STATION)
 		mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
-	rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
+	if (priv->chip_type == MWL8964)
+		rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta, 0);
+	else
+		rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
+
+	if (vif->type == NL80211_IFTYPE_STATION)
+		mwl_hif_set_sta_id(hw, sta, true, true);
+	else
+		mwl_hif_set_sta_id(hw, sta, false, true);
 
 	for (i = 0; i < NUM_WEP_KEYS; i++) {
 		key = (struct ieee80211_key_conf *)mwl_vif->wep_key_conf[i].key;
@@ -506,15 +511,16 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	int rc;
 	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 
-	mwl_tx_del_sta_amsdu_pkts(sta);
-
-	spin_lock_bh(&priv->stream_lock);
+	mwl_hif_tx_del_sta_amsdu_pkts(hw, sta);
 	mwl_fwcmd_del_sta_streams(hw, sta);
-	spin_unlock_bh(&priv->stream_lock);
-
-	mwl_tx_del_pkts_via_sta(hw, sta);
+	mwl_hif_tx_del_pkts_via_sta(hw, sta);
 
 	rc = mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
+
+	if (vif->type == NL80211_IFTYPE_STATION)
+		mwl_hif_set_sta_id(hw, sta, true, false);
+	else
+		mwl_hif_set_sta_id(hw, sta, false, false);
 
 	spin_lock_bh(&priv->sta_lock);
 	list_del(&sta_info->list);
@@ -601,18 +607,41 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 	struct ieee80211_sta *sta = params->sta;
 	u16 tid = params->tid;
 	u8 buf_size = params->buf_size;
-	u8 *addr = sta->addr, idx;
+	u8 *addr = sta->addr;
 	struct mwl_sta *sta_info;
 
 	sta_info = mwl_dev_get_sta(sta);
 
 	spin_lock_bh(&priv->stream_lock);
 
-	stream = mwl_fwcmd_lookup_stream(hw, addr, tid);
+	stream = mwl_fwcmd_lookup_stream(hw, sta, tid);
 
 	switch (action) {
 	case IEEE80211_AMPDU_RX_START:
+		if (priv->chip_type == MWL8964) {
+			struct mwl_ampdu_stream tmp;
+
+			tmp.sta = sta;
+			tmp.tid = tid;
+			spin_unlock_bh(&priv->stream_lock);
+			mwl_fwcmd_create_ba(hw, &tmp, vif,
+					    BA_FLAG_DIRECTION_DOWN,
+					    buf_size, params->ssn,
+					    params->amsdu);
+			spin_lock_bh(&priv->stream_lock);
+			break;
+		}
 	case IEEE80211_AMPDU_RX_STOP:
+		if (priv->chip_type == MWL8964) {
+			struct mwl_ampdu_stream tmp;
+
+			tmp.sta = sta;
+			tmp.tid = tid;
+			spin_unlock_bh(&priv->stream_lock);
+			mwl_fwcmd_destroy_ba(hw, &tmp,
+					     BA_FLAG_DIRECTION_DOWN);
+			spin_lock_bh(&priv->stream_lock);
+		}
 		break;
 	case IEEE80211_AMPDU_TX_START:
 		if (!sta_info->is_ampdu_allowed) {
@@ -630,17 +659,23 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 			}
 		}
 
-		spin_unlock_bh(&priv->stream_lock);
-		rc = mwl_fwcmd_check_ba(hw, stream, vif);
-		spin_lock_bh(&priv->stream_lock);
-		if (rc) {
-			mwl_fwcmd_remove_stream(hw, stream);
-			sta_info->check_ba_failed[tid]++;
-			rc = -EPERM;
-			break;
+		if (priv->chip_type != MWL8964) {
+			spin_unlock_bh(&priv->stream_lock);
+			rc = mwl_fwcmd_check_ba(hw, stream, vif,
+					BA_FLAG_DIRECTION_UP);
+			spin_lock_bh(&priv->stream_lock);
+			if (rc) {
+				mwl_fwcmd_remove_stream(hw, stream);
+				sta_info->check_ba_failed[tid]++;
+				break;
+			}
 		}
 		stream->state = AMPDU_STREAM_IN_PROGRESS;
-		params->ssn = 0;
+		spin_unlock_bh(&priv->stream_lock);
+		rc = mwl_fwcmd_get_seqno(hw, stream, &params->ssn);
+		spin_lock_bh(&priv->stream_lock);
+		if (rc)
+			break;
 		ieee80211_start_tx_ba_cb_irqsafe(vif, addr, tid);
 		break;
 	case IEEE80211_AMPDU_TX_STOP_CONT:
@@ -649,10 +684,10 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
 				stream->state = AMPDU_STREAM_IN_PROGRESS;
-				mwl_tx_del_ampdu_pkts(hw, sta, tid);
-				idx = stream->idx;
+				mwl_hif_tx_del_ampdu_pkts(hw, sta, tid);
 				spin_unlock_bh(&priv->stream_lock);
-				mwl_fwcmd_destroy_ba(hw, idx);
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
 				spin_lock_bh(&priv->stream_lock);
 				sta_info->is_amsdu_allowed = false;
 			}
@@ -671,7 +706,10 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				break;
 			}
 			spin_unlock_bh(&priv->stream_lock);
-			rc = mwl_fwcmd_create_ba(hw, stream, buf_size, vif);
+			rc = mwl_fwcmd_create_ba(hw, stream, vif,
+						 BA_FLAG_DIRECTION_UP,
+						 buf_size, params->ssn,
+						 params->amsdu);
 			spin_lock_bh(&priv->stream_lock);
 
 			if (!rc) {
@@ -679,9 +717,9 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 				sta_info->check_ba_failed[tid] = 0;
 				sta_info->is_amsdu_allowed = params->amsdu;
 			} else {
-				idx = stream->idx;
 				spin_unlock_bh(&priv->stream_lock);
-				mwl_fwcmd_destroy_ba(hw, idx);
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
 				spin_lock_bh(&priv->stream_lock);
 				mwl_fwcmd_remove_stream(hw, stream);
 				wiphy_err(hw->wiphy,

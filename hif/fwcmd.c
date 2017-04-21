@@ -20,11 +20,11 @@
 #include <linux/etherdevice.h>
 
 #include "sysadpt.h"
-#include "dev.h"
-#include "fwcmd.h"
-#include "hostcmd.h"
+#include "core.h"
+#include "utils.h"
+#include "hif/fwcmd.h"
+#include "hif/hif-ops.h"
 
-#define MAX_WAIT_FW_COMPLETE_ITERATIONS         2000
 #define MAX_WAIT_GET_HW_SPECS_ITERATONS         3
 
 struct cmd_header {
@@ -32,28 +32,7 @@ struct cmd_header {
 	__le16 len;
 } __packed;
 
-static bool mwl_fwcmd_chk_adapter(struct mwl_priv *priv)
-{
-	u32 regval;
-
-	regval = readl(priv->iobase1 + MACREG_REG_INT_CODE);
-
-	if (regval == 0xffffffff) {
-		wiphy_err(priv->hw->wiphy, "adapter does not exist\n");
-		return false;
-	}
-
-	return true;
-}
-
-static void mwl_fwcmd_send_cmd(struct mwl_priv *priv)
-{
-	writel(priv->pphys_cmd_buf, priv->iobase1 + MACREG_REG_GEN_PTR);
-	writel(MACREG_H2ARIC_BIT_DOOR_BELL,
-	       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-}
-
-static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
+char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 {
 	int max_entries = 0;
 	int curr_cmd = 0;
@@ -99,6 +78,8 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_COUNTRY_CODE, "SetCountryCode" },
 		{ HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL, "SetOptimizationLevel" },
 		{ HOSTCMD_CMD_SET_WSC_IE, "SetWscIE" },
+		{ HOSTCMD_CMD_GET_RATETABLE, "GetRateTable" },
+		{ HOSTCMD_CMD_GET_SEQNO, "GetSeqno" },
 		{ HOSTCMD_CMD_DWDS_ENABLE, "DwdsEnable" },
 		{ HOSTCMD_CMD_FW_FLUSH_TIMER, "FwFlushTimer" },
 		{ HOSTCMD_CMD_SET_CDD, "SetCDD" },
@@ -106,6 +87,7 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
+		{ HOSTCMD_CMD_NEWDP_DMATHREAD_START, "NewdpDMAThreadStart" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE_SC4, "GetFwRegionCodeSC4" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
@@ -118,60 +100,6 @@ static char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 			return cmds[curr_cmd].cmd_string;
 
 	return "unknown";
-}
-
-static int mwl_fwcmd_wait_complete(struct mwl_priv *priv, unsigned short cmd)
-{
-	unsigned int curr_iteration = MAX_WAIT_FW_COMPLETE_ITERATIONS;
-	unsigned short int_code = 0;
-
-	do {
-		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
-		usleep_range(1000, 2000);
-	} while ((int_code != cmd) && (--curr_iteration));
-
-	if (curr_iteration == 0) {
-		wiphy_err(priv->hw->wiphy, "cmd 0x%04x=%s timed out\n",
-			  cmd, mwl_fwcmd_get_cmd_string(cmd));
-		wiphy_err(priv->hw->wiphy, "return code: 0x%04x\n", int_code);
-		return -EIO;
-	}
-
-	usleep_range(3000, 5000);
-
-	return 0;
-}
-
-static int mwl_fwcmd_exec_cmd(struct mwl_priv *priv, unsigned short cmd)
-{
-	bool busy = false;
-
-	might_sleep();
-
-	if (!mwl_fwcmd_chk_adapter(priv)) {
-		wiphy_err(priv->hw->wiphy, "adapter does not exist\n");
-		priv->in_send_cmd = false;
-		return -EIO;
-	}
-
-	if (!priv->in_send_cmd) {
-		priv->in_send_cmd = true;
-		mwl_fwcmd_send_cmd(priv);
-		if (mwl_fwcmd_wait_complete(priv, 0x8000 | cmd)) {
-			wiphy_err(priv->hw->wiphy, "timeout: 0x%04x\n", cmd);
-			priv->in_send_cmd = false;
-			return -EIO;
-		}
-	} else {
-		wiphy_warn(priv->hw->wiphy,
-			   "previous command is still running\n");
-		busy = true;
-	}
-
-	if (!busy)
-		priv->in_send_cmd = false;
-
-	return 0;
 }
 
 static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
@@ -194,9 +122,8 @@ static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
 		WL_AUTO_PREAMBLE : WL_LONG_PREAMBLE);
 	pcmd->radio_on = cpu_to_le16(enable ? WL_ENABLE : WL_DISABLE);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RADIO_CONTROL)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_RADIO_CONTROL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -226,9 +153,8 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 	pcmd->band = cpu_to_le16(band);
 	pcmd->sub_ch = cpu_to_le16(sub_ch);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_TX_POWER)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_TX_POWER)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -263,9 +189,8 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
 	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++)
 		pcmd->power_level_list[i] = cpu_to_le16(txpow[i]);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_TX_POWER)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_TX_POWER)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -632,9 +557,8 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_IES)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_IES)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -709,9 +633,8 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 	memcpy(pcmd->start_cmd.op_rate_set, mwl_vif->beacon_info.op_rate_set,
 	       SYSADPT_MAX_DATA_RATES_G);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_AP_BEACON)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_AP_BEACON)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -739,9 +662,8 @@ static int mwl_fwcmd_set_spectrum_mgmt(struct mwl_priv *priv, bool enable)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->spectrum_mgmt = cpu_to_le32(enable);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_SPECTRUM_MGMT)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_SPECTRUM_MGMT)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -764,9 +686,8 @@ static int mwl_fwcmd_set_power_constraint(struct mwl_priv *priv,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->power_constraint = cpu_to_le32(power_constraint);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_POWER_CONSTRAINT)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_POWER_CONSTRAINT)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -829,9 +750,8 @@ static int mwl_fwcmd_set_country_code(struct mwl_priv *priv,
 		}
 	}
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_COUNTRY_CODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_COUNTRY_CODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -886,62 +806,12 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
-static u32 pci_read_mac_reg(struct mwl_priv *priv, u32 offset)
-{
-	if (priv->chip_type == MWL8964) {
-		u32 *addr_val = kmalloc(64 * sizeof(u32), GFP_ATOMIC);
-		u32 val;
-
-		if (addr_val) {
-			mwl_fwcmd_get_addr_value(priv->hw,
-						 0x8000a000 + offset, 4,
-						 addr_val, 0);
-			val = addr_val[0];
-			kfree(addr_val);
-			return val;
-		}
-		return 0;
-	} else
-		return le32_to_cpu(*(unsigned long *)
-		       (MAC_REG_ADDR_PCI(offset)));
-}
-
-void mwl_fwcmd_reset(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-
-	if (mwl_fwcmd_chk_adapter(priv))
-		writel(ISR_RESET,
-		       priv->iobase1 + MACREG_REG_H2A_INTERRUPT_EVENTS);
-}
-
-void mwl_fwcmd_int_enable(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-
-	if (mwl_fwcmd_chk_adapter(priv)) {
-		writel(0x00,
-		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
-		writel(MACREG_A2HRIC_BIT_MASK,
-		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
-	}
-}
-
-void mwl_fwcmd_int_disable(struct ieee80211_hw *hw)
-{
-	struct mwl_priv *priv = hw->priv;
-
-	if (mwl_fwcmd_chk_adapter(priv))
-		writel(0x00,
-		       priv->iobase1 + MACREG_REG_A2H_INTERRUPT_MASK);
-}
-
-int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
+const struct hostcmd_get_hw_spec
+*mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_hw_spec *pcmd;
 	int retry;
-	int i;
 
 	pcmd = (struct hostcmd_cmd_get_hw_spec *)&priv->pcmd_buf[0];
 
@@ -949,17 +819,17 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 
 	wiphy_debug(hw->wiphy, "pcmd = %p\n", pcmd);
 	memset(pcmd, 0x00, sizeof(*pcmd));
-	eth_broadcast_addr(pcmd->permanent_addr);
+	eth_broadcast_addr(pcmd->hw_spec.permanent_addr);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_HW_SPEC);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->fw_awake_cookie = cpu_to_le32(priv->pphys_cmd_buf + 2048);
+	pcmd->hw_spec.fw_awake_cookie = cpu_to_le32(priv->pphys_cmd_buf + 2048);
 
 	retry = 0;
-	while (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_HW_SPEC)) {
+	while (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_HW_SPEC)) {
 		if (retry++ > MAX_WAIT_GET_HW_SPECS_ITERATONS) {
 			wiphy_err(hw->wiphy, "can't get hw specs\n");
 			mutex_unlock(&priv->fwcmd_mutex);
-			return -EIO;
+			return NULL;
 		}
 
 		msleep(1000);
@@ -967,34 +837,16 @@ int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 			    "repeat command = %p\n", pcmd);
 	}
 
-	ether_addr_copy(&priv->hw_data.mac_addr[0], pcmd->permanent_addr);
-	priv->desc_data[0].wcb_base =
-		le32_to_cpu(pcmd->wcb_base0) & 0x0000ffff;
-	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
-		priv->desc_data[i].wcb_base =
-			le32_to_cpu(pcmd->wcb_base[i - 1]) & 0x0000ffff;
-	priv->desc_data[0].rx_desc_read =
-		le32_to_cpu(pcmd->rxpd_rd_ptr) & 0x0000ffff;
-	priv->desc_data[0].rx_desc_write =
-		le32_to_cpu(pcmd->rxpd_wr_ptr) & 0x0000ffff;
-	priv->hw_data.region_code = le16_to_cpu(pcmd->region_code) & 0x00ff;
-	priv->hw_data.fw_release_num = le32_to_cpu(pcmd->fw_release_num);
-	priv->hw_data.max_num_tx_desc = le16_to_cpu(pcmd->num_wcb);
-	priv->hw_data.max_num_mc_addr = le16_to_cpu(pcmd->num_mcast_addr);
-	priv->hw_data.num_antennas = le16_to_cpu(pcmd->num_antenna);
-	priv->hw_data.hw_version = pcmd->version;
-	priv->hw_data.host_interface = pcmd->host_if;
-
 	mutex_unlock(&priv->fwcmd_mutex);
 
-	return 0;
+	return &pcmd->hw_spec;
 }
 
-int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
+int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw,
+			   struct hostcmd_set_hw_spec *spec)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_set_hw_spec *pcmd;
-	int i;
 
 	pcmd = (struct hostcmd_cmd_set_hw_spec *)&priv->pcmd_buf[0];
 
@@ -1003,19 +855,10 @@ int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw)
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_HW_SPEC);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->wcb_base[0] = cpu_to_le32(priv->desc_data[0].pphys_tx_ring);
-	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
-		pcmd->wcb_base[i] =
-			cpu_to_le32(priv->desc_data[i].pphys_tx_ring);
-	pcmd->tx_wcb_num_per_queue = cpu_to_le32(SYSADPT_MAX_NUM_TX_DESC);
-	pcmd->num_tx_queues = cpu_to_le32(SYSADPT_NUM_OF_DESC_DATA);
-	pcmd->total_rx_wcb = cpu_to_le32(SYSADPT_MAX_NUM_RX_DESC);
-	pcmd->rxpd_wr_ptr = cpu_to_le32(priv->desc_data[0].pphys_rx_ring);
-	pcmd->features = 0;
+	memcpy(&pcmd->hw_spec, spec, sizeof(*spec));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_HW_SPEC)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_HW_SPEC)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1038,9 +881,8 @@ int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_GET_STAT);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_GET_STAT)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_GET_STAT)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1074,15 +916,14 @@ int mwl_fwcmd_reg_bb(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
 	pcmd->action = cpu_to_le16(flag);
 	pcmd->value = *val;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BBP_REG_ACCESS)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BBP_REG_ACCESS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
 	*val = pcmd->value;
-
 	mutex_unlock(&priv->fwcmd_mutex);
+
 	return 0;
 }
 
@@ -1102,9 +943,8 @@ int mwl_fwcmd_reg_rf(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
 	pcmd->action = cpu_to_le16(flag);
 	pcmd->value = *val;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_RF_REG_ACCESS)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_RF_REG_ACCESS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1155,9 +995,8 @@ int mwl_fwcmd_get_addr_value(struct ieee80211_hw *hw, u32 addr, u32 len,
 	pcmd->value[0] = cpu_to_le32(*val);
 	pcmd->reserved = cpu_to_le16(set);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_MEM_ADDR_ACCESS)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_MEM_ADDR_ACCESS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1407,14 +1246,29 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 	pcmd->action = cpu_to_le16(dir);
 
 	if (dir == WL_ANTENNATYPE_RX) {
-		u8 rx_antenna = 4; /* if auto, set 4 rx antennas in SC2 */
+		u8 rx_antenna;
 
-		if (antenna != 0)
-			pcmd->antenna_mode = cpu_to_le16(antenna);
-		else
+		if (priv->chip_type == MWL8964) {
+			if (antenna == ANTENNA_RX_4_AUTO)
+				rx_antenna = 0xf;
+			else if (antenna == ANTENNA_RX_3)
+				rx_antenna = 7;
+			else if (antenna == ANTENNA_RX_2)
+				rx_antenna = 4;
+			else
+				rx_antenna = 1;
+
 			pcmd->antenna_mode = cpu_to_le16(rx_antenna);
+		} else {
+			rx_antenna = 4;
+
+			if (antenna != 0)
+				pcmd->antenna_mode = cpu_to_le16(antenna);
+			else
+				pcmd->antenna_mode = cpu_to_le16(rx_antenna);
+		}
 	} else {
-		u8 tx_antenna = 0xf; /* if auto, set 4 tx antennas in SC2 */
+		u8 tx_antenna = 0xf;
 
 		if (antenna != 0)
 			pcmd->antenna_mode = cpu_to_le16(antenna);
@@ -1422,9 +1276,8 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna)
 			pcmd->antenna_mode = cpu_to_le16(tx_antenna);
 	}
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RF_ANTENNA)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_RF_ANTENNA)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1452,9 +1305,8 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 	pcmd->enable = cpu_to_le32(enable);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BROADCAST_SSID_ENABLE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BROADCAST_SSID_ENABLE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1524,9 +1376,8 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	pcmd->chnl_flags = cpu_to_le32(chnl_flags);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_RF_CHANNEL)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_RF_CHANNEL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1569,9 +1420,8 @@ int mwl_fwcmd_set_aid(struct ieee80211_hw *hw,
 	pcmd->aid = cpu_to_le16(aid);
 	ether_addr_copy(pcmd->mac_addr, bssid);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_AID)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_AID)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1598,9 +1448,8 @@ int mwl_fwcmd_set_infra_mode(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_INFRA_MODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_INFRA_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1624,9 +1473,8 @@ int mwl_fwcmd_set_rts_threshold(struct ieee80211_hw *hw, int threshold)
 	pcmd->action  = cpu_to_le16(WL_SET);
 	pcmd->threshold = cpu_to_le16(threshold);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11_RTS_THSD)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_RTS_THSD)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1656,9 +1504,8 @@ int mwl_fwcmd_set_edca_params(struct ieee80211_hw *hw, u8 index,
 	pcmd->aifsn = aifs;
 	pcmd->txq_num = index;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_EDCA_PARAMS)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_EDCA_PARAMS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1700,9 +1547,8 @@ int mwl_fwcmd_set_radar_detect(struct ieee80211_hw *hw, u16 action)
 	pcmd->min_num_radar = cpu_to_le16(priv->dfs_min_num_radar);
 	pcmd->pri_min_num = cpu_to_le16(priv->dfs_min_pri_count);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_802_11H_DETECT_RADAR)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11H_DETECT_RADAR)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1725,9 +1571,8 @@ int mwl_fwcmd_set_wmm_mode(struct ieee80211_hw *hw, bool enable)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->action = cpu_to_le16(enable ? WL_ENABLE : WL_DISABLE);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WMM_MODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_WMM_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1751,9 +1596,8 @@ int mwl_fwcmd_ht_guard_interval(struct ieee80211_hw *hw, u32 gi_type)
 	pcmd->action = cpu_to_le32(WL_SET);
 	pcmd->gi_type = cpu_to_le32(gi_type);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_HT_GUARD_INTERVAL)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_HT_GUARD_INTERVAL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1779,9 +1623,8 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw, int mcast, int mgmt)
 	pcmd->multicast_rate = mcast;
 	pcmd->management_rate = mgmt;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_FIXED_RATE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_FIXED_RATE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1805,9 +1648,8 @@ int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw, u16 cs_mode)
 	pcmd->action  = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 	pcmd->cs_mode = cpu_to_le16(cs_mode);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_LINKADAPT_CS_MODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_LINKADAPT_CS_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1831,9 +1673,8 @@ int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw, u16 mode)
 	pcmd->action = cpu_to_le16(WL_SET);
 	pcmd->rate_adapt_mode = cpu_to_le16(mode);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_RATE_ADAPT_MODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_RATE_ADAPT_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1862,9 +1703,8 @@ int mwl_fwcmd_set_mac_addr_client(struct ieee80211_hw *hw,
 	pcmd->mac_type = cpu_to_le16(WL_MAC_TYPE_SECONDARY_CLIENT);
 	ether_addr_copy(pcmd->mac_addr, mac_addr);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_MAC_ADDR)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_MAC_ADDR)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1886,9 +1726,8 @@ int mwl_fwcmd_get_watchdog_bitmap(struct ieee80211_hw *hw, u8 *bitmap)
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_WATCHDOG_BITMAP);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_WATCHDOG_BITMAP)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_WATCHDOG_BITMAP)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1918,9 +1757,8 @@ int mwl_fwcmd_remove_mac_addr(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 	ether_addr_copy(pcmd->mac_addr, mac_addr);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_DEL_MAC_ADDR)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_DEL_MAC_ADDR)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -1961,10 +1799,11 @@ int mwl_fwcmd_bss_start(struct ieee80211_hw *hw,
 		else
 			pcmd->enable = cpu_to_le32(WL_DISABLE_VMAC);
 	}
+	if (priv->chip_type == MWL8964)
+		pcmd->amsdu = MWL_AMSDU_SIZE_11K;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BSS_START)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BSS_START)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2001,9 +1840,6 @@ int mwl_fwcmd_set_beacon(struct ieee80211_hw *hw,
 		goto err;
 
 	if (mwl_fwcmd_set_ap_beacon(priv, mwl_vif, &vif->bss_conf))
-		goto err;
-
-	if (mwl_fwcmd_bss_start(hw, vif, true))
 		goto err;
 
 	if (b_inf->cap_info & WLAN_CAPABILITY_SPECTRUM_MGMT)
@@ -2102,9 +1938,8 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->is_qos_sta = sta->wme;
 	pcmd->qos_info = ((sta->uapsd_queues << 4) | (sta->max_sp << 1));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2113,9 +1948,100 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		pcmd->aid = 2;
 		pcmd->stn_id = 2;
 		pcmd->reserved = 0;
-		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			wiphy_err(hw->wiphy, "failed execution\n");
+			return -EIO;
+		}
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif,
+				  struct ieee80211_sta *sta,
+				  u32 wds)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct mwl_vif *mwl_vif;
+	struct hostcmd_cmd_set_new_stn_sc4 *pcmd;
+	u32 rates;
+
+	mwl_vif = mwl_dev_get_vif(vif);
+
+	pcmd = (struct hostcmd_cmd_set_new_stn_sc4 *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->cmd_hdr.macid = mwl_vif->macid;
+
+	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
+	if (vif->type == NL80211_IFTYPE_STATION) {
+		pcmd->aid = 1;
+		pcmd->stn_id = 1;
+		pcmd->reserved = 1;
+	} else {
+		pcmd->aid = cpu_to_le16(sta->aid);
+		pcmd->stn_id = cpu_to_le16(sta->aid);
+	}
+	ether_addr_copy(pcmd->mac_addr, sta->addr);
+
+	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
+		rates = sta->supp_rates[NL80211_BAND_2GHZ];
+	else
+		rates = sta->supp_rates[NL80211_BAND_5GHZ] << 5;
+	pcmd->peer_info.legacy_rate_bitmap = cpu_to_le32(rates);
+
+	if (sta->ht_cap.ht_supported) {
+		int i;
+
+		for (i = 0; i < 4; i++) {
+			if (i < sta->rx_nss) {
+				pcmd->peer_info.ht_rates[i] =
+					sta->ht_cap.mcs.rx_mask[i];
+			} else {
+				pcmd->peer_info.ht_rates[i] = 0;
+			}
+		}
+		pcmd->peer_info.ht_cap_info = cpu_to_le16(sta->ht_cap.cap);
+		pcmd->peer_info.mac_ht_param_info =
+			(sta->ht_cap.ampdu_factor & 3) |
+			((sta->ht_cap.ampdu_density & 7) << 2);
+	}
+
+	if (sta->vht_cap.vht_supported) {
+		u32 rx_mcs_map_mask = 0;
+
+		rx_mcs_map_mask = ((0x0000FFFF) >> (sta->rx_nss * 2))
+			<< (sta->rx_nss * 2);
+		pcmd->peer_info.vht_max_rx_mcs =
+			cpu_to_le32((*((u32 *)
+			&sta->vht_cap.vht_mcs.rx_mcs_map)) | rx_mcs_map_mask);
+		pcmd->peer_info.vht_cap = cpu_to_le32(sta->vht_cap.cap);
+		pcmd->peer_info.vht_rx_channel_width = sta->bandwidth;
+	}
+
+	pcmd->is_qos_sta = sta->wme;
+	pcmd->qos_info = ((sta->uapsd_queues << 4) | (sta->max_sp << 1));
+	pcmd->wds = cpu_to_le32(wds);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	if (vif->type == NL80211_IFTYPE_STATION) {
+		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
+		pcmd->aid = 2;
+		pcmd->stn_id = 2;
+		pcmd->reserved = 0;
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
+			mutex_unlock(&priv->fwcmd_mutex);
 			return -EIO;
 		}
 	}
@@ -2138,17 +2064,22 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8964) {
+		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+		pcmd->cmd_hdr.len =
+			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
 	ether_addr_copy(pcmd->mac_addr, vif->addr);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2170,26 +2101,30 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8964) {
+		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+		pcmd->cmd_hdr.len =
+			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NEW_STN);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_REMOVE);
 	ether_addr_copy(pcmd->mac_addr, addr);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 
-		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_NEW_STN)) {
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			wiphy_err(hw->wiphy, "failed execution\n");
 			return -EIO;
 		}
 	}
@@ -2213,9 +2148,8 @@ int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->apmode = apmode;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_APMODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_APMODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2290,9 +2224,8 @@ int mwl_fwcmd_set_switch_channel(struct mwl_priv *priv,
 	pcmd->chnl_flags = cpu_to_le32(chnl_flags);
 	pcmd->next_ht_extchnl_offset = cpu_to_le32(sec_chnl_offset);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_SWITCH_CHANNEL)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_SWITCH_CHANNEL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(priv->hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2326,9 +2259,8 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 	ether_addr_copy(pcmd->mac_addr, addr);
 	pcmd->action_data[0] = encr_type;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2338,9 +2270,8 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 		else
 			ether_addr_copy(pcmd->mac_addr, mwl_vif->bssid);
 
-		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			wiphy_err(hw->wiphy, "failed execution\n");
 			return -EIO;
 		}
 	}
@@ -2415,9 +2346,8 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 	memcpy((void *)&pcmd->key_param.key, key->key, keymlen);
 	pcmd->action_type = cpu_to_le32(action);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2429,9 +2359,8 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 			ether_addr_copy(pcmd->key_param.mac_addr,
 					mwl_vif->bssid);
 
-		if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 			mutex_unlock(&priv->fwcmd_mutex);
-			wiphy_err(hw->wiphy, "failed execution\n");
 			return -EIO;
 		}
 	}
@@ -2475,9 +2404,8 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 	    key->cipher == WLAN_CIPHER_SUITE_WEP104)
 		mwl_vif->wep_key_conf[key->keyidx].enabled = 0;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_UPDATE_ENCRYPTION)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2488,7 +2416,8 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 		       struct mwl_ampdu_stream *stream,
-		       struct ieee80211_vif *vif)
+		       struct ieee80211_vif *vif,
+		       u32 direction)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -2511,16 +2440,15 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 	ether_addr_copy(&pcmd->ba_info.create_params.peer_mac_addr[0],
 			stream->sta->addr);
 	pcmd->ba_info.create_params.tid = stream->tid;
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
+	ba_type = BA_FLAG_IMMEDIATE_TYPE;
+	ba_direction = direction;
 	ba_flags = (ba_type & BA_TYPE_MASK) |
 		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.create_params.queue_id = stream->idx;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BASTREAM)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "check ba failed execution\n");
 		return -EIO;
 	}
 
@@ -2536,7 +2464,8 @@ int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
-			u8 buf_size, struct ieee80211_vif *vif)
+			struct ieee80211_vif *vif,
+			u32 direction, u8 buf_size, u16 seqno, bool amsdu)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
@@ -2558,13 +2487,22 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 	pcmd->action_type = cpu_to_le32(BA_CREATE_STREAM);
 	pcmd->ba_info.create_params.bar_thrs = cpu_to_le32(buf_size);
 	pcmd->ba_info.create_params.window_size = cpu_to_le32(buf_size);
+	pcmd->ba_info.create_params.idle_thrs = cpu_to_le32(0x22000);
 	ether_addr_copy(&pcmd->ba_info.create_params.peer_mac_addr[0],
 			stream->sta->addr);
 	pcmd->ba_info.create_params.tid = stream->tid;
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
-	ba_flags = (ba_type & BA_TYPE_MASK) |
-		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
+	ba_direction = direction;
+	if (priv->chip_type == MWL8964) {
+		ba_type = amsdu ? MWL_AMSDU_SIZE_11K : 0;
+		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
+			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
+			BA_DIRECTION_MASK_NDP);
+	} else {
+		ba_type = BA_FLAG_IMMEDIATE_TYPE;
+		ba_flags = (ba_type & BA_TYPE_MASK) |
+			((ba_direction << BA_DIRECTION_SHIFT) &
+			BA_DIRECTION_MASK);
+	}
 	pcmd->ba_info.create_params.flags = cpu_to_le32(ba_flags);
 	pcmd->ba_info.create_params.queue_id = stream->idx;
 	pcmd->ba_info.create_params.param_info =
@@ -2572,12 +2510,23 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 		 IEEE80211_HT_AMPDU_PARM_FACTOR) |
 		((stream->sta->ht_cap.ampdu_density << 2) &
 		 IEEE80211_HT_AMPDU_PARM_DENSITY);
-	pcmd->ba_info.create_params.reset_seq_no = 1;
-	pcmd->ba_info.create_params.current_seq = cpu_to_le16(0);
+	if (direction == BA_FLAG_DIRECTION_UP) {
+		pcmd->ba_info.create_params.reset_seq_no = 0;
+		pcmd->ba_info.create_params.current_seq = cpu_to_le16(seqno);
+	} else {
+		pcmd->ba_info.create_params.reset_seq_no = 1;
+		pcmd->ba_info.create_params.current_seq = cpu_to_le16(0);
+	}
+	if (priv->chip_type == MWL8964 &&
+	    stream->sta->vht_cap.vht_supported) {
+		pcmd->ba_info.create_params.vht_rx_factor =
+			cpu_to_le32((stream->sta->vht_cap.cap  &
+			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK) >>
+			IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_SHIFT);
+	}
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BASTREAM)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "create ba failed execution\n");
 		return -EIO;
 	}
 
@@ -2594,7 +2543,8 @@ int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 }
 
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
-			 u8 idx)
+			 struct mwl_ampdu_stream *stream,
+			 u32 direction)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_bastream *pcmd;
@@ -2609,16 +2559,25 @@ int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
 	pcmd->action_type = cpu_to_le32(BA_DESTROY_STREAM);
-	ba_type = BASTREAM_FLAG_IMMEDIATE_TYPE;
-	ba_direction = BASTREAM_FLAG_DIRECTION_UPSTREAM;
-	ba_flags = (ba_type & BA_TYPE_MASK) |
-		((ba_direction << BA_DIRECTION_SHIFT) & BA_DIRECTION_MASK);
+	ba_type = 0;
+	ba_direction = direction;
+	if (priv->chip_type == MWL8964)
+		ba_flags = (ba_type & BA_TYPE_MASK_NDP) |
+			((ba_direction << BA_DIRECTION_SHIFT_NDP) &
+			BA_DIRECTION_MASK_NDP);
+	else
+		ba_flags = (ba_type & BA_TYPE_MASK) |
+			((ba_direction << BA_DIRECTION_SHIFT) &
+			BA_DIRECTION_MASK);
 	pcmd->ba_info.destroy_params.flags = cpu_to_le32(ba_flags);
-	pcmd->ba_info.destroy_params.fw_ba_context.context = cpu_to_le32(idx);
+	pcmd->ba_info.destroy_params.fw_ba_context.context =
+		cpu_to_le32(stream->idx);
+	pcmd->ba_info.destroy_params.tid = stream->tid;
+	ether_addr_copy(&pcmd->ba_info.destroy_params.peer_mac_addr[0],
+			stream->sta->addr);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_BASTREAM)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_BASTREAM)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "destroy ba failed execution\n");
 		return -EIO;
 	}
 
@@ -2634,17 +2593,30 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	if (priv->chip_type == MWL8964) {
+		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
 
-		if (stream->state == AMPDU_NO_STREAM) {
+		if (idx < priv->ampdu_num) {
+			stream = &priv->ampdu[idx];
 			stream->sta = sta;
 			stream->state = AMPDU_STREAM_NEW;
 			stream->tid = tid;
-			stream->idx = i;
+			stream->idx = idx;
 			return stream;
+		}
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+
+			if (stream->state == AMPDU_NO_STREAM) {
+				stream->sta = sta;
+				stream->state = AMPDU_STREAM_NEW;
+				stream->tid = tid;
+				stream->idx = idx;
+				return stream;
+			}
 		}
 	}
 
@@ -2656,16 +2628,36 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int i, idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	spin_lock_bh(&priv->stream_lock);
+	if (priv->chip_type == MWL8964) {
+		idx = (sta->aid - 1) * SYSADPT_MAX_TID;
+		for (i = 0; i < SYSADPT_MAX_TID; i++) {
+			stream = &priv->ampdu[idx + i];
 
-		if (stream->sta == sta) {
-			mwl_fwcmd_destroy_ba(hw, stream->idx);
-			mwl_fwcmd_remove_stream(hw, stream);
+			if (stream->sta == sta) {
+				mwl_fwcmd_remove_stream(hw, stream);
+				spin_unlock_bh(&priv->stream_lock);
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
+				spin_lock_bh(&priv->stream_lock);
+			}
+		}
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+
+			if (stream->sta == sta) {
+				mwl_fwcmd_remove_stream(hw, stream);
+				spin_unlock_bh(&priv->stream_lock);
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
+				spin_lock_bh(&priv->stream_lock);
+			}
 		}
 	}
+	spin_unlock_bh(&priv->stream_lock);
 }
 
 int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
@@ -2685,21 +2677,26 @@ void mwl_fwcmd_remove_stream(struct ieee80211_hw *hw,
 }
 
 struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
-						 u8 *addr, u8 tid)
+						 struct ieee80211_sta *sta,
+						 u8 tid)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
-	int i;
+	int idx;
 
-	for (i = 0; i < SYSADPT_TX_AMPDU_QUEUES; i++) {
-		stream = &priv->ampdu[i];
+	if (priv->chip_type == MWL8964) {
+		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
+		if (idx < priv->ampdu_num)
+			return &priv->ampdu[idx];
+	} else {
+		for (idx = 0; idx < priv->ampdu_num; idx++) {
+			stream = &priv->ampdu[idx];
+			if (stream->state == AMPDU_NO_STREAM)
+				continue;
 
-		if (stream->state == AMPDU_NO_STREAM)
-			continue;
-
-		if (ether_addr_equal(stream->sta->addr, addr) &&
-		    stream->tid == tid)
-			return stream;
+			if ((stream->sta == sta) && (stream->tid == tid))
+				return stream;
+		}
 	}
 
 	return NULL;
@@ -2735,9 +2732,8 @@ int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->opt_level = opt_level;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_OPTIMIZATION_LEVEL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2761,19 +2757,74 @@ int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data)
 	pcmd->len = cpu_to_le16(len);
 	memcpy(pcmd->data, data, len);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WSC_IE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_WSC_IE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
 	pcmd->ie_type = cpu_to_le16(WSC_IE_SET_PROBE_RESPONSE);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_WSC_IE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_WSC_IE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
+			    u32 size, u8 type)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_ratetable *pcmd;
+
+	pcmd = (struct hostcmd_cmd_get_ratetable *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_RATETABLE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->type = type;
+	ether_addr_copy(pcmd->addr, addr);
+	memset(rate_table, 0x00, size);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_RATETABLE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	memcpy(rate_table, &pcmd->sorted_rates_idx_map, size);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
+			struct mwl_ampdu_stream *stream, u16 *start_seqno)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_seqno *pcmd;
+
+	pcmd = (struct hostcmd_cmd_get_seqno *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_SEQNO);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	ether_addr_copy(pcmd->mac_addr, stream->sta->addr);
+	pcmd->tid = stream->tid;
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_SEQNO)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	*start_seqno = le16_to_cpu(pcmd->seq_no);
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
@@ -2794,9 +2845,8 @@ int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->enable = cpu_to_le32(enable);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_DWDS_ENABLE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_DWDS_ENABLE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2819,9 +2869,8 @@ int mwl_fwcmd_set_fw_flush_timer(struct ieee80211_hw *hw, u32 value)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->value = cpu_to_le32(value);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_FW_FLUSH_TIMER)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_FW_FLUSH_TIMER)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2844,9 +2893,8 @@ int mwl_fwcmd_set_cdd(struct ieee80211_hw *hw)
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->enable = cpu_to_le32(priv->cdd);
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_SET_CDD)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_CDD)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2871,9 +2919,8 @@ int mwl_fwcmd_reg_cau(struct ieee80211_hw *hw, u8 flag, u32 reg, u32 *val)
 	pcmd->action = cpu_to_le16(flag);
 	pcmd->value = *val;
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_CAU_REG_ACCESS)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_CAU_REG_ACCESS)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2897,9 +2944,8 @@ int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_TEMP);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_GET_TEMP)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_TEMP)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2927,9 +2973,8 @@ int mwl_fwcmd_get_fw_region_code(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2970,9 +3015,8 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 	pcmd->status = cpu_to_le16(cmd);
 	pcmd->current_channel_index = cpu_to_le32(channel_index);
 
-	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -2991,6 +3035,32 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 	return status;
 }
 
+int mwl_fwcmd_newdp_dmathread_start(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_newdp_dmathread_start *pcmd;
+	u16 cmd;
+
+	pcmd = (struct hostcmd_cmd_newdp_dmathread_start *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	cmd = HOSTCMD_CMD_NEWDP_DMATHREAD_START;
+	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+
 int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 				     u32 *fw_region_code)
 {
@@ -3007,9 +3077,8 @@ int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.cmd = cpu_to_le16(cmd);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 
-	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -3047,9 +3116,8 @@ int mwl_fwcmd_get_pwr_tbl_sc4(struct ieee80211_hw *hw,
 	pcmd->status = cpu_to_le16(cmd);
 	pcmd->current_channel_index = cpu_to_le32(channel_index);
 
-	if (mwl_fwcmd_exec_cmd(priv, cmd)) {
+	if (mwl_hif_exec_cmd(priv->hw, cmd)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -3089,9 +3157,8 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 		pcmd->next_offset = cpu_to_le32(next_offset);
 	}
 
-	if (mwl_fwcmd_exec_cmd(priv, HOSTCMD_CMD_QUIET_MODE)) {
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_QUIET_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
-		wiphy_err(hw->wiphy, "failed execution\n");
 		return -EIO;
 	}
 
@@ -3113,12 +3180,5 @@ void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx)
 
 	memcpy(&survey_info->channel, conf->chandef.chan,
 	       sizeof(struct ieee80211_channel));
-	survey_info->filled = SURVEY_INFO_TIME |
-			      SURVEY_INFO_TIME_BUSY |
-			      SURVEY_INFO_TIME_TX |
-			      SURVEY_INFO_NOISE_DBM;
-	survey_info->time_period += pci_read_mac_reg(priv, MCU_LAST_READ);
-	survey_info->time_busy += pci_read_mac_reg(priv, MCU_CCA_CNT);
-	survey_info->time_tx += pci_read_mac_reg(priv, MCU_TXPE_CNT);
-	survey_info->noise = priv->noise;
+	mwl_hif_get_survey(hw, survey_info);
 }

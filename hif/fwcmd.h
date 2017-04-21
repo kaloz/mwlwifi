@@ -20,6 +20,8 @@
 #ifndef _FWCMD_H_
 #define _FWCMD_H_
 
+#include "hif/hostcmd.h"
+
 /*  Define OpMode for SoftAP/Station mode
  *
  *  The following mode signature has to be written to PCI scratch register#0
@@ -59,15 +61,13 @@ enum encr_type {
 	ENCR_TYPE_MIX = 7,
 };
 
-void mwl_fwcmd_reset(struct ieee80211_hw *hw);
+char *mwl_fwcmd_get_cmd_string(unsigned short cmd);
 
-void mwl_fwcmd_int_enable(struct ieee80211_hw *hw);
+const struct hostcmd_get_hw_spec
+*mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw);
 
-void mwl_fwcmd_int_disable(struct ieee80211_hw *hw);
-
-int mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw);
-
-int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw);
+int mwl_fwcmd_set_hw_specs(struct ieee80211_hw *hw,
+			   struct hostcmd_set_hw_spec *spec);
 
 int mwl_fwcmd_get_stat(struct ieee80211_hw *hw,
 		       struct ieee80211_low_level_stats *stats);
@@ -146,6 +146,11 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 			      struct ieee80211_vif *vif,
 			      struct ieee80211_sta *sta);
 
+int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
+				  struct ieee80211_vif *vif,
+				  struct ieee80211_sta *sta,
+				  u32 wds);
+
 int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif);
 
@@ -171,14 +176,17 @@ int mwl_fwcmd_encryption_remove_key(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_check_ba(struct ieee80211_hw *hw,
 		       struct mwl_ampdu_stream *stream,
-		       struct ieee80211_vif *vif);
+		       struct ieee80211_vif *vif,
+		       u32 direction);
 
 int mwl_fwcmd_create_ba(struct ieee80211_hw *hw,
 			struct mwl_ampdu_stream *stream,
-			u8 buf_size, struct ieee80211_vif *vif);
+			struct ieee80211_vif *vif,
+			u32 direction, u8 buf_size, u16 seqno, bool amsdu);
 
 int mwl_fwcmd_destroy_ba(struct ieee80211_hw *hw,
-			 u8 idx);
+			 struct mwl_ampdu_stream *stream,
+			 u32 direction);
 
 struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 					      struct ieee80211_sta *sta,
@@ -194,13 +202,20 @@ void mwl_fwcmd_remove_stream(struct ieee80211_hw *hw,
 			     struct mwl_ampdu_stream *stream);
 
 struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
-						 u8 *addr, u8 tid);
+						 struct ieee80211_sta *sta,
+						 u8 tid);
 
 bool mwl_fwcmd_ampdu_allowed(struct ieee80211_sta *sta, u8 tid);
 
 int mwl_fwcmd_set_optimization_level(struct ieee80211_hw *hw, u8 opt_level);
 
 int mwl_fwcmd_set_wsc_ie(struct ieee80211_hw *hw, u8 len, u8 *data);
+
+int mwl_fwcmd_get_ratetable(struct ieee80211_hw *hw, u8 *addr, u8 *rate_table,
+			    u32 size, u8 type);
+
+int mwl_fwcmd_get_seqno(struct ieee80211_hw *hw,
+			struct mwl_ampdu_stream *stream, u16 *start_seqno);
 
 int mwl_fwcmd_set_dwds_stamode(struct ieee80211_hw *hw, bool enable);
 
@@ -220,6 +235,8 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 				 u8 *region_code,
 				 u8 *number_of_channels,
 				 u32 channel_index);
+
+int mwl_fwcmd_newdp_dmathread_start(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 				     u32 *fw_region_code);
