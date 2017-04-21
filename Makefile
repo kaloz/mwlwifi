@@ -13,17 +13,11 @@ mwlwifi-objs			+= hif/pcie/rx.o
 mwlwifi-objs			+= hif/pcie/tx_ndp.o
 mwlwifi-objs			+= hif/pcie/rx_ndp.o
 
-AS		= $(CROSS_COMPILE)as
-LD		= $(CROSS_COMPILE)ld
-CC		= $(CROSS_COMPILE)gcc
-
-EXTRA_CFLAGS+= -I${KDIR}
-EXTRA_CFLAGS+= -O2 -funroll-loops -D__CHECK_ENDIAN__
-
-EXTRA_CFLAGS+= -I${PWD}
+ccflags-y += -I$(src)
+ccflags-y += -O2 -funroll-loops -D__CHECK_ENDIAN__
 
 all:
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(PWD)
 
 clean:
 	rm -f *.a *.s *.ko *.ko.cmd *.mod.* .mwlwifi.* modules.order Module.symvers
