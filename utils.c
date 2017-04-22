@@ -15,6 +15,8 @@
 
 /* Description:  This file implements common utility functions. */
 
+#include <linux/etherdevice.h>
+
 #include "sysadpt.h"
 #include "core.h"
 #include "utils.h"

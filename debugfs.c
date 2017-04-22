@@ -16,6 +16,7 @@
 /* Description:  This file implements debug fs related functions. */
 
 #include <linux/debugfs.h>
+#include <linux/etherdevice.h>
 
 #include "sysadpt.h"
 #include "core.h"
