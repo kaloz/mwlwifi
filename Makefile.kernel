@@ -13,4 +13,5 @@ mwlwifi-objs			+= hif/pcie/rx.o
 mwlwifi-objs			+= hif/pcie/tx_ndp.o
 mwlwifi-objs			+= hif/pcie/rx_ndp.o
 
+ccflags-y += -I$(src)
 ccflags-y += -D__CHECK_ENDIAN__
