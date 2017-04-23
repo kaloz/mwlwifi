@@ -24,6 +24,7 @@
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/sc4_ddr.h"
+#include "hif/pcie/fwdl.h"
 
 #define FW_DOWNLOAD_BLOCK_SIZE          256
 #define FW_CHECK_MSECS                  3

@@ -308,7 +308,7 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 		tcph = (struct tcphdr *)((u8 *)iph + (iph->ihl * 4));
 		if ((iph->protocol == IPPROTO_TCP) &&
 		    (tx_skb->protocol == htons(ETH_P_IP))) {
-			if ((tcph->ack == 1) && (htons(iph->tot_len) ==
+			if ((tcph->ack == 1) && (ntohs(iph->tot_len) ==
 			    (iph->ihl * 4 + tcph->doff * 4))) {
 				if (tcph->syn || tcph->fin)
 					return;

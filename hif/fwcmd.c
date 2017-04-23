@@ -1891,9 +1891,9 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
 	if (vif->type == NL80211_IFTYPE_STATION) {
-		pcmd->aid = 1;
-		pcmd->stn_id = 1;
-		pcmd->reserved = 1;
+		pcmd->aid = cpu_to_le16(1);
+		pcmd->stn_id = cpu_to_le16(1);
+		pcmd->reserved = cpu_to_le16(1);
 	} else {
 		pcmd->aid = cpu_to_le16(sta->aid);
 		pcmd->stn_id = cpu_to_le16(sta->aid);
@@ -1945,9 +1945,9 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
-		pcmd->aid = 2;
-		pcmd->stn_id = 2;
-		pcmd->reserved = 0;
+		pcmd->aid = cpu_to_le16(2);
+		pcmd->stn_id = cpu_to_le16(2);
+		pcmd->reserved = cpu_to_le16(0);
 		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			return -EIO;
@@ -1982,9 +1982,9 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
 	if (vif->type == NL80211_IFTYPE_STATION) {
-		pcmd->aid = 1;
-		pcmd->stn_id = 1;
-		pcmd->reserved = 1;
+		pcmd->aid = cpu_to_le16(1);
+		pcmd->stn_id = cpu_to_le16(1);
+		pcmd->reserved = cpu_to_le16(1);
 	} else {
 		pcmd->aid = cpu_to_le16(sta->aid);
 		pcmd->stn_id = cpu_to_le16(sta->aid);
@@ -2037,9 +2037,9 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
-		pcmd->aid = 2;
-		pcmd->stn_id = 2;
-		pcmd->reserved = 0;
+		pcmd->aid = cpu_to_le16(2);
+		pcmd->stn_id = cpu_to_le16(2);
+		pcmd->reserved = cpu_to_le16(0);
 		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			return -EIO;
@@ -2067,7 +2067,7 @@ int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 	if (priv->chip_type == MWL8964) {
 		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
 		pcmd->cmd_hdr.len =
-			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+			cpu_to_le16(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
 	} else {
 		memset(pcmd, 0x00, sizeof(*pcmd));
 		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
@@ -2104,7 +2104,7 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 	if (priv->chip_type == MWL8964) {
 		memset(pcmd, 0x00, sizeof(struct hostcmd_cmd_set_new_stn_sc4));
 		pcmd->cmd_hdr.len =
-			cpu_to_le32(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
+			cpu_to_le16(sizeof(struct hostcmd_cmd_set_new_stn_sc4));
 	} else {
 		memset(pcmd, 0x00, sizeof(*pcmd));
 		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));

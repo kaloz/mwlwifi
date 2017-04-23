@@ -1,4 +1,4 @@
-unsigned char sc4_ddr_init[] = {
+static unsigned char sc4_ddr_init[] = {
 0x05,
 0x00,
 0x00,

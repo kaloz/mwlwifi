@@ -117,7 +117,7 @@ static u32 pcie_read_mac_reg(struct pcie_priv *pcie_priv, u32 offset)
 		}
 		return 0;
 	} else
-		return le32_to_cpu(*(unsigned long *)
+		return le32_to_cpu(*(__le32 *)
 		       (MAC_REG_ADDR_PCI(offset)));
 }
 

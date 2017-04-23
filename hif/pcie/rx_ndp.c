@@ -493,7 +493,7 @@ void pcie_rx_recv_ndp(unsigned long data)
 		case RXRING_CASE_SLOW_PROMISC:
 			rx_info = (struct rx_info *)psk_buff->data;
 			dma_data = (struct pcie_dma_data *)&rx_info->hdr[0];
-			pktlen = le32_to_cpu(dma_data->fwlen);
+			pktlen = le16_to_cpu(dma_data->fwlen);
 			pktlen += sizeof(*rx_info);
 			pktlen += sizeof(struct pcie_dma_data);
 			if (bad_mic) {
