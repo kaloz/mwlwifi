@@ -16,6 +16,7 @@
 /* Description:  This file implements functions needed for PCIe module. */
 
 #include <linux/module.h>
+#include <linux/etherdevice.h>
 
 #include "sysadpt.h"
 #include "core.h"
