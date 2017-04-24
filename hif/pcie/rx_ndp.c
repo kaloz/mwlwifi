@@ -52,7 +52,7 @@ static int pcie_rx_ring_alloc_ndp(struct mwl_priv *priv)
 				   GFP_KERNEL);
 	if (!desc->prx_ring_done)
 		goto err_no_mem;
-	memset(desc->prx_ring, 0x00, MAX_NUM_RX_RING_DONE_BYTES);
+	memset(desc->prx_ring_done, 0x00, MAX_NUM_RX_RING_DONE_BYTES);
 	return 0;
 
 err_no_mem:
