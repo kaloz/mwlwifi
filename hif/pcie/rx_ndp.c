@@ -127,9 +127,6 @@ static void pcie_rx_ring_cleanup_ndp(struct mwl_priv *priv)
 		}
 		skb_queue_purge(&pcie_priv->rx_skb_trace);
 	}
-	desc->rx_desc_write = 0;
-	desc->rx_desc_read = 0;
-	desc->rx_ring_done_head = 0;
 }
 
 static void pcie_rx_ring_free_ndp(struct mwl_priv *priv)
@@ -179,7 +176,7 @@ static inline void pcie_rx_update_ndp_cnts(struct mwl_priv *priv, u32 ctrl)
 		pcie_priv->rx_cnts.slow_bad_sta_cnt++;
 		break;
 	case RXRING_CASE_SLOW_MCAST:
-		pcie_priv->rx_cnts.slow_mcastcnt++;
+		pcie_priv->rx_cnts.slow_mcast_cnt++;
 		break;
 	case RXRING_CASE_SLOW_MGMT:
 		pcie_priv->rx_cnts.slow_mgmt_cnt++;

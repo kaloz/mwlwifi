@@ -82,6 +82,28 @@ static inline int mwl_hif_get_info(struct ieee80211_hw *hw,
 		return 0;
 }
 
+static inline int mwl_hif_get_tx_status(struct ieee80211_hw *hw,
+					char *buf, size_t size)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->get_tx_status)
+		return priv->hif.ops->get_tx_status(hw, buf, size);
+	else
+		return 0;
+}
+
+static inline int mwl_hif_get_rx_status(struct ieee80211_hw *hw,
+					char *buf, size_t size)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->get_rx_status)
+		return priv->hif.ops->get_rx_status(hw, buf, size);
+	else
+		return 0;
+}
+
 static inline void mwl_hif_enable_data_tasks(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;

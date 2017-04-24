@@ -442,8 +442,6 @@ struct pcie_desc_data_ndp {
 	dma_addr_t pphys_rx_ring;         /* ptr to first RX desc (phys.)    */
 	struct pcie_rx_desc_ndp *prx_ring;/* ptr to first RX desc (virt.)    */
 	u32 wcb_base;                     /* FW base offset for registers    */
-	u32 rx_desc_write;                /* FW descriptor write position    */
-	u32 rx_desc_read;                 /* FW descriptor read position     */
 	u32 rx_buf_size;                  /* length of the RX buffers        */
 	u32 tx_sent_tail;                 /* index to the TX desc FW used    */
 	u32 tx_sent_head;                 /* index to next TX desc to be used*/
@@ -454,10 +452,8 @@ struct pcie_desc_data_ndp {
 	struct sk_buff *rx_vbuflist[MAX_NUM_RX_DESC];
 	struct tx_ring_done *ptx_ring_done;
 	dma_addr_t pphys_tx_ring_done; /* ptr to first TX done desc (phys.)  */
-	u32 tx_ring_done_head;         /* ptr to head of TX done desc (phys.)*/
 	struct rx_ring_done *prx_ring_done;
 	dma_addr_t pphys_rx_ring_done; /* ptr to first RX done desc (phys.)  */
-	u32 rx_ring_done_head;         /* ptr to head of RX done desc (phys.)*/
 	dma_addr_t pphys_acnt_ring;    /* ptr to first account record (phys.)*/
 	u8 *pacnt_ring;                /* ptr to first accounting record     */
 	u32 tx_desc_busy_cnt;
@@ -470,7 +466,7 @@ struct ndp_rx_counter {
 	u32 fast_bad_amsdu_cnt;
 	u32 slow_noqueue_cnt;
 	u32 slow_norun_cnt;
-	u32 slow_mcastcnt;
+	u32 slow_mcast_cnt;
 	u32 slow_bad_sta_cnt;
 	u32 slow_bad_mic_cnt;
 	u32 slow_bad_pn_cnt;
@@ -478,7 +474,7 @@ struct ndp_rx_counter {
 	u32 slow_promisc_cnt;
 	u32 drop_cnt;
 	u32 offch_promisc_cnt;
-	u32 mu_pktcnt;
+	u32 mu_pkt_cnt;
 };
 
 struct pcie_priv {

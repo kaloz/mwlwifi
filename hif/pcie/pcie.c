@@ -737,6 +737,74 @@ static int pcie_get_info_ndp(struct ieee80211_hw *hw, char *buf, size_t size)
 	return len;
 }
 
+static int pcie_get_tx_status_ndp(struct ieee80211_hw *hw, char *buf,
+				  size_t size)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	char *p = buf;
+	int len = 0;
+
+	len += scnprintf(p + len, size - len, "tx_done_cnt: %d\n",
+			 pcie_priv->tx_done_cnt);
+	len += scnprintf(p + len, size - len, "tx_desc_busy_cnt: %d\n",
+			 pcie_priv->desc_data_ndp.tx_desc_busy_cnt);
+	len += scnprintf(p + len, size - len, "tx_sent_head: %d\n",
+			 pcie_priv->desc_data_ndp.tx_sent_head);
+	len += scnprintf(p + len, size - len, "tx_sent_tail: %d\n",
+			 pcie_priv->desc_data_ndp.tx_sent_tail);
+	len += scnprintf(p + len, size - len, "tx_done_head: %d\n",
+			 readl(pcie_priv->iobase1 + MACREG_REG_TXDONEHEAD));
+	len += scnprintf(p + len, size - len, "tx_done_tail: %d\n",
+			 pcie_priv->desc_data_ndp.tx_done_tail);
+	len += scnprintf(p + len, size - len, "tx_vbuflist_idx: %d\n",
+			 pcie_priv->desc_data_ndp.tx_vbuflist_idx);
+	return len;
+}
+
+static int pcie_get_rx_status_ndp(struct ieee80211_hw *hw, char *buf,
+				  size_t size)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	char *p = buf;
+	int len = 0;
+
+	len += scnprintf(p + len, size - len, "rx_done_head: %d\n",
+			 readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD));
+	len += scnprintf(p + len, size - len, "rx_done_tail: %d\n",
+			 readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL));
+	len += scnprintf(p + len, size - len, "rx_desc_head: %d\n",
+			 readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD));
+	len += scnprintf(p + len, size - len, "fast_data_cnt: %d\n",
+			 pcie_priv->rx_cnts.fast_data_cnt);
+	len += scnprintf(p + len, size - len, "fast_bad_amsdu_cnt: %d\n",
+			 pcie_priv->rx_cnts.fast_bad_amsdu_cnt);
+	len += scnprintf(p + len, size - len, "slow_noqueue_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_noqueue_cnt);
+	len += scnprintf(p + len, size - len, "slow_norun_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_norun_cnt);
+	len += scnprintf(p + len, size - len, "slow_mcast_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_mcast_cnt);
+	len += scnprintf(p + len, size - len, "slow_bad_sta_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_bad_sta_cnt);
+	len += scnprintf(p + len, size - len, "slow_bad_mic_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_bad_mic_cnt);
+	len += scnprintf(p + len, size - len, "slow_bad_pn_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_bad_pn_cnt);
+	len += scnprintf(p + len, size - len, "slow_mgmt_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_mgmt_cnt);
+	len += scnprintf(p + len, size - len, "slow_promisc_cnt: %d\n",
+			 pcie_priv->rx_cnts.slow_promisc_cnt);
+	len += scnprintf(p + len, size - len, "drop_cnt: %d\n",
+			 pcie_priv->rx_cnts.drop_cnt);
+	len += scnprintf(p + len, size - len, "offch_promisc_cnt: %d\n",
+			 pcie_priv->rx_cnts.offch_promisc_cnt);
+	len += scnprintf(p + len, size - len, "mu_pkt_cnt: %d\n",
+			 pcie_priv->rx_cnts.mu_pkt_cnt);
+	return len;
+}
+
 static void pcie_enable_data_tasks_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -856,6 +924,8 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.init                  = pcie_init_ndp,
 	.deinit                = pcie_deinit_ndp,
 	.get_info              = pcie_get_info_ndp,
+	.get_tx_status         = pcie_get_tx_status_ndp,
+	.get_rx_status         = pcie_get_rx_status_ndp,
 	.enable_data_tasks     = pcie_enable_data_tasks_ndp,
 	.disable_data_tasks    = pcie_disable_data_tasks_ndp,
 	.exec_cmd              = pcie_exec_cmd,
