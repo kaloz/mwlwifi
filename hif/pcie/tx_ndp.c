@@ -43,14 +43,14 @@
  *       is the size of control buffer of socket buffer.
  */
 struct pcie_tx_ctrl_ndp {
-	u8 type;
-	u8 eapol;
 	u16 tx_que_priority;
 	u16 hdrlen;
-	bool tcp_ack;
 	u32 tcp_dst_src;
 	u32 tcp_sn;
-};
+	u8 tcp_ack;
+	u8 type;
+	u8 eapol;
+} __packed;
 
 static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
 {
@@ -301,7 +301,7 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 	struct iphdr *iph;
 	struct tcphdr *tcph;
 
-	tx_ctrl->tcp_ack = false;
+	tx_ctrl->tcp_ack = 0;
 
 	if (tx_ctrl->type == IEEE_TYPE_DATA) {
 		iph = (struct iphdr *)(tx_skb->data + tx_ctrl->hdrlen + 8);
@@ -313,7 +313,7 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 				if (tcph->syn || tcph->fin)
 					return;
 
-				tx_ctrl->tcp_ack = true;
+				tx_ctrl->tcp_ack = 1;
 				tx_ctrl->tcp_dst_src = ntohs(tcph->source) |
 					(ntohs(tcph->dest) << 16);
 				tx_ctrl->tcp_sn = ntohl(tcph->ack_seq);
@@ -325,7 +325,17 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
+	struct sk_buff skb;
+	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(&skb);
 	int rc;
+
+	if (sizeof(struct pcie_tx_ctrl_ndp) >
+	    sizeof(tx_info->status.status_driver_data)) {
+		wiphy_err(hw->wiphy, "driver data is not enough: %d (%d)\n",
+			  sizeof(struct pcie_tx_ctrl_ndp),
+			  sizeof(tx_info->status.status_driver_data));
+		return -ENOMEM;
+	}
 
 	rc = pcie_tx_ring_alloc_ndp(priv);
 	if (rc) {
