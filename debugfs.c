@@ -667,6 +667,7 @@ static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 	if (!priv->reg_type) {
 		/* No command has been given */
 		len += scnprintf(p + len, size - len, "0");
+		ret = -EINVAL;
 		goto none;
 	}
 
