@@ -509,6 +509,7 @@ struct pcie_priv {
 	struct tasklet_struct qe_task;
 	int txq_limit;
 	int txq_wake_threshold;
+	bool is_tx_schedule;
 	bool is_tx_done_schedule;
 	int recv_limit;
 	bool is_rx_schedule;

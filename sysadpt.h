@@ -73,6 +73,6 @@
 
 #define SYSADPT_THERMAL_THROTTLE_MAX   100
 
-#define SYSADPT_TIMER_WAKEUP_TIME      50 /* ms */
+#define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
 
 #endif /* _SYSADPT_H_ */

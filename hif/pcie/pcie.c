@@ -33,6 +33,7 @@
 
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS 2000
 #define CHECK_BA_TRAFFIC_TIME           300 /* msec */
+#define CHECK_TX_DONE_TIME              50  /* msec */
 
 static struct pci_device_id pcie_id_tbl[] = {
 	{ PCI_VDEVICE(MARVELL, 0x2a55), .driver_data = MWL8864, },
@@ -640,6 +641,7 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	tasklet_disable(&pcie_priv->rx_task);
 	pcie_priv->txq_limit = TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = TX_WAKE_Q_THRESHOLD;
+	pcie_priv->is_tx_schedule = false;
 	pcie_priv->recv_limit = MAX_NUM_RX_DESC;
 	pcie_priv->is_rx_schedule = false;
 
@@ -885,7 +887,25 @@ static void pcie_irq_enable_ndp(struct ieee80211_hw *hw)
 
 static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
 {
-	pcie_tx_done_ndp(hw);
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int num = SYSADPT_TX_WMM_QUEUES;
+	static int cnt;
+
+	if (!pcie_priv->is_tx_schedule) {
+		while (num--) {
+			if (skb_queue_len(&pcie_priv->txq[num]) > 0) {
+				tasklet_schedule(&pcie_priv->tx_task);
+				pcie_priv->is_tx_schedule = true;
+				break;
+			}
+		}
+	}
+
+	if ((++cnt * SYSADPT_TIMER_WAKEUP_TIME) < CHECK_TX_DONE_TIME) {
+		pcie_tx_done_ndp(hw);
+		cnt = 0;
+	}
 }
 
 static void pcie_tx_return_pkts_ndp(struct ieee80211_hw *hw)

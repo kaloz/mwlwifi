@@ -405,6 +405,8 @@ void pcie_tx_skbs_ndp(unsigned long data)
 				ieee80211_wake_queue(hw, queue);
 		}
 	}
+
+	pcie_priv->is_tx_schedule = false;
 }
 
 void pcie_tx_done_ndp(struct ieee80211_hw *hw)
@@ -650,5 +652,8 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	skb_queue_tail(&pcie_priv->txq[index], skb);
 
-	tasklet_schedule(&pcie_priv->tx_task);
+	if (!pcie_priv->is_tx_schedule) {
+		tasklet_schedule(&pcie_priv->tx_task);
+		pcie_priv->is_tx_schedule = true;
+	}
 }
