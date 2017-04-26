@@ -902,7 +902,7 @@ static void pcie_timer_routine_ndp(struct ieee80211_hw *hw)
 		}
 	}
 
-	if ((++cnt * SYSADPT_TIMER_WAKEUP_TIME) < CHECK_TX_DONE_TIME) {
+	if ((++cnt * SYSADPT_TIMER_WAKEUP_TIME) >= CHECK_TX_DONE_TIME) {
 		pcie_tx_done_ndp(hw);
 		cnt = 0;
 	}
