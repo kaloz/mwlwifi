@@ -664,6 +664,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	INIT_LIST_HEAD(&priv->sta_list);
 
 	/* Set default radio state, preamble and wmm */
+	priv->noise = -95;
 	priv->radio_on = false;
 	priv->radio_short_preamble = false;
 	priv->wmm_enabled = false;
