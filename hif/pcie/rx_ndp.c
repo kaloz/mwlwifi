@@ -466,7 +466,8 @@ void pcie_rx_recv_ndp(unsigned long data)
 							  stnid);
 			} else {
 				wiphy_err(hw->wiphy,
-					  "space of buffer is not enough\n");
+					  "fast: space %d(%d) is not enough\n",
+					  skb_tailroom(psk_buff), pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;
@@ -504,7 +505,8 @@ void pcie_rx_recv_ndp(unsigned long data)
 							  bad_mic);
 			} else {
 				wiphy_err(hw->wiphy,
-					  "space of buffer is not enough\n");
+					  "slow: space %d(%d) is not enough\n",
+					  skb_tailroom(psk_buff), pktlen);
 				dev_kfree_skb_any(psk_buff);
 			}
 			break;

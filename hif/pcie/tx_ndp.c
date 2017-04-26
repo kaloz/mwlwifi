@@ -212,6 +212,8 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	u32 ctrl = 0;
 	dma_addr_t dma;
 
+	spin_lock_bh(&pcie_priv->tx_desc_lock);
+
 	tx_send_tail = desc->tx_sent_tail;
 	tx_send_head_new = desc->tx_sent_head;
 
@@ -222,8 +224,10 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 		desc->tx_sent_tail = tx_send_tail;
 
 		if (((tx_send_head_new + 1) & (MAX_NUM_TX_DESC-1)) ==
-		    tx_send_tail)
+		    tx_send_tail) {
+			spin_unlock_bh(&pcie_priv->tx_desc_lock);
 			return -EAGAIN;
+		}
 	}
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
@@ -270,6 +274,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 		dev_kfree_skb_any(tx_skb);
 		wiphy_err(priv->hw->wiphy,
 			  "failed to map pci memory!\n");
+		spin_unlock_bh(&pcie_priv->tx_desc_lock);
 		return -EIO;
 	}
 
@@ -291,6 +296,8 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	wmb(); /*Data Memory Barrier*/
 	writel(tx_send_head_new, pcie_priv->iobase1 + MACREG_REG_TXSENDHEAD);
 	desc->tx_desc_busy_cnt++;
+
+	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 
 	return 0;
 }
