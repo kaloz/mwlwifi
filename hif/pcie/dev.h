@@ -447,6 +447,7 @@ struct pcie_desc_data_ndp {
 	u32 tx_sent_head;                 /* index to next TX desc to be used*/
 	u32 tx_done_tail;                 /* index to Tx Done queue tail     */
 	/* keept the skb owned by fw */
+	dma_addr_t pphys_tx_buflist[MAX_TX_RING_SEND_SIZE];
 	struct sk_buff *tx_vbuflist[MAX_TX_RING_SEND_SIZE];
 	u32 tx_vbuflist_idx;              /* idx to empty slot in tx_vbuflist*/
 	struct sk_buff *rx_vbuflist[MAX_NUM_RX_DESC];

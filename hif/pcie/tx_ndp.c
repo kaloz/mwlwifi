@@ -122,26 +122,21 @@ static void pcie_tx_ring_cleanup_ndp(struct mwl_priv *priv)
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
 	struct sk_buff *tx_skb;
-	int i, idx;
+	int i;
 
 	for (i = 0; i < PCIE_NUM_OF_DESC_DATA; i++)
 		skb_queue_purge(&pcie_priv->txq[i]);
 
-	for (i = 0; i < MAX_NUM_TX_DESC; i++) {
-		if (desc->ptx_ring[i].data) {
-			idx = le32_to_cpu(desc->ptx_ring[i].user);
-			tx_skb = desc->tx_vbuflist[idx];
-			if (tx_skb) {
-				pci_unmap_single(pcie_priv->pdev,
-						 le32_to_cpu(
-						 desc->ptx_ring[i].data),
-						 tx_skb->len,
-						 PCI_DMA_TODEVICE);
-				dev_kfree_skb_any(tx_skb);
-				desc->ptx_ring[i].data = 0;
-				desc->ptx_ring[i].user = 0;
-				desc->tx_vbuflist[idx] = NULL;
-			}
+	for (i = 0; i < MAX_TX_RING_SEND_SIZE; i++) {
+		tx_skb = desc->tx_vbuflist[i];
+		if (tx_skb) {
+			pci_unmap_single(pcie_priv->pdev,
+					 desc->pphys_tx_buflist[i],
+					 tx_skb->len,
+					 PCI_DMA_TODEVICE);
+			dev_kfree_skb_any(tx_skb);
+			desc->pphys_tx_buflist[i] = 0;
+			desc->tx_vbuflist[i] = NULL;
 		}
 	}
 	desc->tx_sent_tail = 0;
@@ -183,7 +178,8 @@ static void pcie_tx_ring_free_ndp(struct mwl_priv *priv)
 	kfree(desc->pacnt_buf);
 }
 
-static inline u32 pcie_tx_set_skb(struct mwl_priv *priv, struct sk_buff *skb)
+static inline u32 pcie_tx_set_skb(struct mwl_priv *priv, struct sk_buff *skb,
+				  dma_addr_t dma)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
@@ -193,6 +189,7 @@ static inline u32 pcie_tx_set_skb(struct mwl_priv *priv, struct sk_buff *skb)
 		index = (index + 1) % MAX_TX_RING_SEND_SIZE;
 
 	desc->tx_vbuflist_idx = (index + 1) % MAX_TX_RING_SEND_SIZE;
+	desc->pphys_tx_buflist[index] = dma;
 	desc->tx_vbuflist[index] = skb;
 
 	return index;
@@ -280,7 +277,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 
 	pnext_tx_desc->data = cpu_to_le32(dma);
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
-	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb));
+	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb, dma));
 
 	if (tx_ctrl->type == IEEE_TYPE_DATA) {
 		skb_push(tx_skb, tx_ctrl->hdrlen);
@@ -441,25 +438,25 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 		ptx_ring_done = &desc->ptx_ring_done[tx_done_tail];
 
 		index = le32_to_cpu(ptx_ring_done->user);
+		ptx_ring_done->user = 0;
 		if (index >= MAX_TX_RING_SEND_SIZE) {
 			wiphy_err(hw->wiphy,
 				  "corruption for index of buffer\n");
 			break;
 		}
 		skb = desc->tx_vbuflist[index];
-		desc->tx_vbuflist[index] = NULL;
-		ptx_ring_done->user = 0;
 		if (!skb) {
 			wiphy_err(hw->wiphy,
 				  "buffer is NULL for tx done ring\n");
 			break;
 		}
-
 		pci_unmap_single(pcie_priv->pdev,
-				 le32_to_cpu(
-				 desc->ptx_ring[index].data),
+				 desc->pphys_tx_buflist[index],
 				 skb->len,
 				 PCI_DMA_TODEVICE);
+		desc->pphys_tx_buflist[index] = 0;
+		desc->tx_vbuflist[index] = NULL;
+
 		tx_info = IEEE80211_SKB_CB(skb);
 		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
 			tx_info->status.status_driver_data;
