@@ -487,6 +487,21 @@ struct pcie_priv {
 
 	struct sk_buff_head txq[PCIE_NUM_OF_DESC_DATA];
 
+	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
+	struct tasklet_struct tx_task;
+	struct tasklet_struct tx_done_task;
+	struct tasklet_struct rx_task;
+	struct tasklet_struct qe_task;
+	int txq_limit;
+	int txq_wake_threshold;
+	bool is_tx_schedule;
+	bool is_tx_done_schedule;
+	int recv_limit;
+	bool is_rx_schedule;
+	bool is_qe_schedule;
+	u32 qe_trig_num;
+	unsigned long qe_trig_time;
+
 	/* various descriptor data */
 	/* for tx descriptor data  */
 	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
@@ -503,20 +518,6 @@ struct pcie_priv {
 	struct ndp_rx_counter rx_cnts;
 	u32 rx_skb_unlink_err;
 	u32 signature_err;
-
-	struct tasklet_struct tx_task;
-	struct tasklet_struct tx_done_task;
-	struct tasklet_struct rx_task;
-	struct tasklet_struct qe_task;
-	int txq_limit;
-	int txq_wake_threshold;
-	bool is_tx_schedule;
-	bool is_tx_done_schedule;
-	int recv_limit;
-	bool is_rx_schedule;
-	bool is_qe_schedule;
-	u32 qe_trig_num;
-	unsigned long qe_trig_time;
 };
 
 static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
@@ -675,6 +676,24 @@ static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 
 	if (hdrlen != sizeof(*dma_data))
 		skb_pull(skb, sizeof(*dma_data) - hdrlen);
+}
+
+static inline void pcie_mask_int(struct pcie_priv *pcie_priv,
+				 u32 mask_bit, bool set)
+{
+	unsigned long flags;
+	void __iomem *int_status_mask;
+	u32 status;
+
+	spin_lock_irqsave(&pcie_priv->int_mask_lock, flags);
+	int_status_mask = pcie_priv->iobase1 +
+		MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
+	status = readl(int_status_mask);
+	if (set)
+		writel((status | mask_bit), int_status_mask);
+	else
+		writel((status & ~mask_bit), int_status_mask);
+	spin_unlock_irqrestore(&pcie_priv->int_mask_lock, flags);
 }
 
 #endif /* _DEV_H_ */

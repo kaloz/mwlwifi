@@ -639,7 +639,6 @@ void pcie_tx_flush_amsdu(unsigned long data)
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	u32 status_mask;
 	struct mwl_sta *sta_info;
 	int i;
 	struct mwl_amsdu_frag *amsdu_frag;
@@ -667,11 +666,7 @@ void pcie_tx_flush_amsdu(unsigned long data)
 	}
 	spin_unlock(&priv->sta_lock);
 
-	status_mask = readl(pcie_priv->iobase1 +
-			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status_mask | MACREG_A2HRIC_BIT_QUE_EMPTY,
-	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
+	pcie_mask_int(pcie_priv, MACREG_A2HRIC_BIT_QUE_EMPTY, true);
 	pcie_priv->is_qe_schedule = false;
 }
 
@@ -769,14 +764,7 @@ void pcie_tx_done(unsigned long data)
 	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 
 	if (pcie_priv->is_tx_done_schedule) {
-		u32 status_mask;
-
-		status_mask = readl(pcie_priv->iobase1 +
-				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-		writel(status_mask | MACREG_A2HRIC_BIT_TX_DONE,
-		       pcie_priv->iobase1 +
-		       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
+		pcie_mask_int(pcie_priv, MACREG_A2HRIC_BIT_TX_DONE, true);
 		tasklet_schedule(&pcie_priv->tx_task);
 		pcie_priv->is_tx_done_schedule = false;
 	}

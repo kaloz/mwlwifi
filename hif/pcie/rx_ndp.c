@@ -407,7 +407,6 @@ void pcie_rx_recv_ndp(unsigned long data)
 	u16 pktlen;
 	struct rx_info *rx_info;
 	struct pcie_dma_data *dma_data;
-	u32 status_mask;
 
 	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
 	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
@@ -533,10 +532,6 @@ out:
 	writel(rx_done_tail, pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
 	writel(rx_desc_head, pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD);
 
-	status_mask = readl(pcie_priv->iobase1 +
-			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status_mask | MACREG_A2HRIC_RX_DONE_HEAD_RDY,
-	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
+	pcie_mask_int(pcie_priv, MACREG_A2HRIC_RX_DONE_HEAD_RDY, true);
 	pcie_priv->is_rx_schedule = false;
 }

@@ -368,18 +368,12 @@ void pcie_rx_recv(unsigned long data)
 	struct ieee80211_rx_status status;
 	struct mwl_vif *mwl_vif = NULL;
 	struct ieee80211_hdr *wh;
-	u32 status_mask;
 
 	desc = &pcie_priv->desc_data[0];
 	curr_hndl = desc->pnext_rx_hndl;
 
 	if (!curr_hndl) {
-		status_mask = readl(pcie_priv->iobase1 +
-				    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-		writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
-		       pcie_priv->iobase1 +
-		       MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
+		pcie_mask_int(pcie_priv, MACREG_A2HRIC_BIT_RX_RDY, true);
 		pcie_priv->is_rx_schedule = false;
 		wiphy_warn(hw->wiphy, "busy or no receiving packets\n");
 		return;
@@ -490,11 +484,6 @@ out:
 	}
 
 	desc->pnext_rx_hndl = curr_hndl;
-
-	status_mask = readl(pcie_priv->iobase1 +
-			    MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-	writel(status_mask | MACREG_A2HRIC_BIT_RX_RDY,
-	       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_STATUS_MASK);
-
+	pcie_mask_int(pcie_priv, MACREG_A2HRIC_BIT_RX_RDY, true);
 	pcie_priv->is_rx_schedule = false;
 }

@@ -175,6 +175,7 @@ static int pcie_init(struct ieee80211_hw *hw)
 	struct hostcmd_set_hw_spec set_hw_spec;
 	int rc, i;
 
+	spin_lock_init(&pcie_priv->int_mask_lock);
 	tasklet_init(&pcie_priv->tx_task,
 		     (void *)pcie_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
@@ -380,12 +381,8 @@ static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	void __iomem *int_status_mask;
 	u32 int_status;
-	u32 status;
 
-	int_status_mask = pcie_priv->iobase1 +
-		MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 	int_status = readl(pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
 	if (int_status == 0x00000000)
@@ -399,9 +396,8 @@ static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
 			if (!pcie_priv->is_tx_done_schedule) {
-				status = readl(int_status_mask);
-				writel((status & ~MACREG_A2HRIC_BIT_TX_DONE),
-				       int_status_mask);
+				pcie_mask_int(pcie_priv,
+					      MACREG_A2HRIC_BIT_TX_DONE, false);
 				tasklet_schedule(&pcie_priv->tx_done_task);
 				pcie_priv->is_tx_done_schedule = true;
 			}
@@ -409,9 +405,8 @@ static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
 			if (!pcie_priv->is_rx_schedule) {
-				status = readl(int_status_mask);
-				writel((status & ~MACREG_A2HRIC_BIT_RX_RDY),
-				       int_status_mask);
+				pcie_mask_int(pcie_priv,
+					      MACREG_A2HRIC_BIT_RX_RDY, false);
 				tasklet_schedule(&pcie_priv->rx_task);
 				pcie_priv->is_rx_schedule = true;
 			}
@@ -426,10 +421,9 @@ static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 			if (!pcie_priv->is_qe_schedule) {
 				if (time_after(jiffies,
 					       (pcie_priv->qe_trig_time + 1))) {
-					status = readl(int_status_mask);
-					writel((status &
-					       ~MACREG_A2HRIC_BIT_QUE_EMPTY),
-					       int_status_mask);
+					pcie_mask_int(pcie_priv,
+					      MACREG_A2HRIC_BIT_QUE_EMPTY,
+					      false);
 					tasklet_schedule(&pcie_priv->qe_task);
 					pcie_priv->qe_trig_num++;
 					pcie_priv->is_qe_schedule = true;
@@ -632,6 +626,7 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	struct hostcmd_set_hw_spec set_hw_spec;
 	int rc;
 
+	spin_lock_init(&pcie_priv->int_mask_lock);
 	tasklet_init(&pcie_priv->tx_task,
 		     (void *)pcie_tx_skbs_ndp, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
@@ -829,12 +824,8 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	void __iomem *int_status_mask;
 	u32 int_status;
-	u32 status;
 
-	int_status_mask = pcie_priv->iobase1 +
-		MACREG_REG_A2H_INTERRUPT_STATUS_MASK;
 	int_status = readl(pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
 	if (int_status == 0x00000000)
@@ -851,10 +842,9 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 
 		if (int_status & MACREG_A2HRIC_RX_DONE_HEAD_RDY) {
 			if (!pcie_priv->is_rx_schedule) {
-				status = readl(int_status_mask);
-				writel((status &
-				       ~MACREG_A2HRIC_RX_DONE_HEAD_RDY),
-				       int_status_mask);
+				pcie_mask_int(pcie_priv,
+					      MACREG_A2HRIC_RX_DONE_HEAD_RDY,
+					      false);
 				tasklet_schedule(&pcie_priv->rx_task);
 				pcie_priv->is_rx_schedule = true;
 			}
