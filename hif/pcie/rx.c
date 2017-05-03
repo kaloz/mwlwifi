@@ -225,6 +225,29 @@ static inline void pcie_rx_prepare_status(struct pcie_rx_desc *pdesc,
 	gi = (rate & MWL_RX_RATE_GI_MASK) >> MWL_RX_RATE_GI_SHIFT;
 	rt = (rate & MWL_RX_RATE_RT_MASK) >> MWL_RX_RATE_RT_SHIFT;
 
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+	switch (format) {
+	case RX_RATE_INFO_FORMAT_11N:
+		status->encoding = RX_ENC_HT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->bw = RATE_INFO_BW_40;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+		break;
+	case RX_RATE_INFO_FORMAT_11AC:
+		status->encoding = RX_ENC_VHT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->bw = RATE_INFO_BW_40;
+		if (bw == RX_RATE_INFO_HT80)
+			status->bw = RATE_INFO_BW_80;
+		if (bw == RX_RATE_INFO_HT160)
+			status->bw = RATE_INFO_BW_160;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+		status->nss = (nss + 1);
+		break;
+	}
+#else
 	switch (format) {
 	case RX_RATE_INFO_FORMAT_11N:
 		status->flag |= RX_FLAG_HT;
@@ -246,21 +269,31 @@ static inline void pcie_rx_prepare_status(struct pcie_rx_desc *pdesc,
 		status->vht_nss = (nss + 1);
 		break;
 	}
-
+#endif
 	status->rate_idx = rt;
 
 	if (pdesc->channel > BAND_24_CHANNEL_NUM) {
 		status->band = NL80211_BAND_5GHZ;
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+		if ((!(status->encoding == RX_ENC_HT)) &&
+		    (!(status->encoding == RX_ENC_VHT))) {
+#else
 		if ((!(status->flag & RX_FLAG_HT)) &&
 		    (!(status->flag & RX_FLAG_VHT))) {
+#endif
 			status->rate_idx -= 5;
 			if (status->rate_idx >= BAND_50_RATE_NUM)
 				status->rate_idx = BAND_50_RATE_NUM - 1;
 		}
 	} else {
 		status->band = NL80211_BAND_2GHZ;
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+		if ((!(status->encoding == RX_ENC_HT)) &&
+		    (!(status->encoding == RX_ENC_VHT))) {
+#else
 		if ((!(status->flag & RX_FLAG_HT)) &&
 		    (!(status->flag & RX_FLAG_VHT))) {
+#endif
 			if (status->rate_idx >= BAND_24_RATE_NUM)
 				status->rate_idx = BAND_24_RATE_NUM - 1;
 		}
