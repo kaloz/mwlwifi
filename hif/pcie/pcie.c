@@ -243,6 +243,7 @@ static int pcie_init(struct ieee80211_hw *hw)
 	       pcie_priv->iobase0 + pcie_priv->desc_data[0].rx_desc_write);
 
 	/* prepare and set HW specifications */
+	memset(&set_hw_spec, 0, sizeof(set_hw_spec));
 	set_hw_spec.wcb_base[0] =
 		cpu_to_le32(pcie_priv->desc_data[0].pphys_tx_ring);
 	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
@@ -253,7 +254,6 @@ static int pcie_init(struct ieee80211_hw *hw)
 	set_hw_spec.total_rx_wcb = cpu_to_le32(PCIE_MAX_NUM_RX_DESC);
 	set_hw_spec.rxpd_wr_ptr =
 		cpu_to_le32(pcie_priv->desc_data[0].pphys_rx_ring);
-	set_hw_spec.features = 0;
 	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
@@ -667,6 +667,7 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 	priv->hw_data.hw_version = get_hw_spec->version;
 
 	/* prepare and set HW specifications */
+	memset(&set_hw_spec, 0, sizeof(set_hw_spec));
 	set_hw_spec.wcb_base[0] =
 		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_tx_ring);
 	set_hw_spec.wcb_base[1] =
@@ -679,7 +680,6 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_acnt_ring);
 	set_hw_spec.acnt_buf_size =
 		cpu_to_le32(pcie_priv->desc_data_ndp.acnt_ring_size);
-	set_hw_spec.features = 0;
 	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
