@@ -74,7 +74,9 @@ static int pcie_rx_ring_init_ndp(struct mwl_priv *priv)
 		desc->rx_buf_size = MAX_AGGR_SIZE;
 
 		for (i = 0; i < MAX_NUM_RX_DESC; i++) {
-			psk_buff = dev_alloc_skb(desc->rx_buf_size);
+			psk_buff = __alloc_skb(desc->rx_buf_size, GFP_ATOMIC,
+					       SKB_ALLOC_RX, NUMA_NO_NODE);
+			skb_reserve(psk_buff, NET_SKB_PAD);
 			if (!psk_buff) {
 				wiphy_err(priv->hw->wiphy,
 					  "rxdesc %i: no skbuff available\n",
@@ -333,7 +335,9 @@ static inline int pcie_rx_refill_ndp(struct mwl_priv *priv, u32 buf_idx)
 	struct sk_buff *psk_buff;
 	dma_addr_t dma;
 
-	psk_buff = dev_alloc_skb(desc->rx_buf_size);
+	psk_buff = __alloc_skb(desc->rx_buf_size, GFP_ATOMIC,
+			       SKB_ALLOC_RX, NUMA_NO_NODE);
+	skb_reserve(psk_buff, NET_SKB_PAD);
 	if (!psk_buff)
 		return -ENOMEM;
 	skb_reserve(psk_buff, MIN_BYTES_RX_HEADROOM);
