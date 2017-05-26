@@ -19,6 +19,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/hif-ops.h"
 
@@ -395,14 +396,7 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	u8 *addr;
 
 	mwl_vif = mwl_dev_get_vif(vif);
-
-	if (!sta) {
-		addr = vif->addr;
-	} else {
-		addr = sta->addr;
-		if (vif->type == NL80211_IFTYPE_STATION)
-			ether_addr_copy(mwl_vif->bssid, addr);
-	}
+	addr = sta ? sta->addr : vif->addr;
 
 	if (cmd_param == SET_KEY) {
 		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
@@ -451,15 +445,29 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 				struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv = hw->priv;
+	u16 stnid, sta_stnid;
 	struct mwl_vif *mwl_vif;
 	struct mwl_sta *sta_info;
 	struct ieee80211_key_conf *key;
 	int rc;
 	int i;
 
+	if (vif->type == NL80211_IFTYPE_STATION)
+		sta->aid = 1;
 	mwl_vif = mwl_dev_get_vif(vif);
+	stnid = utils_assign_stnid(priv, mwl_vif->macid, sta->aid);
+	if (!stnid)
+		return -EPERM;
+	if (vif->type == NL80211_IFTYPE_STATION) {
+		sta_stnid = utils_assign_stnid(priv, mwl_vif->macid,
+					       sta->aid + 1);
+		if (!sta_stnid) {
+			utils_free_stnid(priv, stnid);
+			return -EPERM;
+		}
+		ether_addr_copy(mwl_vif->bssid, sta->addr);
+	}
 	sta_info = mwl_dev_get_sta(sta);
-
 	memset(sta_info, 0, sizeof(*sta_info));
 
 	if (sta->ht_cap.ht_supported) {
@@ -473,6 +481,9 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 			sta->wme = true;
 	}
 	sta_info->mwl_vif = mwl_vif;
+	sta_info->stnid = stnid;
+	if (vif->type == NL80211_IFTYPE_STATION)
+		sta_info->sta_stnid = sta_stnid;
 	sta_info->iv16 = 1;
 	sta_info->iv32 = 0;
 	spin_lock_init(&sta_info->amsdu_lock);
@@ -521,6 +532,10 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 		mwl_hif_set_sta_id(hw, sta, true, false);
 	else
 		mwl_hif_set_sta_id(hw, sta, false, false);
+
+	utils_free_stnid(priv, sta_info->stnid);
+	if (vif->type == NL80211_IFTYPE_STATION)
+		utils_free_stnid(priv, sta_info->sta_stnid);
 
 	spin_lock_bh(&priv->sta_lock);
 	list_del(&sta_info->list);

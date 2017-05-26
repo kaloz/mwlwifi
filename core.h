@@ -148,6 +148,11 @@ struct mwl_ampdu_stream {
 	int idx;
 };
 
+struct mwl_stnid {
+	int macid;                  /* keep macid for related stnid */
+	u16 aid;                    /* keep aid for related stnid   */
+};
+
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	struct device *dev;
@@ -229,6 +234,14 @@ struct mwl_priv {
 		struct mwl_ampdu_stream *ampdu;
 	} ____cacheline_aligned_in_smp;
 	struct work_struct watchdog_ba_handle;
+
+	/* station id */
+	int stnid_num;
+	struct {
+		spinlock_t stnid_lock;      /* for station id              */
+		struct mwl_stnid *stnid;
+		u16 available_stnid;
+	} ____cacheline_aligned_in_smp;
 
 	bool radio_on;
 	bool radio_short_preamble;
@@ -321,6 +334,8 @@ struct mwl_amsdu_ctrl {
 struct mwl_sta {
 	struct list_head list;
 	struct mwl_vif *mwl_vif;
+	u16 stnid;
+	u16 sta_stnid;
 	bool wds;
 	bool is_mesh_node;
 	bool is_ampdu_allowed;

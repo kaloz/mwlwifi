@@ -525,6 +525,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
 	index = skb_get_queue_mapping(skb);
 	sta = control->sta;
+	sta_info = mwl_dev_get_sta(sta);
 
 	wh = (struct ieee80211_hdr *)skb->data;
 
@@ -580,8 +581,8 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 						SYSADPT_MAX_TID;
 				else
 					tx_que_priority = SYSADPT_MAX_TID *
-						(sta->aid + QUEUE_STAOFFSET)
-						+ 6;
+						(sta_info->stnid +
+						QUEUE_STAOFFSET) + 6;
 			}
 		}
 
@@ -598,7 +599,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 		pcie_tx_encapsulate_frame(priv, skb, k_conf, NULL);
 	} else {
-		tid = qos & 0xF;
+		tid = qos & 0x7;
 		if (sta && sta->ht_cap.ht_supported && !eapol_frame &&
 		    qos != 0xFFFF) {
 			spin_lock_bh(&priv->stream_lock);
@@ -611,7 +612,6 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 				dev_kfree_skb_any(skb);
 				return;
 			}
-			sta_info = mwl_dev_get_sta(sta);
 			if ((stream->state == AMPDU_NO_STREAM) &&
 			    sta_info->is_ampdu_allowed) {
 				stream = mwl_fwcmd_add_stream(hw, sta, tid);
@@ -624,19 +624,22 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			spin_unlock_bh(&priv->stream_lock);
 		}
 
-		if (is_multicast_ether_addr(wh->addr1) &&
-		    (mwl_vif->macid != SYSADPT_NUM_OF_AP))
-			tx_que_priority = mwl_vif->macid * SYSADPT_MAX_TID;
-		else {
+		if (is_multicast_ether_addr(ieee80211_get_DA(wh))
+		    && (mwl_vif->macid != SYSADPT_NUM_OF_AP)) {
+				tx_que_priority = mwl_vif->macid *
+					SYSADPT_MAX_TID;
+		} else {
 			if (sta) {
 				if (!eapol_frame)
 					tx_que_priority = SYSADPT_MAX_TID *
-						(sta->aid + QUEUE_STAOFFSET)
-						+ tid;
+						(sta_info->stnid +
+						QUEUE_STAOFFSET) +
+						((qos == 0xFFFF) ? 0 : tid);
 				else
 					tx_que_priority = SYSADPT_MAX_TID *
-						(sta->aid + QUEUE_STAOFFSET)
-						+ ((qos == 0xFFFF) ? 0 : 6);
+						(sta_info->stnid +
+						QUEUE_STAOFFSET) +
+						((qos == 0xFFFF) ? 0 : 6);
 			} else
 				tx_que_priority = 0;
 		}

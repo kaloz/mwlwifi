@@ -916,20 +916,12 @@ static void pcie_set_sta_id(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	u16 aid;
+	struct mwl_sta *sta_info;
+	u16 stnid;
 
-	if (!sta_mode)
-		aid = sta->aid;
-	else
-		aid = 0;
-
-	if (aid > SYSADPT_MAX_STA_SC4)
-		return;
-
-	if (set)
-		pcie_priv->sta_link[aid] = sta;
-	else
-		pcie_priv->sta_link[aid] = NULL;
+	sta_info = mwl_dev_get_sta(sta);
+	stnid = sta_mode ? 0 : sta_info->stnid;
+	pcie_priv->sta_link[stnid] = set ? sta : NULL;
 }
 
 static const struct mwl_hif_ops pcie_hif_ops_ndp = {

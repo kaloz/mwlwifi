@@ -75,6 +75,42 @@ static inline void utils_add_basic_rates(int band, struct sk_buff *skb)
 	}
 }
 
+static inline int utils_assign_stnid(struct mwl_priv *priv, int macid, u16 aid)
+{
+	int stnid;
+	int i;
+
+	spin_lock_bh(&priv->stnid_lock);
+	stnid = priv->available_stnid;
+	if (stnid >= priv->stnid_num) {
+		spin_unlock_bh(&priv->stnid_lock);
+		return 0;
+	}
+	priv->stnid[stnid].macid = macid;
+	priv->stnid[stnid].aid = aid;
+	stnid++;
+	for (i = stnid; i < priv->stnid_num; i++) {
+		if (!priv->stnid[i].aid)
+			break;
+	}
+	priv->available_stnid = i;
+	spin_unlock_bh(&priv->stnid_lock);
+	return stnid;
+}
+
+static inline void utils_free_stnid(struct mwl_priv *priv, u16 stnid)
+{
+	spin_lock_bh(&priv->stnid_lock);
+	if (stnid && (stnid <= priv->stnid_num)) {
+		stnid--;
+		priv->stnid[stnid].macid = 0;
+		priv->stnid[stnid].aid = 0;
+		if (priv->available_stnid > stnid)
+			priv->available_stnid = stnid;
+	}
+	spin_unlock_bh(&priv->stnid_lock);
+}
+
 int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);
 
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);

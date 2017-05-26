@@ -392,6 +392,39 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	return ret;
 }
 
+static ssize_t mwl_debugfs_stnid_read(struct file *file, char __user *ubuf,
+				      size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct mwl_stnid *stnid;
+	int i;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	spin_lock_bh(&priv->stnid_lock);
+	for (i = 0; i < priv->stnid_num; i++) {
+		stnid = &priv->stnid[i];
+		if (!stnid->aid)
+			continue;
+		len += scnprintf(p + len, size - len,
+				 "stnid: %d macid: %d aid: %d\n",
+				 i + 1, stnid->macid, stnid->aid);
+	}
+	spin_unlock_bh(&priv->stnid_lock);
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
 static ssize_t mwl_debugfs_device_pwrtbl_read(struct file *file,
 					      char __user *ubuf,
 					      size_t count, loff_t *ppos)
@@ -890,6 +923,7 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(rx_status);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
+MWLWIFI_DEBUGFS_FILE_READ_OPS(stnid);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
@@ -914,6 +948,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(vif);
 	MWLWIFI_DEBUGFS_ADD_FILE(sta);
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
+	MWLWIFI_DEBUGFS_ADD_FILE(stnid);
 	MWLWIFI_DEBUGFS_ADD_FILE(device_pwrtbl);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);

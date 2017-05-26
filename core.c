@@ -684,6 +684,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	spin_lock_init(&priv->vif_lock);
 	spin_lock_init(&priv->sta_lock);
 	spin_lock_init(&priv->stream_lock);
+	spin_lock_init(&priv->stnid_lock);
 
 	rc = mwl_thermal_register(priv);
 	if (rc) {
@@ -807,7 +808,6 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->hif.ops = ops;
 	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
-
 	priv->ampdu =
 		kzalloc(priv->ampdu_num * sizeof(*priv->ampdu), GFP_KERNEL);
 	if (!priv->ampdu) {
@@ -815,6 +815,20 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 		pr_err("alloc ampdu stream failed\n");
 		return NULL;
 	}
+
+	if (chip_type == MWL8964)
+		priv->stnid_num = SYSADPT_MAX_STA_SC4;
+	else
+		priv->stnid_num = SYSADPT_MAX_STA;
+	priv->stnid =
+		kzalloc(priv->stnid_num * sizeof(struct mwl_stnid), GFP_KERNEL);
+	if (!priv->stnid) {
+		kfree(priv->ampdu);
+		ieee80211_free_hw(hw);
+		pr_err("alloc stnid failed\n");
+		return NULL;
+	}
+	priv->available_stnid = 0;
 
 	SET_IEEE80211_DEV(hw, dev);
 
@@ -825,6 +839,7 @@ void mwl_free_hw(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 
+	kfree(priv->stnid);
 	kfree(priv->ampdu);
 	ieee80211_free_hw(hw);
 }

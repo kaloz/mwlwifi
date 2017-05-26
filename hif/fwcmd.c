@@ -1875,10 +1875,12 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
+	struct mwl_sta *sta_info;
 	struct hostcmd_cmd_set_new_stn *pcmd;
 	u32 rates;
 
 	mwl_vif = mwl_dev_get_vif(vif);
+	sta_info = mwl_dev_get_sta(sta);
 
 	pcmd = (struct hostcmd_cmd_set_new_stn *)&priv->pcmd_buf[0];
 
@@ -1890,14 +1892,9 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
-	if (vif->type == NL80211_IFTYPE_STATION) {
-		pcmd->aid = cpu_to_le16(1);
-		pcmd->stn_id = cpu_to_le16(1);
-		pcmd->reserved = cpu_to_le16(1);
-	} else {
-		pcmd->aid = cpu_to_le16(sta->aid);
-		pcmd->stn_id = cpu_to_le16(sta->aid);
-	}
+	pcmd->aid = cpu_to_le16(sta->aid);
+	pcmd->stn_id = cpu_to_le16(sta_info->stnid);
+	pcmd->reserved = cpu_to_le16(1);
 	ether_addr_copy(pcmd->mac_addr, sta->addr);
 
 	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
@@ -1945,8 +1942,8 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
-		pcmd->aid = cpu_to_le16(2);
-		pcmd->stn_id = cpu_to_le16(2);
+		pcmd->aid = cpu_to_le16(sta->aid + 1);
+		pcmd->stn_id = cpu_to_le16(sta_info->sta_stnid);
 		pcmd->reserved = cpu_to_le16(0);
 		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
@@ -1966,10 +1963,12 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_vif *mwl_vif;
+	struct mwl_sta *sta_info;
 	struct hostcmd_cmd_set_new_stn_sc4 *pcmd;
 	u32 rates;
 
 	mwl_vif = mwl_dev_get_vif(vif);
+	sta_info = mwl_dev_get_sta(sta);
 
 	pcmd = (struct hostcmd_cmd_set_new_stn_sc4 *)&priv->pcmd_buf[0];
 
@@ -1981,14 +1980,8 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
-	if (vif->type == NL80211_IFTYPE_STATION) {
-		pcmd->aid = cpu_to_le16(1);
-		pcmd->stn_id = cpu_to_le16(1);
-		pcmd->reserved = cpu_to_le16(1);
-	} else {
-		pcmd->aid = cpu_to_le16(sta->aid);
-		pcmd->stn_id = cpu_to_le16(sta->aid);
-	}
+	pcmd->aid = cpu_to_le16(sta->aid);
+	pcmd->stn_id = cpu_to_le16(sta_info->stnid);
 	ether_addr_copy(pcmd->mac_addr, sta->addr);
 
 	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
@@ -2037,9 +2030,8 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 
 	if (vif->type == NL80211_IFTYPE_STATION) {
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
-		pcmd->aid = cpu_to_le16(2);
-		pcmd->stn_id = cpu_to_le16(2);
-		pcmd->reserved = cpu_to_le16(0);
+		pcmd->aid = cpu_to_le16(sta->aid + 1);
+		pcmd->stn_id = cpu_to_le16(sta_info->sta_stnid);
 		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			return -EIO;
