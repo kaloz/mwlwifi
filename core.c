@@ -549,8 +549,8 @@ static void mwl_chnl_switch_event(struct work_struct *work)
 
 	spin_lock_bh(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		vif = container_of((char *)mwl_vif, struct ieee80211_vif,
-				   drv_priv[0]);
+		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
+				   drv_priv);
 
 		if (vif->csa_active)
 			ieee80211_csa_finish(vif);
