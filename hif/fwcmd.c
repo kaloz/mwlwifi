@@ -2585,10 +2585,11 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 	int idx;
 
 	if (priv->chip_type == MWL8964) {
-		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
+		idx = ((sta_info->stnid - 1) * SYSADPT_MAX_TID) + tid;
 
 		if (idx < priv->ampdu_num) {
 			stream = &priv->ampdu[idx];
@@ -2620,11 +2621,12 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 	int i, idx;
 
 	spin_lock_bh(&priv->stream_lock);
 	if (priv->chip_type == MWL8964) {
-		idx = (sta->aid - 1) * SYSADPT_MAX_TID;
+		idx = (sta_info->stnid - 1) * SYSADPT_MAX_TID;
 		for (i = 0; i < SYSADPT_MAX_TID; i++) {
 			stream = &priv->ampdu[idx + i];
 
@@ -2674,10 +2676,11 @@ struct mwl_ampdu_stream *mwl_fwcmd_lookup_stream(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct mwl_ampdu_stream *stream;
+	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 	int idx;
 
 	if (priv->chip_type == MWL8964) {
-		idx = ((sta->aid - 1) * SYSADPT_MAX_TID) + tid;
+		idx = ((sta_info->stnid - 1) * SYSADPT_MAX_TID) + tid;
 		if (idx < priv->ampdu_num)
 			return &priv->ampdu[idx];
 	} else {
