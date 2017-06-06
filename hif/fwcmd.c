@@ -2256,7 +2256,8 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 		return -EIO;
 	}
 
-	if (vif->type == NL80211_IFTYPE_STATION) {
+	if ((vif->type == NL80211_IFTYPE_STATION) &&
+	    (priv->chip_type != MWL8964)) {
 		if (ether_addr_equal(mwl_vif->bssid, addr))
 			ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 		else
