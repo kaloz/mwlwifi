@@ -55,10 +55,15 @@ d. make V=s (-jx)
 
   marvell,powertable => Specify external power table. If your device needs external power table, you must provide the power table via this parameter, otherwise the Tx power will be pretty low.
   root@lede:/# cat /sys/kernel/debug/ieee80211/phy0/mwlwifi/info
+
   power table loaded from dts: no
+  
   => If it is "no", it does not allow you to load external power table (for new device).
+
   => If it is "yes", you must provide power table in DTS file (for old device).
   
-* The way to change interrupt to different CPU cores: 
+* The way to change interrupt to different CPU cores:
+
 root@lede:/# echo 1 > /proc/irq/irq number of phy0 or phy1/smp_affinity => use CPU0
+
 root@lede:/# echo 2 > /proc/irq/irq number of phy0 or phy1/smp_affinity => use CPU1
