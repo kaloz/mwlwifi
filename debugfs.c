@@ -210,8 +210,8 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len, "\n");
 	spin_lock_bh(&priv->vif_lock);
 	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		vif = container_of((char *)mwl_vif, struct ieee80211_vif,
-				   drv_priv[0]);
+		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
+				   drv_priv);
 		len += scnprintf(p + len, size - len,
 				 "macid: %d\n", mwl_vif->macid);
 		switch (vif->type) {
@@ -281,8 +281,8 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	len += scnprintf(p + len, size - len, "\n");
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((char *)sta_info, struct ieee80211_sta,
-				   drv_priv[0]);
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
 		len += scnprintf(p + len, size - len,
 				 "mac address: %pM\n", sta->addr);
 		len += scnprintf(p + len, size - len, "aid: %u\n", sta->aid);
@@ -373,9 +373,9 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		for (i = 0; i < MWL_MAX_TID; i++) {
 			if (sta_info->check_ba_failed[i]) {
-				sta = container_of((char *)sta_info,
+				sta = container_of((void *)sta_info,
 						   struct ieee80211_sta,
-						   drv_priv[0]);
+						   drv_priv);
 				len += scnprintf(p + len, size - len,
 						 "%pM(%d): %d\n",
 						 sta->addr, i,
@@ -793,8 +793,8 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((char *)sta_info, struct ieee80211_sta,
-				   drv_priv[0]);
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
 		if (priv->sta_aid == sta->aid) {
 			ether_addr_copy(addr, sta->addr);
 			break;
