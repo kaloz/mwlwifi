@@ -692,6 +692,7 @@ static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,
 	info->status.rates[0].idx = -1;
 	info->status.rates[0].count = 0;
 	info->status.rates[0].flags = 0;
+	info->flags &= ~IEEE80211_TX_CTL_AMPDU;
 	info->flags |= IEEE80211_TX_STAT_ACK;
 
 	if (rate) {

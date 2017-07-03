@@ -280,7 +280,8 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
 	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb, dma));
 
-	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
+	if ((tx_ctrl->flags & TX_CTRL_TYPE_DATA) &&
+	    (tx_ctrl->rate != 0)) {
 		skb_push(tx_skb, tx_ctrl->hdrlen);
 		skb_get(tx_skb);
 		pcie_tx_prepare_info(priv, tx_ctrl->rate, tx_info);

@@ -544,7 +544,6 @@ static inline void pcie_tx_ack_amsdu_pkts(struct ieee80211_hw *hw, u32 rate,
 		amsdu_pkt = skb_dequeue(amsdu_pkts);
 		info = IEEE80211_SKB_CB(amsdu_pkt);
 		pcie_tx_prepare_info(hw->priv, rate, info);
-		info->flags &= ~IEEE80211_TX_CTL_AMPDU;
 		ieee80211_tx_status(hw, amsdu_pkt);
 	}
 
@@ -750,7 +749,6 @@ void pcie_tx_done(unsigned long data)
 				memmove(dma_data->data - hdrlen,
 					&dma_data->wh, hdrlen);
 				skb_pull(done_skb, sizeof(*dma_data) - hdrlen);
-				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
 				ieee80211_tx_status(hw, done_skb);
 			}
 
