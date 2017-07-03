@@ -155,6 +155,20 @@ struct pcie_tx_hndl {
 	struct pcie_tx_hndl *pnext;
 };
 
+/* Receive rate information constants */
+#define RX_RATE_INFO_FORMAT_11A       0
+#define RX_RATE_INFO_FORMAT_11B       1
+#define RX_RATE_INFO_FORMAT_11N       2
+#define RX_RATE_INFO_FORMAT_11AC      4
+
+#define RX_RATE_INFO_HT20             0
+#define RX_RATE_INFO_HT40             1
+#define RX_RATE_INFO_HT80             2
+#define RX_RATE_INFO_HT160            3
+
+#define RX_RATE_INFO_LONG_INTERVAL    0
+#define RX_RATE_INFO_SHORT_INTERVAL   1
+
 #define MWL_RX_RATE_FORMAT_MASK       0x0007
 #define MWL_RX_RATE_NSS_MASK          0x0018
 #define MWL_RX_RATE_NSS_SHIFT         3
@@ -312,6 +326,12 @@ struct pcie_dma_data {
 #define TXRING_CTRL_TAG_TCP_ACK 0x4
 #define TXRING_CTRL_TAG_RSVD    0x3C   /* Unused                              */
 
+struct tx_info { /* Tx INFO used by MAC HW */
+	__le32 reserved0[10];
+	__le32 rate_info;
+	__le32 reserved1[14];
+} __packed;
+
 struct pcie_tx_desc_ndp {
 	union { /* Union for Tx DA/SA or Mgmt Overrides */
 		struct { /* Fields for Data frames     */
@@ -406,14 +426,16 @@ enum { /* Type of Key */
 	KEY_TYPE_GCMP256,   /* GCMP with 256 bit Key + 16 byte MIC    */
 };
 
-#define RXINFO_RSSI_X_SHIFT     0
+#define RXINFO_RSSI_X_SHIFT     24
 #define RXINFO_RSSI_X_MASK      0xFF
-#define RXINFO_HT_SIG1_SHIFT    8
+#define RXINFO_HT_SIG1_SHIFT    0
 #define RXINFO_HT_SIG1_MASK     0xFFFFFF
-#define RXINFO_HT_SIG2_SHIFT    14
+#define RXINFO_HT_SIG2_SHIFT    0
 #define RXINFO_HT_SIG2_MASK     0x3FFFF
-#define RXINFO_RATE_SHIFT       0
+#define RXINFO_RATE_SHIFT       24
 #define RXINFO_RATE_MASK        0xFF
+#define RXINFO_PARAM_SHIFT      0
+#define RXINFO_PARAM_MASK       0xFFFFFF
 
 struct rx_info { /* HW Rx buffer */
 	__le32 reserved0[2];
@@ -421,7 +443,9 @@ struct rx_info { /* HW Rx buffer */
 	__le32 reserved1[2];
 	__le32 ht_sig1;
 	__le32 ht_sig2_rate;
-	__le32 reserved2[17];
+	__le32 reserved2[14];
+	__le32 param;
+	__le32 reserved3[2];
 	__le32 hdr[0]; /* Len from HW includes rx_info w/ hdr */
 } __packed;
 
@@ -519,6 +543,61 @@ struct pcie_priv {
 	u32 rx_skb_unlink_err;
 	u32 signature_err;
 };
+
+enum { /* Definition of accounting record codes */
+	ACNT_CODE_BUSY = 0,   /* Marked busy until filled in                  */
+	ACNT_CODE_WRAP,       /* Used to pad when wrapping (no TSF sometimes) */
+	ACNT_CODE_DROP,       /* Count of dropped records (acnt_u32_t)        */
+	ACNT_CODE_TX_ENQUEUE, /* TXINFO when added to TCQ (acnt_tx_t)         */
+	ACNT_CODE_RX_PPDU,    /* RXINFO for each PPDu (acnt_rx_t)             */
+	ACNT_CODE_TX_FLUSH,   /* Flush Tx Queue (acnt_txflush_t)              */
+	ACNT_CODE_RX_RESET,   /* Channel Change / Rx Reset (acnt_u32_t)       */
+	ACNT_CODE_TX_RESET,   /* TCQ reset (acnt_u8_t)                        */
+	ACNT_CODE_QUOTE_LEVEL,/* Quota Level changes (acnt_u8_t)              */
+	ACNT_CODE_TX_DONE,    /* Tx status when done (acnt_tx2_t)             */
+	ACNT_CODE_RA_STATS,   /* rateinfo PER (acnt_RA_stats_t)               */
+	ACNT_CODE_BA_STATS,   /* BA stats (acnt_BA_stats_t)                   */
+};
+
+struct acnt_s { /* Baseline Accounting Record format */
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 pad;               /* Alignment for generic, but specific can reuse*/
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+} __packed;
+
+struct acnt_tx_s { /* Accounting Record For Tx (at Enqueue time) */
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 tcq;               /* Which TCQ was used                           */
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+	__le64 bitmap;        /* Map of SeqNr when AMPDU                      */
+	__le16 air_time;      /* Air Time used by PPDU                        */
+	__le16 npkts;         /* Number of Descriptors sent (AMPDU&AMSDU)     */
+	__le16 qid;           /* Transmit Queue ID                            */
+	__le16 latency;       /* Latency of oldest frame in AMPDU (128us)     */
+	__le16 rate1;         /* Rate Code for sending data                   */
+	__le16 rate2;         /* Rate Code for sending RTS/CTS protection     */
+	u8 rate_tbl_index;    /* Rate table index for this TxInfo rate        */
+	u8 type;              /* SU:0 or MU:1                                 */
+	u8 pad[1];            /* Unused                                       */
+	u8 retries;           /* Number of retries of oldest frame in AMPDU   */
+	__le32 tx_cnt;        /* No. of pkt sent                              */
+	struct tx_info tx_info;/* Transmit parameters used for 1st MPDU/AMPDU */
+	struct pcie_dma_data hdr;/* Dot11 header used for 1st MPDU in AMPDU   */
+	u8 payload[0];        /* Variable Payload by use case                 */
+} __packed;
+
+struct acnt_rx_s { /* Accounting Record for Rx PPDU */
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 flags;             /* Flags (ACNTRX_*)                             */
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+	__le64 bitmap;        /* Map of SeqNr when AMPDU                      */
+	__le16 air_time;      /* Air Time used by PPDU (no CSMA overhead)     */
+	__le16 rate;          /* Rate Code for receiving data                 */
+	struct rx_info rx_info;/* Receive parameters from 1st valid MPDU/AMPDU*/
+} __packed;
 
 static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 					 struct sk_buff *skb,
@@ -653,6 +732,86 @@ static inline void pcie_tx_prepare_info(struct mwl_priv *priv, u32 rate,
 				IEEE80211_TX_RC_SHORT_GI;
 		info->status.rates[0].count = 1;
 		info->status.rates[1].idx = -1;
+	}
+}
+
+static inline void pcie_rx_prepare_status(struct mwl_priv *priv, u16 format,
+					  u16 nss, u16 bw, u16 gi, u16 rate,
+					  struct ieee80211_rx_status *status)
+{
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+	switch (format) {
+	case RX_RATE_INFO_FORMAT_11N:
+		status->encoding = RX_ENC_HT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->bw = RATE_INFO_BW_40;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+		break;
+	case RX_RATE_INFO_FORMAT_11AC:
+		status->encoding = RX_ENC_VHT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->bw = RATE_INFO_BW_40;
+		if (bw == RX_RATE_INFO_HT80)
+			status->bw = RATE_INFO_BW_80;
+		if (bw == RX_RATE_INFO_HT160)
+			status->bw = RATE_INFO_BW_160;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->enc_flags |= RX_ENC_FLAG_SHORT_GI;
+		status->nss = (nss + 1);
+		break;
+	}
+#else
+	switch (format) {
+	case RX_RATE_INFO_FORMAT_11N:
+		status->flag |= RX_FLAG_HT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->flag |= RX_FLAG_40MHZ;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->flag |= RX_FLAG_SHORT_GI;
+		break;
+	case RX_RATE_INFO_FORMAT_11AC:
+		status->flag |= RX_FLAG_VHT;
+		if (bw == RX_RATE_INFO_HT40)
+			status->flag |= RX_FLAG_40MHZ;
+		if (bw == RX_RATE_INFO_HT80)
+			status->vht_flag |= RX_VHT_FLAG_80MHZ;
+		if (bw == RX_RATE_INFO_HT160)
+			status->vht_flag |= RX_VHT_FLAG_160MHZ;
+		if (gi == RX_RATE_INFO_SHORT_INTERVAL)
+			status->flag |= RX_FLAG_SHORT_GI;
+		status->vht_nss = (nss + 1);
+		break;
+	}
+#endif
+	status->rate_idx = rate;
+
+	if (priv->hw->conf.chandef.chan->hw_value >
+	    BAND_24_CHANNEL_NUM) {
+		status->band = NL80211_BAND_5GHZ;
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+		if ((!(status->encoding == RX_ENC_HT)) &&
+		    (!(status->encoding == RX_ENC_VHT))) {
+#else
+		if ((!(status->flag & RX_FLAG_HT)) &&
+		    (!(status->flag & RX_FLAG_VHT))) {
+#endif
+			status->rate_idx -= 5;
+			if (status->rate_idx >= BAND_50_RATE_NUM)
+				status->rate_idx = BAND_50_RATE_NUM - 1;
+		}
+	} else {
+		status->band = NL80211_BAND_2GHZ;
+#ifdef RX_ENC_FLAG_STBC_SHIFT
+		if ((!(status->encoding == RX_ENC_HT)) &&
+		    (!(status->encoding == RX_ENC_VHT))) {
+#else
+		if ((!(status->flag & RX_FLAG_HT)) &&
+		    (!(status->flag & RX_FLAG_VHT))) {
+#endif
+			if (status->rate_idx >= BAND_24_RATE_NUM)
+				status->rate_idx = BAND_24_RATE_NUM - 1;
+		}
 	}
 }
 

@@ -133,6 +133,40 @@ int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id)
 		return (phy_rate_11ac160M[rate_11ac][index] / 2);
 }
 
+u8 utils_get_rate_id(u8 rate)
+{
+	switch (rate) {
+	case 10:   /* 1 Mbit/s or 12 Mbit/s */
+		return 0;
+	case 20:   /* 2 Mbit/s */
+		return 1;
+	case 55:   /* 5.5 Mbit/s */
+		return 2;
+	case 110:  /* 11 Mbit/s */
+		return 3;
+	case 220:  /* 22 Mbit/s */
+		return 4;
+	case 0xb:  /* 6 Mbit/s */
+		return 5;
+	case 0xf:  /* 9 Mbit/s */
+		return 6;
+	case 0xe:  /* 18 Mbit/s */
+		return 8;
+	case 0x9:  /* 24 Mbit/s */
+		return 9;
+	case 0xd:  /* 36 Mbit/s */
+		return 10;
+	case 0x8:  /* 48 Mbit/s */
+		return 11;
+	case 0xc:  /* 54 Mbit/s */
+		return 12;
+	case 0x7:  /* 72 Mbit/s */
+		return 13;
+	}
+
+	return 0;
+}
+
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
@@ -145,6 +179,25 @@ struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
 		}
 	}
 	spin_unlock_bh(&priv->vif_lock);
+
+	return NULL;
+}
+
+struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr)
+{
+	struct mwl_sta *sta_info;
+	struct ieee80211_sta *sta;
+
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
+		if (ether_addr_equal(addr, sta->addr)) {
+			spin_unlock_bh(&priv->sta_lock);
+			return sta_info;
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
 
 	return NULL;
 }

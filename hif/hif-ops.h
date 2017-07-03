@@ -276,4 +276,12 @@ static inline void mwl_hif_set_sta_id(struct ieee80211_hw *hw,
 	if (priv->hif.ops->set_sta_id)
 		priv->hif.ops->set_sta_id(hw, sta, sta_mode, set);
 }
+
+static inline void mwl_hif_process_account(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->process_account)
+		priv->hif.ops->process_account(hw);
+}
 #endif /* _HIF_OPS_H_ */

@@ -20,6 +20,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
 #include "hif/pcie/fwdl.h"
@@ -844,8 +845,8 @@ static irqreturn_t pcie_isr_ndp(struct ieee80211_hw *hw)
 		writel(~int_status,
 		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
-		if (int_status & MACREG_A2HRIC_ACNT_HEAD_RDY) {
-		}
+		if (int_status & MACREG_A2HRIC_ACNT_HEAD_RDY)
+			ieee80211_queue_work(hw, &priv->account_handle);
 
 		if (int_status & MACREG_A2HRIC_RX_DONE_HEAD_RDY) {
 			if (!pcie_priv->is_rx_schedule) {
@@ -924,6 +925,131 @@ static void pcie_set_sta_id(struct ieee80211_hw *hw,
 	pcie_priv->sta_link[stnid] = set ? sta : NULL;
 }
 
+static void pcie_account_rx_status(struct mwl_priv *priv,
+				   struct acnt_rx_s *acnt_rx,
+				   struct mwl_sta *sta_info)
+{
+	struct ieee80211_rx_status *status = &sta_info->rx_status;
+	u32 sig1, sig2, rate, param;
+	u16 format, nss, bw, gi, rate_mcs;
+
+	sig1 = (le32_to_cpu(acnt_rx->rx_info.ht_sig1) >>
+		RXINFO_HT_SIG1_SHIFT) & RXINFO_HT_SIG1_MASK;
+	sig2 = (le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate) >>
+		RXINFO_HT_SIG2_SHIFT) & RXINFO_HT_SIG2_MASK;
+	rate = (le32_to_cpu(acnt_rx->rx_info.ht_sig2_rate) >>
+		RXINFO_RATE_SHIFT) & RXINFO_RATE_MASK;
+	param = (le32_to_cpu(acnt_rx->rx_info.param) >>
+		RXINFO_PARAM_SHIFT) & RXINFO_PARAM_MASK;
+
+	format = (param >> 3) & 0x7;
+	nss = 0;
+	bw = RX_RATE_INFO_HT20;
+	switch (format) {
+	case RX_RATE_INFO_FORMAT_11A:
+		rate_mcs = rate & 0xF;
+		if (rate_mcs == 10)
+			rate_mcs = 7; /* 12 Mbps */
+		else
+			rate_mcs = utils_get_rate_id(rate_mcs);
+		gi = RX_RATE_INFO_SHORT_INTERVAL;
+		if ((rate_mcs == 5) || (rate_mcs == 7) || (rate_mcs == 9))
+			return;
+		break;
+	case RX_RATE_INFO_FORMAT_11B:
+		rate_mcs = utils_get_rate_id(rate & 0xF);
+		gi = RX_RATE_INFO_LONG_INTERVAL;
+		if ((rate_mcs == 0) || (rate_mcs == 1))
+			return;
+		break;
+	case RX_RATE_INFO_FORMAT_11N:
+		bw = (sig1 >> 7) & 0x1;
+		gi = (sig2 >> 7) & 0x1;
+		rate_mcs = sig1 & 0x3F;
+		break;
+	case RX_RATE_INFO_FORMAT_11AC:
+		nss = (sig1 >> 10) & 0x3;
+		bw = sig1 & 0x3;
+		gi = sig2 & 0x1;
+		rate_mcs = (sig2 >> 4) & 0xF;
+		break;
+	default:
+		return;
+	}
+
+	memset(status, 0, sizeof(*status));
+	status->signal = -((le32_to_cpu(acnt_rx->rx_info.rssi_x) >>
+		RXINFO_RSSI_X_SHIFT) & RXINFO_RSSI_X_MASK);
+
+	pcie_rx_prepare_status(priv, format, nss, bw, gi, rate_mcs, status);
+}
+
+static void pcie_process_account(struct ieee80211_hw *hw)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct pcie_desc_data_ndp *desc = &pcie_priv->desc_data_ndp;
+	u32 acnt_head, acnt_tail;
+	u32 read_size;
+	u8 *acnt_recds;
+	u8 *pstart, *pend;
+	struct acnt_s *acnt;
+	struct acnt_tx_s *acnt_tx;
+	struct acnt_rx_s *acnt_rx;
+	struct pcie_dma_data *dma_data;
+	struct mwl_sta *sta_info;
+
+	acnt_head = readl(pcie_priv->iobase1 + MACREG_REG_ACNTHEAD);
+	acnt_tail = readl(pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
+
+	if (acnt_tail == acnt_head)
+		return;
+
+	if (acnt_tail > acnt_head) {
+		memset(desc->pacnt_buf, 0, desc->acnt_ring_size);
+		read_size = desc->acnt_ring_size - acnt_tail + acnt_head;
+		memcpy(desc->pacnt_buf, desc->pacnt_ring + acnt_tail,
+		       desc->acnt_ring_size - acnt_tail);
+		memcpy(desc->pacnt_buf + desc->acnt_ring_size - acnt_tail,
+		       desc->pacnt_ring, acnt_head);
+		acnt_recds = desc->pacnt_buf;
+	} else {
+		read_size = acnt_head - acnt_tail;
+		acnt_recds = desc->pacnt_ring + acnt_tail;
+	}
+
+	pstart = acnt_recds;
+	pend = pstart + read_size;
+	while (pstart < pend) {
+		acnt = (struct acnt_s *)pstart;
+
+		switch (le16_to_cpu(acnt->code)) {
+		case ACNT_CODE_TX_ENQUEUE:
+			acnt_tx = (struct acnt_tx_s *)pstart;
+			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
+			if (sta_info)
+				sta_info->tx_rate_info =
+					le32_to_cpu(acnt_tx->tx_info.rate_info);
+			break;
+		case ACNT_CODE_RX_PPDU:
+			acnt_rx = (struct acnt_rx_s *)pstart;
+			dma_data = (struct pcie_dma_data *)
+				&acnt_rx->rx_info.hdr[0];
+			sta_info = utils_find_sta(priv, dma_data->wh.addr2);
+			if (sta_info)
+				pcie_account_rx_status(priv, acnt_rx, sta_info);
+			break;
+		default:
+			break;
+		}
+
+		pstart += acnt->len * 4;
+	}
+
+	acnt_tail = acnt_head;
+	writel(acnt_tail, pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
+}
+
 static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
@@ -950,6 +1076,7 @@ static const struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.get_survey            = pcie_get_survey,
 	.reg_access            = pcie_reg_access,
 	.set_sta_id            = pcie_set_sta_id,
+	.process_account       = pcie_process_account,
 };
 
 static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)

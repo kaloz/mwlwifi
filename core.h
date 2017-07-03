@@ -214,7 +214,7 @@ struct mwl_priv {
 	u32 ap_macids_supported;
 	u32 sta_macids_supported;
 	u32 macids_used;
-	u32 running_bsses;           /* bitmap of running BSSes      */
+	u32 running_bsses;           /* bitmap of running BSSes             */
 
 	struct {
 		spinlock_t vif_lock;         /* for private interface info  */
@@ -247,6 +247,8 @@ struct mwl_priv {
 	bool radio_short_preamble;
 	bool wmm_enabled;
 	struct ieee80211_tx_queue_params wmm_params[SYSADPT_TX_WMM_QUEUES];
+
+	struct work_struct account_handle;
 
 	bool csa_active;
 	struct work_struct chnl_switch_handle;
@@ -347,6 +349,8 @@ struct mwl_sta {
 		spinlock_t amsdu_lock;   /* for amsdu */
 		struct mwl_amsdu_ctrl amsdu_ctrl;
 	} ____cacheline_aligned_in_smp;
+	u32 tx_rate_info;
+	struct ieee80211_rx_status rx_status;
 	u16 iv16;
 	u32 iv32;
 };

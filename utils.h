@@ -113,7 +113,11 @@ static inline void utils_free_stnid(struct mwl_priv *priv, u16 stnid)
 
 int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);
 
+u8 utils_get_rate_id(u8 rate);
+
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);
+
+struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr);
 
 void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
 

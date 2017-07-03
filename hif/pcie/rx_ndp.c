@@ -255,7 +255,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	}
 
 	status = IEEE80211_SKB_RXCB(skb);
-	memset(status, 0, sizeof(*status));
+	memcpy(status, &sta_info->rx_status, sizeof(*status));
 	status->band = priv->hw->conf.chandef.chan->band;
 	status->freq = ieee80211_channel_to_frequency(
 		priv->hw->conf.chandef.chan->hw_value, status->band);

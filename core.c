@@ -534,34 +534,6 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	}
 }
 
-static void mwl_chnl_switch_event(struct work_struct *work)
-{
-	struct mwl_priv *priv =
-		container_of(work, struct mwl_priv, chnl_switch_handle);
-	struct mwl_vif *mwl_vif;
-	struct ieee80211_vif *vif;
-
-	if (!priv->csa_active) {
-		wiphy_err(priv->hw->wiphy,
-			  "csa is not active (got channel switch event)\n");
-		return;
-	}
-
-	spin_lock_bh(&priv->vif_lock);
-	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
-		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
-				   drv_priv);
-
-		if (vif->csa_active)
-			ieee80211_csa_finish(vif);
-	}
-	spin_unlock_bh(&priv->vif_lock);
-
-	wiphy_info(priv->hw->wiphy, "channel switch is done\n");
-
-	priv->csa_active = false;
-}
-
 static void mwl_watchdog_ba_events(struct work_struct *work)
 {
 	int rc;
@@ -609,6 +581,42 @@ static void mwl_watchdog_ba_events(struct work_struct *work)
 	}
 
 	spin_unlock_bh(&priv->stream_lock);
+}
+
+static void mwl_account_handle(struct work_struct *work)
+{
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, account_handle);
+
+	mwl_hif_process_account(priv->hw);
+}
+
+static void mwl_chnl_switch_event(struct work_struct *work)
+{
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, chnl_switch_handle);
+	struct mwl_vif *mwl_vif;
+	struct ieee80211_vif *vif;
+
+	if (!priv->csa_active) {
+		wiphy_err(priv->hw->wiphy,
+			  "csa is not active (got channel switch event)\n");
+		return;
+	}
+
+	spin_lock_bh(&priv->vif_lock);
+	list_for_each_entry(mwl_vif, &priv->vif_list, list) {
+		vif = container_of((void *)mwl_vif, struct ieee80211_vif,
+				   drv_priv);
+
+		if (vif->csa_active)
+			ieee80211_csa_finish(vif);
+	}
+	spin_unlock_bh(&priv->vif_lock);
+
+	wiphy_info(priv->hw->wiphy, "channel switch is done\n");
+
+	priv->csa_active = false;
 }
 
 static irqreturn_t mwl_isr(int irq, void *dev_id)
@@ -678,6 +686,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	/* Handle watchdog ba events */
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
+	INIT_WORK(&priv->account_handle, mwl_account_handle);
 	INIT_WORK(&priv->chnl_switch_handle, mwl_chnl_switch_event);
 
 	mutex_init(&priv->fwcmd_mutex);

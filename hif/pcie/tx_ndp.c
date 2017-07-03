@@ -38,18 +38,19 @@
 #define MGMT_TXQNUM             ((PROBE_RESPONSE_TXQNUM + 1))
 #define TXDONE_THRESHOLD        4
 
+#define TX_CTRL_TYPE_DATA       BIT(0)
+#define TX_CTRL_EAPOL           BIT(1)
+#define TX_CTRL_TCP_ACK         BIT(2)
+
 /* Transmission information to transmit a socket buffer.
- * Note: Must make sure this data structure is less than 48 bytes which
- *       is the size of control buffer of socket buffer.
  */
 struct pcie_tx_ctrl_ndp {
 	u16 tx_que_priority;
-	u16 hdrlen;
+	u8 hdrlen;
+	u8 flags;
+	u32 rate;
 	u32 tcp_dst_src;
 	u32 tcp_sn;
-	u8 tcp_ack;
-	u8 type;
-	u8 eapol;
 } __packed;
 
 static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
@@ -231,7 +232,28 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
 	pnext_tx_desc = &desc->ptx_ring[tx_send_head_new];
 
-	if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
+	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
+		wh = (struct ieee80211_hdr *)tx_skb->data;
+
+		skb_pull(tx_skb, tx_ctrl->hdrlen);
+		ether_addr_copy(pnext_tx_desc->u.sa,
+				ieee80211_get_SA(wh));
+		ether_addr_copy(pnext_tx_desc->u.da,
+				ieee80211_get_DA(wh));
+
+		if (tx_ctrl->flags & TX_CTRL_EAPOL)
+			ctrl = TXRING_CTRL_TAG_EAP << TXRING_CTRL_TAG_SHIFT;
+		if (tx_ctrl->flags & TX_CTRL_TCP_ACK) {
+			pnext_tx_desc->tcp_dst_src =
+				cpu_to_le32(tx_ctrl->tcp_dst_src);
+			pnext_tx_desc->tcp_sn = cpu_to_le32(tx_ctrl->tcp_sn);
+			ctrl = TXRING_CTRL_TAG_TCP_ACK << TXRING_CTRL_TAG_SHIFT;
+		}
+		ctrl |= (((tx_ctrl->tx_que_priority & TXRING_CTRL_QID_MASK) <<
+			TXRING_CTRL_QID_SHIFT) |
+			((tx_skb->len & TXRING_CTRL_LEN_MASK) <<
+			TXRING_CTRL_LEN_SHIFT));
+	} else {
 		/* Assigning rate code; use legacy 6mbps rate. */
 		pnext_tx_desc->u.rate_code = cpu_to_le16(RATECODE_TYPE_LEGACY +
 			(0 << RATECODE_MCS_SHIFT) + RATECODE_BW_20MHZ);
@@ -242,27 +264,6 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 			(((tx_skb->len - sizeof(struct pcie_dma_data)) &
 			TXRING_CTRL_LEN_MASK) << TXRING_CTRL_LEN_SHIFT) |
 			(TXRING_CTRL_TAG_MGMT << TXRING_CTRL_TAG_SHIFT));
-	} else {
-		wh = (struct ieee80211_hdr *)tx_skb->data;
-
-		skb_pull(tx_skb, tx_ctrl->hdrlen);
-		ether_addr_copy(pnext_tx_desc->u.sa,
-				ieee80211_get_SA(wh));
-		ether_addr_copy(pnext_tx_desc->u.da,
-				ieee80211_get_DA(wh));
-
-		if (tx_ctrl->eapol)
-			ctrl = TXRING_CTRL_TAG_EAP << TXRING_CTRL_TAG_SHIFT;
-		if (tx_ctrl->tcp_ack) {
-			pnext_tx_desc->tcp_dst_src =
-				cpu_to_le32(tx_ctrl->tcp_dst_src);
-			pnext_tx_desc->tcp_sn = cpu_to_le32(tx_ctrl->tcp_sn);
-			ctrl = TXRING_CTRL_TAG_TCP_ACK << TXRING_CTRL_TAG_SHIFT;
-		}
-		ctrl |= (((tx_ctrl->tx_que_priority & TXRING_CTRL_QID_MASK) <<
-			TXRING_CTRL_QID_SHIFT) |
-			((tx_skb->len & TXRING_CTRL_LEN_MASK) <<
-			TXRING_CTRL_LEN_SHIFT));
 	}
 
 	dma = pci_map_single(pcie_priv->pdev, tx_skb->data,
@@ -279,11 +280,11 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	pnext_tx_desc->ctrl = cpu_to_le32(ctrl);
 	pnext_tx_desc->user = cpu_to_le32(pcie_tx_set_skb(priv, tx_skb, dma));
 
-	if (tx_ctrl->type == IEEE_TYPE_DATA) {
+	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
 		skb_push(tx_skb, tx_ctrl->hdrlen);
 		skb_get(tx_skb);
-		pcie_tx_prepare_info(priv, 0, tx_info);
-		tx_ctrl->type = IEEE_TYPE_DATA;
+		pcie_tx_prepare_info(priv, tx_ctrl->rate, tx_info);
+		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
 		ieee80211_tx_status(priv->hw, tx_skb);
 	}
 
@@ -305,9 +306,7 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 	struct iphdr *iph;
 	struct tcphdr *tcph;
 
-	tx_ctrl->tcp_ack = 0;
-
-	if (tx_ctrl->type == IEEE_TYPE_DATA) {
+	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
 		iph = (struct iphdr *)(tx_skb->data + tx_ctrl->hdrlen + 8);
 		tcph = (struct tcphdr *)((u8 *)iph + (iph->ihl * 4));
 		if ((iph->protocol == IPPROTO_TCP) &&
@@ -317,7 +316,7 @@ static inline void pcie_tx_check_tcp_ack(struct sk_buff *tx_skb,
 				if (tcph->syn || tcph->fin)
 					return;
 
-				tx_ctrl->tcp_ack = 1;
+				tx_ctrl->flags |= TX_CTRL_TCP_ACK;
 				tx_ctrl->tcp_dst_src = ntohs(tcph->source) |
 					(ntohs(tcph->dest) << 16);
 				tx_ctrl->tcp_sn = ntohl(tcph->ack_seq);
@@ -461,7 +460,10 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
 			tx_info->status.status_driver_data;
 
-		if (tx_ctrl->type == IEEE_TYPE_MANAGEMENT) {
+		if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
+			dev_kfree_skb_any(skb);
+			goto bypass_ack;
+		} else {
 			/* Remove H/W dma header */
 			dma_data = (struct pcie_dma_data *)skb->data;
 
@@ -477,9 +479,6 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 			memmove(dma_data->data - hdrlen,
 				&dma_data->wh, hdrlen);
 			skb_pull(skb, sizeof(*dma_data) - hdrlen);
-		} else {
-			dev_kfree_skb_any(skb);
-			goto bypass_ack;
 		}
 
 		pcie_tx_prepare_info(priv, 0, tx_info);
@@ -525,7 +524,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
 	index = skb_get_queue_mapping(skb);
 	sta = control->sta;
-	sta_info = mwl_dev_get_sta(sta);
+	sta_info = sta ? mwl_dev_get_sta(sta) : NULL;
 
 	wh = (struct ieee80211_hdr *)skb->data;
 
@@ -626,8 +625,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 		if (is_multicast_ether_addr(ieee80211_get_DA(wh))
 		    && (mwl_vif->macid != SYSADPT_NUM_OF_AP)) {
-				tx_que_priority = mwl_vif->macid *
-					SYSADPT_MAX_TID;
+			tx_que_priority = mwl_vif->macid * SYSADPT_MAX_TID;
 		} else {
 			if (sta) {
 				if (!eapol_frame)
@@ -648,10 +646,14 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
 
 	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
-	tx_ctrl->type = mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA;
-	tx_ctrl->eapol = eapol_frame ? 1 : 0;
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
+	tx_ctrl->flags = 0;
+	if (!mgmtframe)
+		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
+	if (eapol_frame)
+		tx_ctrl->flags |= TX_CTRL_EAPOL;
+	tx_ctrl->rate = sta ? sta_info->tx_rate_info : 0;
 	pcie_tx_check_tcp_ack(skb, tx_ctrl);
 
 	if (skb_queue_len(&pcie_priv->txq[index]) > pcie_priv->txq_limit)
