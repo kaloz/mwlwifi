@@ -42,8 +42,10 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     Note: After hostapd package 2016-06-15, this commit is already included.
 
 * In order to let STA mode to support 160 MHz operation, mac80211 package should be 2016-10-08 or later.
+
 * WiFi device does not use HT rates when using TKIP as the encryption cipher.
   If you want to have good performance, please use AES only.
+
 * DTS parameters for mwlwifi driver (pcie@X,0):
 
     marvell,2ghz = <0>; => Disable 2g band.
@@ -57,11 +59,11 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     root@lede:/# cat /sys/kernel/debug/ieee80211/phy0/mwlwifi/info
 
     power table loaded from dts: no
-  
+
     => If it is "no", it does not allow you to load external power table (for new device).
 
     => If it is "yes", you must provide power table in DTS file (for old device).
-  
+
 * The way to change interrupt to different CPU cores:
 
     root@lede:/# echo 1 > /proc/irq/irq number of phy0 or phy1/smp_affinity => use CPU0
@@ -79,9 +81,28 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.2.0-20170110.tar.xz
 
     b. Back up original mwlwifi package and tar your working mwlwifi to replace oringial mwlwifi package:
-    
+
     #tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
-    
+
     c. You can use "make V=s" to build the whole image or "make V=s package/kernel/mwlwifi/compile" to build mwlwifi package.
-    
+
     d. Due to package version is the same as previous one, you need to add option "--force-reinstall" when you use "opkg" to update mwlwifi package on your device.
+
+* Note for DFS of WRT3200ACM (88W8964):
+
+    All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will based on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
+
+    There are two ways to resolve this problem:
+
+    a. Please don't change country code and let mwlwifi set it for you.
+
+    b. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted.
+
+    opkg remove kmod-mwifiex-sdio
+
+    opkg remove mwifiex-sdio-firmware
+
+    reboot
+
+    The better way is let mwlwifi set country code for you.
+
