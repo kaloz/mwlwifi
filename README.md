@@ -84,13 +84,13 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     #tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
 
-    c. You can use "make V=s" to build the whole image or "make V=s package/kernel/mwlwifi/compile" to build mwlwifi package.
+    c. You can use "make V=s" to build the whole image or "make V=s package/kernel/mwlwifi/compile" to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
 
     d. Due to package version is the same as previous one, you need to add option "--force-reinstall" when you use "opkg" to update mwlwifi package on your device.
 
 * Note for DFS of WRT3200ACM (88W8964):
 
-    All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will based on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
+    All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
 
     There are two ways to resolve this problem:
 
