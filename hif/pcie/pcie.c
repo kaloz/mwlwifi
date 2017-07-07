@@ -998,6 +998,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 	struct acnt_rx_s *acnt_rx;
 	struct pcie_dma_data *dma_data;
 	struct mwl_sta *sta_info;
+	u16 nf_a, nf_b, nf_c, nf_d;
 
 	acnt_head = readl(pcie_priv->iobase1 + MACREG_REG_ACNTHEAD);
 	acnt_tail = readl(pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
@@ -1033,6 +1034,23 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			break;
 		case ACNT_CODE_RX_PPDU:
 			acnt_rx = (struct acnt_rx_s *)pstart;
+			nf_a = (le32_to_cpu(acnt_rx->rx_info.nf_a_b) >>
+				RXINFO_NF_A_SHIFT) & RXINFO_NF_A_MASK;
+			nf_b = (le32_to_cpu(acnt_rx->rx_info.nf_a_b) >>
+				RXINFO_NF_B_SHIFT) & RXINFO_NF_B_MASK;
+			nf_c = (le32_to_cpu(acnt_rx->rx_info.nf_c_d) >>
+				RXINFO_NF_C_SHIFT) & RXINFO_NF_C_MASK;
+			nf_d = (le32_to_cpu(acnt_rx->rx_info.nf_c_d) >>
+				RXINFO_NF_D_SHIFT) & RXINFO_NF_D_MASK;
+			if ((nf_a >= 2048) && (nf_b >= 2048) &&
+			    (nf_c >= 2048) && (nf_d >= 2048)) {
+				nf_a = ((4096 - nf_a) >> 4);
+				nf_b = ((4096 - nf_b) >> 4);
+				nf_c = ((4096 - nf_c) >> 4);
+				nf_d = ((4096 - nf_d) >> 4);
+				priv->noise =
+					-((nf_a + nf_b + nf_c + nf_d) / 4);
+			}
 			dma_data = (struct pcie_dma_data *)
 				&acnt_rx->rx_info.hdr[0];
 			sta_info = utils_find_sta(priv, dma_data->wh.addr2);

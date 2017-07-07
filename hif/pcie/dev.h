@@ -434,6 +434,14 @@ enum { /* Type of Key */
 #define RXINFO_HT_SIG2_MASK     0x3FFFF
 #define RXINFO_RATE_SHIFT       24
 #define RXINFO_RATE_MASK        0xFF
+#define RXINFO_NF_A_SHIFT       12
+#define RXINFO_NF_A_MASK        0xFFF
+#define RXINFO_NF_B_SHIFT       0
+#define RXINFO_NF_B_MASK        0xFFF
+#define RXINFO_NF_C_SHIFT       12
+#define RXINFO_NF_C_MASK        0xFFF
+#define RXINFO_NF_D_SHIFT       0
+#define RXINFO_NF_D_MASK        0xFFF
 #define RXINFO_PARAM_SHIFT      0
 #define RXINFO_PARAM_MASK       0xFFFFFF
 
@@ -443,9 +451,12 @@ struct rx_info { /* HW Rx buffer */
 	__le32 reserved1[2];
 	__le32 ht_sig1;
 	__le32 ht_sig2_rate;
-	__le32 reserved2[14];
+	__le32 reserved2[6];
+	__le32 nf_a_b;
+	__le32 nf_c_d;
+	__le32 reserved3[6];
 	__le32 param;
-	__le32 reserved3[2];
+	__le32 reserved4[2];
 	__le32 hdr[0]; /* Len from HW includes rx_info w/ hdr */
 } __packed;
 
