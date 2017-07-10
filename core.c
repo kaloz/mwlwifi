@@ -724,7 +724,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		for (addr_num = 0; addr_num < SYSADPT_NUM_OF_AP; addr_num++) {
 			mac_addr = &hw->wiphy->addresses[addr_num + 1];
 			ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
-			if (strcmp(wiphy_name(hw->wiphy), "phy0")) {
+			if (!strcmp(wiphy_name(hw->wiphy), "phy0")) {
 				last_nibble++;
 				if (last_nibble == 0x10)
 					last_nibble = 0;
