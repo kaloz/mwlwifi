@@ -643,6 +643,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	int rc;
 	u16 addr_num;
 	struct mac_address *mac_addr;
+	u8 last_nibble;
 
 	hw->extra_tx_headroom = mwl_hif_get_tx_head_room(hw);
 	hw->queues = SYSADPT_TX_WMM_QUEUES;
@@ -712,19 +713,30 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	SET_IEEE80211_PERM_ADDR(hw, priv->hw_data.mac_addr);
 
 	if (priv->chip_type == MWL8964) {
-		addr_num = 8 + SYSADPT_NUM_OF_CLIENT;
+		addr_num = SYSADPT_NUM_OF_AP + SYSADPT_NUM_OF_CLIENT;
 		hw->wiphy->n_addresses = addr_num;
 		hw->wiphy->addresses =
 			kzalloc(addr_num * sizeof(*mac_addr), GFP_KERNEL);
 
-		for (addr_num = 0; addr_num < 8; addr_num++) {
-			mac_addr = &hw->wiphy->addresses[addr_num];
-			ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
-			mac_addr->addr[5] += addr_num;
-		}
-		mac_addr = &hw->wiphy->addresses[addr_num];
+		mac_addr = &hw->wiphy->addresses[0];
 		ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
-		mac_addr->addr[0] |= 0x2;
+		last_nibble = mac_addr->addr[5] & 0x0F;
+		for (addr_num = 0; addr_num < SYSADPT_NUM_OF_AP; addr_num++) {
+			mac_addr = &hw->wiphy->addresses[addr_num + 1];
+			ether_addr_copy(mac_addr->addr, priv->hw_data.mac_addr);
+			if (strcmp(wiphy_name(hw->wiphy), "phy0")) {
+				last_nibble++;
+				if (last_nibble == 0x10)
+					last_nibble = 0;
+			} else {
+				last_nibble--;
+				if (last_nibble == 0xFF)
+					last_nibble = 0x0F;
+			}
+			mac_addr->addr[5] =
+				(mac_addr->addr[5] & 0xF0) | last_nibble;
+			mac_addr->addr[0] |= 0x2;
+		}
 	}
 
 	wiphy_info(hw->wiphy,
