@@ -968,14 +968,20 @@ static void pcie_account_rx_status(struct mwl_priv *priv,
 		bw = (sig1 >> 7) & 0x1;
 		gi = (sig2 >> 7) & 0x1;
 		rate_mcs = sig1 & 0x3F;
+		if (rate_mcs > 76)
+			return;
 		break;
 	case RX_RATE_INFO_FORMAT_11AC:
 		if (((sig2 >> 4) & 0xf) >= 10)
 			return;
 		nss = (sig1 >> 10) & 0x3;
+		if (!nss)
+			return;
 		bw = sig1 & 0x3;
 		gi = sig2 & 0x1;
 		rate_mcs = (sig2 >> 4) & 0xF;
+		if (rate_mcs > 9)
+			return;
 		break;
 	default:
 		return;
