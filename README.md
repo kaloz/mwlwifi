@@ -105,17 +105,3 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     reboot
 
     The better way is let mwlwifi set country code for you.
-
-* BSSID assignment of VAPs for WRT3200ACM (88W8964):
-
-    For WRT3200ACM, it allows 8 VAPs + 1 STA.
-
-    Mwlwifi will base on mac address programmed in device to add addresses to /sys/class/ieee80211/phy0 or phy1/addresses to support BSSID assignment.
-
-    The first 8 will be mac address + 0..7.
-    
-    The last one (9) will be mac address with local admin bit.
-
-    Note: 
-    1. Your device must reserve 8 mac addresses for each interface. (xx:xx:xx:xx:xx:x0 or xx:xx:xx:xx:xx:x8)
-    2. The firmware mask for BSSID will be 0xfd:ff:ff:ff:ff:f0.
