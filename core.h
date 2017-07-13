@@ -350,7 +350,12 @@ struct mwl_sta {
 		struct mwl_amsdu_ctrl amsdu_ctrl;
 	} ____cacheline_aligned_in_smp;
 	u32 tx_rate_info;
-	struct ieee80211_rx_status rx_status;
+	u16 rx_format;
+	u16 rx_nss;
+	u16 rx_bw;
+	u16 rx_gi;
+	u16 rx_rate_mcs;
+	u8 rx_signal;
 	u16 iv16;
 	u32 iv32;
 };

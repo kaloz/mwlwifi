@@ -925,11 +925,10 @@ static void pcie_set_sta_id(struct ieee80211_hw *hw,
 	pcie_priv->sta_link[stnid] = set ? sta : NULL;
 }
 
-static void pcie_account_rx_status(struct mwl_priv *priv,
-				   struct acnt_rx_s *acnt_rx,
-				   struct mwl_sta *sta_info)
+static void pcie_rx_account(struct mwl_priv *priv,
+			    struct mwl_sta *sta_info,
+			    struct acnt_rx_s *acnt_rx)
 {
-	struct ieee80211_rx_status *status = &sta_info->rx_status;
 	u32 sig1, sig2, rate, param;
 	u16 format, nss, bw, gi, rate_mcs;
 
@@ -987,11 +986,13 @@ static void pcie_account_rx_status(struct mwl_priv *priv,
 		return;
 	}
 
-	memset(status, 0, sizeof(*status));
-	status->signal = -((le32_to_cpu(acnt_rx->rx_info.rssi_x) >>
+	sta_info->rx_format = format;
+	sta_info->rx_nss = nss;
+	sta_info->rx_bw = bw;
+	sta_info->rx_gi = gi;
+	sta_info->rx_rate_mcs = rate_mcs;
+	sta_info->rx_signal = ((le32_to_cpu(acnt_rx->rx_info.rssi_x) >>
 		RXINFO_RSSI_X_SHIFT) & RXINFO_RSSI_X_MASK);
-
-	pcie_rx_prepare_status(priv, format, nss, bw, gi, rate_mcs, status);
 }
 
 static void pcie_process_account(struct ieee80211_hw *hw)
@@ -1038,9 +1039,12 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 		case ACNT_CODE_TX_ENQUEUE:
 			acnt_tx = (struct acnt_tx_s *)pstart;
 			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
-			if (sta_info)
+			if (sta_info) {
+				spin_lock_bh(&priv->sta_lock);
 				sta_info->tx_rate_info =
 					le32_to_cpu(acnt_tx->tx_info.rate_info);
+				spin_unlock_bh(&priv->sta_lock);
+			}
 			break;
 		case ACNT_CODE_RX_PPDU:
 			acnt_rx = (struct acnt_rx_s *)pstart;
@@ -1064,8 +1068,11 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			dma_data = (struct pcie_dma_data *)
 				&acnt_rx->rx_info.hdr[0];
 			sta_info = utils_find_sta(priv, dma_data->wh.addr2);
-			if (sta_info)
-				pcie_account_rx_status(priv, acnt_rx, sta_info);
+			if (sta_info) {
+				spin_lock_bh(&priv->sta_lock);
+				pcie_rx_account(priv, sta_info, acnt_rx);
+				spin_unlock_bh(&priv->sta_lock);
+			}
 			break;
 		default:
 			break;

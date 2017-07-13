@@ -196,6 +196,24 @@ static inline void pcie_rx_update_ndp_cnts(struct mwl_priv *priv, u32 ctrl)
 	}
 }
 
+static void pcie_rx_status_ndp(struct mwl_priv *priv,
+			       struct mwl_sta *sta_info,
+			       struct ieee80211_rx_status *status)
+{
+	memset(status, 0, sizeof(*status));
+	pcie_rx_prepare_status(priv,
+			       sta_info->rx_format,
+			       sta_info->rx_nss,
+			       sta_info->rx_bw,
+			       sta_info->rx_gi,
+			       sta_info->rx_rate_mcs,
+			       status);
+	status->signal = -sta_info->rx_signal;
+	status->band = priv->hw->conf.chandef.chan->band;
+	status->freq = ieee80211_channel_to_frequency(
+		priv->hw->conf.chandef.chan->hw_value, status->band);
+}
+
 static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 					     struct sk_buff *skb,
 					     u16 stnid)
@@ -255,18 +273,13 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	}
 
 	status = IEEE80211_SKB_RXCB(skb);
-	memcpy(status, &sta_info->rx_status, sizeof(*status));
-	status->band = priv->hw->conf.chandef.chan->band;
-	status->freq = ieee80211_channel_to_frequency(
-		priv->hw->conf.chandef.chan->hw_value, status->band);
-
+	pcie_rx_status_ndp(priv, sta_info, status);
 	if (mwl_vif->is_hw_crypto_enabled) {
 		fc |= cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 		status->flag |= RX_FLAG_IV_STRIPPED |
 				RX_FLAG_DECRYPTED |
 				RX_FLAG_MMIC_STRIPPED;
 	}
-	/* TODO: prepare receive status information */
 
 	hdr.frame_control = fc;
 	hdr.duration_id = 0;
@@ -309,7 +322,6 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	status->band = priv->hw->conf.chandef.chan->band;
 	status->freq = ieee80211_channel_to_frequency(
 		priv->hw->conf.chandef.chan->hw_value, status->band);
-	/* TODO: prepare receive status information */
 
 	if (bad_mic)
 		status->flag |= RX_FLAG_MMIC_ERROR;
