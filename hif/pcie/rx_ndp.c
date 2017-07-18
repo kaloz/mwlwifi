@@ -242,7 +242,7 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	if (!mwl_vif)
 		goto drop_packet;
 
-	ethertype = (skb->data[12] << 8) | skb->data[13];
+	ethertype = (skb->data[20] << 8) | skb->data[21];
 	fc = cpu_to_le16(IEEE80211_FTYPE_DATA | IEEE80211_STYPE_DATA);
 
 	memset(&hdr, 0, sizeof(hdr));
