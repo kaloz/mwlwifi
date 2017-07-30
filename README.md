@@ -7,7 +7,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     a. Modify package/kernel/mwlwifi/Makefile:
 
-    PKG_VERSION:=10.3.0.17-20160601 & PKG_SOURCE_VERSION:=4bb95ba1aeccce506a95499b49b9b844ecfae8a1
+    PKG_VERSION:=10.3.4.0-20170727 & PKG_SOURCE_VERSION:=3ca0ea1c201bab59c9d4c3941584e34a7acf0325
 
     b. Rename package/kernel/mwlwifi/patches to package/kernel/mwlwifi/patches.tmp
 
