@@ -15,6 +15,8 @@
 
 /* Description:  This file implements core layer related functions. */
 
+#include <linux/etherdevice.h>
+
 #include "sysadpt.h"
 #include "core.h"
 #include "thermal.h"
