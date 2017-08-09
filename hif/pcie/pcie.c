@@ -1018,8 +1018,14 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 		return;
 
 	if (acnt_tail > acnt_head) {
-		memset(desc->pacnt_buf, 0, desc->acnt_ring_size);
 		read_size = desc->acnt_ring_size - acnt_tail + acnt_head;
+		if (read_size > desc->acnt_ring_size) {
+			wiphy_err(hw->wiphy,
+				  "account size overflow (%d %d %d)\n",
+				  acnt_head, acnt_tail, read_size);
+			goto process_next;
+		}
+		memset(desc->pacnt_buf, 0, desc->acnt_ring_size);
 		memcpy(desc->pacnt_buf, desc->pacnt_ring + acnt_tail,
 		       desc->acnt_ring_size - acnt_tail);
 		memcpy(desc->pacnt_buf + desc->acnt_ring_size - acnt_tail,
@@ -1027,6 +1033,12 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 		acnt_recds = desc->pacnt_buf;
 	} else {
 		read_size = acnt_head - acnt_tail;
+		if (read_size > desc->acnt_ring_size) {
+			wiphy_err(hw->wiphy,
+				  "account size overflow (%d %d %d)\n",
+				  acnt_head, acnt_tail, read_size);
+			goto process_next;
+		}
 		acnt_recds = desc->pacnt_ring + acnt_tail;
 	}
 
@@ -1078,9 +1090,12 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			break;
 		}
 
-		pstart += acnt->len * 4;
+		if (!acnt->len)
+			pstart += acnt->len * 4;
+		else
+			goto process_next;
 	}
-
+process_next:
 	acnt_tail = acnt_head;
 	writel(acnt_tail, pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
 }
