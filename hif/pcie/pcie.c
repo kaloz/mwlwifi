@@ -1090,7 +1090,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			break;
 		}
 
-		if (!acnt->len)
+		if (acnt->len)
 			pstart += acnt->len * 4;
 		else
 			goto process_next;
