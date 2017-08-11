@@ -75,4 +75,6 @@
 
 #define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
 
+#define SYSADPT_OTP_BUF_SIZE           (256*8) /* 258 lines * 8 bytes */
+
 #endif /* _SYSADPT_H_ */

@@ -54,7 +54,8 @@ static const struct file_operations mwl_debugfs_##name##_fops = { \
 static const char chipname[MWLUNKNOWN][8] = {
 	"88W8864",
 	"88W8897",
-	"88W8964"
+	"88W8964",
+	"88W8997"
 };
 
 static void dump_data(char *p, int size, int *len, u8 *data,

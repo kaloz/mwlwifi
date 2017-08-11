@@ -145,7 +145,7 @@ struct pcie_tx_desc {
 	u8 packet_id;
 	__le16 packet_len_and_retry;
 	__le16 packet_rate_info;
-	__le32 reserved4;
+	__le32 flags;
 	__le32 status;
 } __packed;
 
@@ -513,48 +513,6 @@ struct ndp_rx_counter {
 	u32 mu_pkt_cnt;
 };
 
-struct pcie_priv {
-	struct mwl_priv *mwl_priv;
-	struct pci_dev *pdev;
-	void __iomem *iobase0; /* MEM Base Address Register 0  */
-	void __iomem *iobase1; /* MEM Base Address Register 1  */
-	u32 next_bar_num;
-
-	struct sk_buff_head txq[PCIE_NUM_OF_DESC_DATA];
-
-	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
-	struct tasklet_struct tx_task;
-	struct tasklet_struct tx_done_task;
-	struct tasklet_struct rx_task;
-	struct tasklet_struct qe_task;
-	int txq_limit;
-	int txq_wake_threshold;
-	bool is_tx_schedule;
-	bool is_tx_done_schedule;
-	int recv_limit;
-	bool is_rx_schedule;
-	bool is_qe_schedule;
-	u32 qe_trig_num;
-	unsigned long qe_trig_time;
-
-	/* various descriptor data */
-	/* for tx descriptor data  */
-	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
-	struct pcie_desc_data desc_data[PCIE_NUM_OF_DESC_DATA];
-	struct sk_buff_head delay_q;
-	/* number of descriptors owned by fw at any one time */
-	int fw_desc_cnt[PCIE_NUM_OF_DESC_DATA];
-
-	/* new data path */
-	struct pcie_desc_data_ndp desc_data_ndp;
-	int tx_done_cnt;
-	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
-	struct sk_buff_head rx_skb_trace;
-	struct ndp_rx_counter rx_cnts;
-	u32 rx_skb_unlink_err;
-	u32 signature_err;
-};
-
 enum { /* Definition of accounting record codes */
 	ACNT_CODE_BUSY = 0,   /* Marked busy until filled in                  */
 	ACNT_CODE_WRAP,       /* Used to pad when wrapping (no TSF sometimes) */
@@ -610,15 +568,136 @@ struct acnt_rx_s { /* Accounting Record for Rx PPDU */
 	struct rx_info rx_info;/* Receive parameters from 1st valid MPDU/AMPDU*/
 } __packed;
 
+/* KF2 - 88W8997 */
+#define PCIE_MAX_TXRX_BD                0x20
+/* PCIE read data pointer for queue 0 and 1 */
+#define PCIE_RD_DATA_PTR_Q0_Q1          0xC1A4  /* 0x8000C1A4          */
+/* PCIE read data pointer for queue 2 and 3 */
+#define PCIE_RD_DATA_PTR_Q2_Q3          0xC1A8  /* 0x8000C1A8          */
+/* PCIE write data pointer for queue 0 and 1 */
+#define PCIE_WR_DATA_PTR_Q0_Q1          0xC174  /* 0x8000C174          */
+/* PCIE write data pointer for queue 2 and 3 */
+#define PCIE_WR_DATA_PTR_Q2_Q3          0xC178  /* 0x8000C178          */
+
+/* TX buffer description read pointer */
+#define REG_TXBD_RDPTR                  PCIE_RD_DATA_PTR_Q0_Q1
+/* TX buffer description write pointer */
+#define REG_TXBD_WRPTR                  PCIE_WR_DATA_PTR_Q0_Q1
+
+#define PCIE_TX_START_PTR               16
+
+#define PCIE_TXBD_MASK                  0x0FFF0000
+#define PCIE_TXBD_WRAP_MASK             0x1FFF0000
+
+#define PCIE_BD_FLAG_RX_ROLLOVER_IND    BIT(12)
+#define PCIE_BD_FLAG_TX_START_PTR       BIT(16)
+#define PCIE_BD_FLAG_TX_ROLLOVER_IND    BIT(28)
+#define PCIE_BD_FLAG_TX2_START_PTR      BIT(0)
+#define PCIE_BD_FLAG_TX2_ROLLOVER_IND   BIT(12)
+
+#define PCIE_BD_FLAG_FIRST_DESC         BIT(0)
+#define PCIE_BD_FLAG_LAST_DESC          BIT(1)
+
+#define PCIE_TX_WCB_FLAGS_DONT_ENCRYPT  0x00000001
+#define PCIE_TX_WCB_FLAGS_NO_CCK_RATE   0x00000002
+
+#define PCIE_TXBD_NOT_FULL(wrptr, rdptr) \
+	(((wrptr & PCIE_TXBD_MASK) != (rdptr & PCIE_TXBD_MASK)) \
+	 || ((wrptr & PCIE_BD_FLAG_TX_ROLLOVER_IND) ==          \
+	     (rdptr & PCIE_BD_FLAG_TX_ROLLOVER_IND)))
+
+struct pcie_data_buf {
+	/* Buffer descriptor flags */
+	__le16 flags;
+	/* Offset of fragment/pkt to start of ip header */
+	__le16 offset;
+	/* Fragment length of the buffer */
+	__le16 frag_len;
+	/* Length of the buffer */
+	__le16 len;
+	/* Physical address of the buffer */
+	__le64 paddr;
+	/* Reserved */
+	__le32 reserved;
+} __packed;
+
+struct pcie_pfu_dma_data {
+	struct pcie_tx_desc tx_desc;
+	struct pcie_dma_data dma_data;
+} __packed;
+
+struct pcie_priv {
+	struct mwl_priv *mwl_priv;
+	struct pci_dev *pdev;
+	void __iomem *iobase0; /* MEM Base Address Register 0  */
+	void __iomem *iobase1; /* MEM Base Address Register 1  */
+	u32 next_bar_num;
+
+	struct sk_buff_head txq[PCIE_NUM_OF_DESC_DATA];
+
+	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
+	struct tasklet_struct tx_task;
+	struct tasklet_struct tx_done_task;
+	struct tasklet_struct rx_task;
+	struct tasklet_struct qe_task;
+	int txq_limit;
+	int txq_wake_threshold;
+	bool is_tx_schedule;
+	bool is_tx_done_schedule;
+	int recv_limit;
+	bool is_rx_schedule;
+	bool is_qe_schedule;
+	u32 qe_trig_num;
+	unsigned long qe_trig_time;
+
+	/* various descriptor data */
+	/* for tx descriptor data  */
+	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
+	struct pcie_desc_data desc_data[PCIE_NUM_OF_DESC_DATA];
+	struct sk_buff_head delay_q;
+	/* number of descriptors owned by fw at any one time */
+	int fw_desc_cnt[PCIE_NUM_OF_DESC_DATA];
+
+	/* new data path */
+	struct pcie_desc_data_ndp desc_data_ndp;
+	int tx_done_cnt;
+	struct ieee80211_sta *sta_link[SYSADPT_MAX_STA_SC4 + 1];
+	struct sk_buff_head rx_skb_trace;
+	struct ndp_rx_counter rx_cnts;
+	u32 rx_skb_unlink_err;
+	u32 signature_err;
+
+	/* KF2 - 88W8997 */
+	struct firmware *cal_data;
+	/* Write pointer for TXBD ring */
+	u32 txbd_wrptr;
+	/* Shadow copy of TXBD read pointer */
+	u32 txbd_rdptr;
+	/* TXBD ring size */
+	u32 txbd_ring_size;
+	/* Virtual base address of txbd_ring */
+	u8 *txbd_ring_vbase;
+	/* Physical base address of txbd_ring */
+	dma_addr_t txbd_ring_pbase;
+	/* Ring of buffer descriptors for TX */
+	struct pcie_data_buf *txbd_ring[PCIE_MAX_TXRX_BD];
+	struct sk_buff *tx_buf_list[PCIE_MAX_TXRX_BD];
+};
+
 static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 					 struct sk_buff *skb,
 					 int head_pad,
 					 int tail_pad)
 {
 	struct ieee80211_hdr *wh;
+	int dma_hdrlen;
 	int hdrlen;
 	int reqd_hdrlen;
 	struct pcie_dma_data *dma_data;
+
+	dma_hdrlen = (priv->chip_type == MWL8997) ?
+		sizeof(struct pcie_pfu_dma_data) :
+		sizeof(struct pcie_dma_data);
 
 	/* Add a firmware DMA header; the firmware requires that we
 	 * present a 2-byte payload length followed by a 4-address
@@ -629,7 +708,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 
 	hdrlen = ieee80211_hdrlen(wh->frame_control);
 
-	reqd_hdrlen = sizeof(*dma_data) + head_pad;
+	reqd_hdrlen = dma_hdrlen + head_pad;
 
 	if (hdrlen != reqd_hdrlen)
 		skb_push(skb, reqd_hdrlen - hdrlen);
@@ -637,7 +716,10 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 	if (ieee80211_is_data_qos(wh->frame_control))
 		hdrlen -= IEEE80211_QOS_CTL_LEN;
 
-	dma_data = (struct pcie_dma_data *)skb->data;
+	if (priv->chip_type == MWL8997)
+		dma_data = &((struct pcie_pfu_dma_data *)skb->data)->dma_data;
+	else
+		dma_data = (struct pcie_dma_data *)skb->data;
 
 	if (wh != &dma_data->wh)
 		memmove(&dma_data->wh, wh, hdrlen);
@@ -651,7 +733,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 	 * This includes all crypto material including the MIC.
 	 */
 	dma_data->fwlen =
-		cpu_to_le16(skb->len - sizeof(*dma_data) + tail_pad);
+		cpu_to_le16(skb->len - dma_hdrlen + tail_pad);
 }
 
 static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,

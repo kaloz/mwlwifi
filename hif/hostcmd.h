@@ -31,6 +31,7 @@
 #define HOSTCMD_CMD_802_11_TX_POWER             0x001f
 #define HOSTCMD_CMD_802_11_RF_ANTENNA           0x0020
 #define HOSTCMD_CMD_BROADCAST_SSID_ENABLE       0x0050 /* per-vif */
+#define HOSTCMD_CMD_SET_CFG                     0x008f
 #define HOSTCMD_CMD_SET_RF_CHANNEL              0x010a
 #define HOSTCMD_CMD_SET_AID                     0x010d /* per-vif */
 #define HOSTCMD_CMD_SET_INFRA_MODE              0x010e /* per-vif */
@@ -42,6 +43,7 @@
 #define HOSTCMD_CMD_SET_FIXED_RATE              0x0126
 #define HOSTCMD_CMD_SET_IES                     0x0127
 #define HOSTCMD_CMD_SET_LINKADAPT_CS_MODE       0x0129
+#define HOSTCMD_CMD_DUMP_OTP_DATA               0x0142
 #define HOSTCMD_CMD_SET_MAC_ADDR                0x0202 /* per-vif */
 #define HOSTCMD_CMD_SET_RATE_ADAPT_MODE         0x0203
 #define HOSTCMD_CMD_GET_WATCHDOG_BITMAP         0x0205
@@ -362,6 +364,19 @@ struct hostcmd_cmd_broadcast_ssid_enable {
 	__le32 enable;
 } __packed;
 
+/* HOSTCMD_CMD_SET_CFG */
+struct hostcmd_cmd_set_cfg {
+	struct hostcmd_header cmd_hdr;
+	/* Action */
+	__le16 action;
+	/* Type */
+	__le16 type;
+	/* Data length */
+	__le16 data_len;
+	/* Data */
+	u8 data[1];
+} __packed;
+
 /* HOSTCMD_CMD_SET_RF_CHANNEL */
 #define FREQ_BAND_MASK     0x0000003f
 #define CHNL_WIDTH_MASK    0x000007c0
@@ -487,6 +502,12 @@ struct hostcmd_cmd_set_linkadapt_cs_mode {
 	struct hostcmd_header cmd_hdr;
 	__le16 action;
 	__le16 cs_mode;
+} __packed;
+
+/* HOSTCMD_CMD_DUMP_OTP_DATA */
+struct hostcmd_cmd_dump_otp_data {
+	struct hostcmd_header cmd_hdr;
+	u8 pload[0];
 } __packed;
 
 /* HOSTCMD_CMD_SET_MAC_ADDR, HOSTCMD_CMD_DEL_MAC_ADDR */

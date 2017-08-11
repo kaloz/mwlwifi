@@ -97,6 +97,8 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna);
 int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif, bool enable);
 
+int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type);
+
 int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf);
 
@@ -123,6 +125,8 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw,
 				    u16 cs_mode);
+
+int mwl_fwcmd_dump_otp_data(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw,
 				  u16 mode);

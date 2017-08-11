@@ -18,6 +18,7 @@
  */
 
 #include <linux/etherdevice.h>
+#include <linux/ctype.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -50,7 +51,8 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_MEM_ADDR_ACCESS, "MEMAddrAccess" },
 		{ HOSTCMD_CMD_802_11_TX_POWER, "80211TxPower" },
 		{ HOSTCMD_CMD_802_11_RF_ANTENNA, "80211RfAntenna" },
-		{ HOSTCMD_CMD_BROADCAST_SSID_ENABLE, "broadcast_ssid_enable" },
+		{ HOSTCMD_CMD_BROADCAST_SSID_ENABLE, "BroadcastSsidEnable" },
+		{ HOSTCMD_CMD_SET_CFG, "SetCfg" },
 		{ HOSTCMD_CMD_SET_RF_CHANNEL, "SetRfChannel" },
 		{ HOSTCMD_CMD_SET_AID, "SetAid" },
 		{ HOSTCMD_CMD_SET_INFRA_MODE, "SetInfraMode" },
@@ -62,6 +64,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_FIXED_RATE, "SetFixedRate" },
 		{ HOSTCMD_CMD_SET_IES, "SetInformationElements" },
 		{ HOSTCMD_CMD_SET_LINKADAPT_CS_MODE, "LinkAdaptCsMode" },
+		{ HOSTCMD_CMD_DUMP_OTP_DATA, "DumpOtpData" },
 		{ HOSTCMD_CMD_SET_MAC_ADDR, "SetMacAddr" },
 		{ HOSTCMD_CMD_SET_RATE_ADAPT_MODE, "SetRateAdaptationMode" },
 		{ HOSTCMD_CMD_GET_WATCHDOG_BITMAP, "GetWatchdogBitMap" },
@@ -806,6 +809,33 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
+static u16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
+{
+	const u8 *ptr;
+	u8 *dptr;
+	long res;
+
+	ptr = src;
+	dptr = dst;
+
+	while (ptr - src < len) {
+		if (*ptr && (isspace(*ptr) || iscntrl(*ptr))) {
+			ptr++;
+			continue;
+		}
+
+		if (isxdigit(*ptr)) {
+			kstrtol(ptr, 16, &res);
+			*dptr++ = res;
+			ptr += 2;
+		} else {
+			ptr++;
+		}
+	}
+
+	return (dptr - dst);
+}
+
 const struct hostcmd_get_hw_spec
 *mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 {
@@ -1315,6 +1345,42 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_set_cfg *pcmd;
+
+	if (!priv->cal_data)
+		return 0;
+
+	pcmd = (struct hostcmd_cmd_set_cfg *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->data_len = mwl_fwcmd_parse_cal_cfg(priv->cal_data->data,
+		priv->cal_data->size, pcmd->data);
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
+		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
+	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
+	pcmd->type = cpu_to_le16(type);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_CFG)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		release_firmware(priv->cal_data);
+		priv->cal_data = NULL;
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	release_firmware(priv->cal_data);
+	priv->cal_data = NULL;
+
+	return 0;
+}
+
 int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf)
 {
@@ -1651,6 +1717,40 @@ int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw, u16 cs_mode)
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_LINKADAPT_CS_MODE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_dump_otp_data(struct ieee80211_hw *hw)
+{
+	int otp_data_len;
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_dump_otp_data *pcmd;
+
+	pcmd = (struct hostcmd_cmd_dump_otp_data *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_DUMP_OTP_DATA);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_DUMP_OTP_DATA)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	otp_data_len = pcmd->cmd_hdr.len - cpu_to_le16(sizeof(*pcmd));
+
+	if (otp_data_len <= SYSADPT_OTP_BUF_SIZE) {
+		wiphy_info(hw->wiphy, "OTP data len = %d\n", otp_data_len);
+		priv->otp_data.len = otp_data_len;
+		memcpy(priv->otp_data.buf, pcmd->pload, otp_data_len);
+	} else {
+		wiphy_err(hw->wiphy, "Driver OTP buf size is less\n");
 	}
 
 	mutex_unlock(&priv->fwcmd_mutex);

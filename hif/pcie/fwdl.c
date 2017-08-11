@@ -169,8 +169,9 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	 */
 	wiphy_debug(hw->wiphy, "fw download start\n");
 
-	/* Disable PFU before FWDL */
-	writel(0x100, pcie_priv->iobase1 + 0xE0E4);
+	if (priv->chip_type != MWL8997)
+		/* Disable PFU before FWDL */
+		writel(0x100, pcie_priv->iobase1 + 0xE0E4);
 
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
 	while (readl(pcie_priv->iobase1 + 0xc40) == 0)
@@ -208,14 +209,6 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 		 * or you can alternatively tweak this routines to fit your
 		 * platform
 		 */
-		do {
-			int_code = readl(pcie_priv->iobase1 + 0xc1c);
-			if (int_code != 0)
-				break;
-			cond_resched();
-			curr_iteration--;
-		} while (curr_iteration);
-
 		do {
 			int_code = readl(pcie_priv->iobase1 + 0xc1c);
 			if ((int_code & MACREG_H2ARIC_BIT_DOOR_BELL) !=
