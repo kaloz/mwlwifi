@@ -597,6 +597,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 
 	if (amsdu->num == 0) {
 		struct sk_buff *newskb;
+		int headroom;
 
 		amsdu_pkts = (struct sk_buff_head *)
 			kmalloc(sizeof(*amsdu_pkts), GFP_ATOMIC);
@@ -611,6 +612,11 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 			kfree(amsdu_pkts);
 			return tx_skb;
 		}
+
+		headroom = skb_headroom(newskb);
+		if (headroom < PCIE_MIN_BYTES_HEADROOM)
+			skb_reserve(newskb,
+				    (PCIE_MIN_BYTES_HEADROOM - headroom));
 
 		data = newskb->data;
 		memcpy(data, tx_skb->data, wh_len);
