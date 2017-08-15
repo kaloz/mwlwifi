@@ -484,6 +484,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info->stnid = stnid;
 	if (vif->type == NL80211_IFTYPE_STATION)
 		sta_info->sta_stnid = sta_stnid;
+	sta_info->tx_rate_info = utils_get_init_tx_rate(priv, &hw->conf, sta);
 	sta_info->iv16 = 1;
 	sta_info->iv32 = 0;
 	spin_lock_init(&sta_info->amsdu_lock);

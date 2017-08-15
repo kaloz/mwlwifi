@@ -167,6 +167,77 @@ u8 utils_get_rate_id(u8 rate)
 	return 0;
 }
 
+u32 utils_get_init_tx_rate(struct mwl_priv *priv, struct ieee80211_conf *conf,
+			   struct ieee80211_sta *sta)
+{
+	u32 tx_rate;
+	u16 format, nss, bw, rate_mcs;
+
+	if (sta->vht_cap.vht_supported)
+		format = TX_RATE_FORMAT_11AC;
+	else if (sta->ht_cap.ht_supported)
+		format = TX_RATE_FORMAT_11N;
+	else
+		format = TX_RATE_FORMAT_LEGACY;
+
+	switch (priv->antenna_tx) {
+	case ANTENNA_TX_1:
+		nss = 1;
+		break;
+	case ANTENNA_TX_2:
+		nss = 2;
+		break;
+	case ANTENNA_TX_3:
+	case ANTENNA_TX_4_AUTO:
+		nss = 3;
+		break;
+	default:
+		nss = sta->rx_nss;
+		break;
+	}
+	if (nss > sta->rx_nss)
+		nss = sta->rx_nss;
+
+	switch (conf->chandef.width) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+	case NL80211_CHAN_WIDTH_20:
+		bw = TX_RATE_BANDWIDTH_20;
+		break;
+	case NL80211_CHAN_WIDTH_40:
+		bw = TX_RATE_BANDWIDTH_40;
+		break;
+	case NL80211_CHAN_WIDTH_80:
+		bw = TX_RATE_BANDWIDTH_80;
+		break;
+	case NL80211_CHAN_WIDTH_160:
+		bw = TX_RATE_BANDWIDTH_160;
+		break;
+	default:
+		bw = sta->bandwidth;
+		break;
+	}
+	if (bw > sta->bandwidth)
+		bw = sta->bandwidth;
+
+	switch (format) {
+	case TX_RATE_FORMAT_LEGACY:
+		rate_mcs = 12; /* ignore 11b */
+		break;
+	case TX_RATE_FORMAT_11N:
+		rate_mcs = (nss * 8) - 1;
+		break;
+	default:
+		rate_mcs = ((nss - 1) << 4) | 8;
+		break;
+	}
+
+	tx_rate = (format | (bw << MWL_TX_RATE_BANDWIDTH_SHIFT) |
+		(TX_RATE_INFO_SHORT_GI << MWL_TX_RATE_SHORTGI_SHIFT) |
+		(rate_mcs << MWL_TX_RATE_RATEIDMCS_SHIFT));
+
+	return tx_rate;
+}
+
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid)
 {
 	struct mwl_vif *mwl_vif;
