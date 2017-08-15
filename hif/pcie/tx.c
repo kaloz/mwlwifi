@@ -769,7 +769,7 @@ static void pcie_pfu_tx_done(struct mwl_priv *priv)
 					dma_data->wh.frame_control);
 				memmove(dma_data->data - hdrlen,
 					&dma_data->wh, hdrlen);
-				skb_pull(done_skb, sizeof(*dma_data) - hdrlen);
+				skb_pull(done_skb, sizeof(*pfu_dma) - hdrlen);
 				ieee80211_tx_status(priv->hw, done_skb);
 			}
 		}
