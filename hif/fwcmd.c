@@ -475,6 +475,18 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_ht_ptr += elen;
 			}
 			break;
+		case WLAN_EID_MESH_CONFIG:
+			beacon_info->ie_meshcfg_len = (elen + 2);
+			beacon_info->ie_meshcfg_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MESH_ID:
+			beacon_info->ie_meshid_len = (elen + 2);
+			beacon_info->ie_meshid_ptr = (pos - 2);
+			break;
+		case WLAN_EID_CHAN_SWITCH_PARAM:
+			beacon_info->ie_meshchsw_len = (elen + 2);
+			beacon_info->ie_meshchsw_ptr = (pos - 2);
+			break;
 		case WLAN_EID_VHT_CAPABILITY:
 		case WLAN_EID_VHT_OPERATION:
 		case WLAN_EID_OPMODE_NOTIF:
@@ -551,6 +563,18 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	memcpy(pcmd->ie_list_vht, beacon->ie_vht_ptr, beacon->ie_vht_len);
 	pcmd->ie_list_len_vht = cpu_to_le16(beacon->ie_vht_len);
+
+	memcpy(pcmd->ie_list_proprietary, beacon->ie_meshid_ptr,
+	       beacon->ie_meshid_len);
+	ie_list_len_proprietary = beacon->ie_meshid_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_meshcfg_ptr, beacon->ie_meshcfg_len);
+	ie_list_len_proprietary += beacon->ie_meshcfg_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_meshchsw_ptr, beacon->ie_meshchsw_len);
+	ie_list_len_proprietary += beacon->ie_meshchsw_len;
 
 	if (priv->chip_type == MWL8897) {
 		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
@@ -2409,8 +2433,13 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
 		action = ENCR_ACTION_TYPE_SET_KEY;
-	else
+	else {
 		action = ENCR_ACTION_TYPE_SET_GROUP_KEY;
+		if (vif->type == NL80211_IFTYPE_MESH_POINT &&
+		    !ether_addr_equal(mwl_vif->bssid, addr))
+			pcmd->key_param.key_info |=
+				cpu_to_le32(ENCR_KEY_FLAG_RXGROUPKEY);
+	}
 
 	switch (key->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:

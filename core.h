@@ -297,6 +297,9 @@ struct beacon_info {
 	u8 *ie_ht_ptr;
 	u8 *ie_vht_ptr;
 	u8 *ie_country_ptr;
+	u8 *ie_meshid_ptr;
+	u8 *ie_meshcfg_ptr;
+	u8 *ie_meshchsw_ptr;
 	u8 ie_wmm_len;
 	u8 ie_wsc_len;
 	u8 ie_rsn_len;
@@ -304,6 +307,9 @@ struct beacon_info {
 	u8 ie_ht_len;
 	u8 ie_vht_len;
 	u8 ie_country_len;
+	u8 ie_meshid_len;
+	u8 ie_meshcfg_len;
+	u8 ie_meshchsw_len;
 };
 
 struct mwl_vif {
