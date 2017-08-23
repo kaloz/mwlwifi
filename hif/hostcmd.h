@@ -391,6 +391,14 @@ struct hostcmd_cmd_set_rf_channel {
 	__le32 chnl_flags;
 } __packed;
 
+struct hostcmd_cmd_set_rf_channel_kf2 {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	u8 curr_chnl;
+	__le32 chnl_flags;
+	u8 remain_on_chan;
+} __packed;
+
 /* HOSTCMD_CMD_SET_AID */
 struct hostcmd_cmd_set_aid {
 	struct hostcmd_header cmd_hdr;

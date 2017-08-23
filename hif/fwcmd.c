@@ -1417,9 +1417,16 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8997) {
+		memset(pcmd, 0x00,
+		       sizeof(struct hostcmd_cmd_set_rf_channel_kf2));
+		pcmd->cmd_hdr.len = cpu_to_le16(
+			sizeof(struct hostcmd_cmd_set_rf_channel_kf2));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_RF_CHANNEL);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->action = cpu_to_le16(WL_SET);
 	pcmd->curr_chnl = channel->hw_value;
 
