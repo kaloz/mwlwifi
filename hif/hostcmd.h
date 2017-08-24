@@ -699,7 +699,7 @@ struct hostcmd_cmd_set_new_stn {
 	u8 mac_addr[ETH_ALEN];
 	__le16 stn_id;
 	__le16 action;
-	__le16 reserved;
+	__le16 if_type;
 	struct peer_info peer_info;
 	/* UAPSD_SUPPORT */
 	u8 qos_info;
