@@ -194,8 +194,9 @@ struct mwl_priv {
 	bool cdd;
 	u16 txantenna2;
 	u8 powinited;
-	u16 max_tx_pow[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* max tx power (dBm) */
-	u16 target_powers[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* target powers   */
+	u8 pwr_level;
+	u16 max_tx_pow[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* max tx power (dBm) */
+	u16 target_powers[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* target powers   */
 
 	struct mutex fwcmd_mutex;    /* for firmware command         */
 	unsigned short *pcmd_buf;    /* pointer to CmdBuf (virtual)  */

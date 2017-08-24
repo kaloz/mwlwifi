@@ -145,6 +145,12 @@
 #define HOSTCMD_ACT_GEN_SET_LIST                0x0002
 #define HOSTCMD_ACT_GEN_GET_LIST                0x0003
 
+/* Define TXPower control action*/
+#define HOSTCMD_ACT_GET_TARGET_TX_PWR           0x0000
+#define HOSTCMD_ACT_GET_MAX_TX_PWR              0x0001
+#define HOSTCMD_ACT_SET_TARGET_TX_PWR           0x0002
+#define HOSTCMD_ACT_SET_MAX_TX_PWR              0x0003
+
 /* Misc */
 #define WSC_IE_MAX_LENGTH                       251
 #define WSC_IE_SET_BEACON                       0
@@ -349,6 +355,16 @@ struct hostcmd_cmd_802_11_tx_power {
 	__le16 bw;
 	__le16 sub_ch;
 	__le16 power_level_list[SYSADPT_TX_POWER_LEVEL_TOTAL];
+} __packed;
+
+struct hostcmd_cmd_802_11_tx_power_kf2 {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 band;
+	__le16 ch;
+	__le16 bw;
+	__le16 sub_ch;
+	__le16 power_level_list[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL];
 } __packed;
 
 /* HOSTCMD_CMD_802_11_RF_ANTENNA */

@@ -268,7 +268,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	priv->dfs_region = request->dfs_region;
 
 #ifdef CONFIG_OF
-	if (priv->pwr_node) {
+	if ((priv->chip_type != MWL8997) && (priv->pwr_node)) {
 		for_each_property_of_node(priv->pwr_node, prop) {
 			if (strcmp(prop->name, "FCC") == 0)
 				fcc_prop = prop;
@@ -713,6 +713,10 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->radio_short_preamble = false;
 	priv->wmm_enabled = false;
 	priv->powinited = 0;
+	if (priv->chip_type == MWL8997)
+		priv->pwr_level = SYSADPT_TX_GRP_PWR_LEVEL_TOTAL;
+	else
+		priv->pwr_level = SYSADPT_TX_POWER_LEVEL_TOTAL;
 	priv->csa_active = false;
 	priv->dfs_chirp_count_min = 5;
 	priv->dfs_chirp_time_interval = 1000;
