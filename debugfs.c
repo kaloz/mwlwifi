@@ -203,6 +203,8 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	struct mwl_vif *mwl_vif;
 	struct ieee80211_vif *vif;
 	char ssid[IEEE80211_MAX_SSID_LEN + 1];
+	struct cfg80211_chan_def *chan_def;
+	struct beacon_info *beacon_info;
 	ssize_t ret;
 
 	if (!p)
@@ -243,8 +245,6 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			break;
 		}
 		if (vif->chanctx_conf) {
-			struct cfg80211_chan_def *chan_def;
-
 			chan_def = &vif->chanctx_conf->def;
 			len += scnprintf(p + len, size - len,
 					 "channel: %d: width: %d\n",
@@ -264,16 +264,25 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 		len += scnprintf(p + len, size - len,
 				 "IV: %08x%04x\n", mwl_vif->iv32,
 				 mwl_vif->iv16);
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_wmm_ptr,
-			  mwl_vif->beacon_info.ie_wmm_len, "WMM:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn_ptr,
-			  mwl_vif->beacon_info.ie_rsn_len, "RSN:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn48_ptr,
-			  mwl_vif->beacon_info.ie_rsn48_len, "RSN48:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_ht_ptr,
-			  mwl_vif->beacon_info.ie_ht_len, "HT:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_vht_ptr,
-			  mwl_vif->beacon_info.ie_vht_len, "VHT:");
+		beacon_info = &mwl_vif->beacon_info;
+		dump_data(p, size, &len, beacon_info->ie_wmm_ptr,
+			  beacon_info->ie_wmm_len, "WMM:");
+		dump_data(p, size, &len, beacon_info->ie_rsn_ptr,
+			  beacon_info->ie_rsn_len, "RSN:");
+		dump_data(p, size, &len, beacon_info->ie_rsn48_ptr,
+			  beacon_info->ie_rsn48_len, "RSN48:");
+		dump_data(p, size, &len, beacon_info->ie_ht_ptr,
+			  beacon_info->ie_ht_len, "HT:");
+		dump_data(p, size, &len, beacon_info->ie_vht_ptr,
+			  beacon_info->ie_vht_len, "VHT:");
+		if (vif->type == NL80211_IFTYPE_MESH_POINT) {
+			dump_data(p, size, &len, beacon_info->ie_meshid_ptr,
+				  beacon_info->ie_meshid_len, "MESHID:");
+			dump_data(p, size, &len, beacon_info->ie_meshcfg_ptr,
+				  beacon_info->ie_meshcfg_len, "MESHCFG:");
+			dump_data(p, size, &len, beacon_info->ie_meshchsw_ptr,
+				  beacon_info->ie_meshchsw_len, "MESHCHSW:");
+		}
 		len += scnprintf(p + len, size - len, "\n");
 	}
 	spin_unlock_bh(&priv->vif_lock);
