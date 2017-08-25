@@ -242,6 +242,20 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 					 "type: unknown\n");
 			break;
 		}
+		if (vif->chanctx_conf) {
+			struct cfg80211_chan_def *chan_def;
+
+			chan_def = &vif->chanctx_conf->def;
+			len += scnprintf(p + len, size - len,
+					 "channel: %d: width: %d\n",
+					 chan_def->chan->hw_value,
+					 chan_def->width);
+			len += scnprintf(p + len, size - len,
+					 "freq: %d freq1: %d freq2: %d\n",
+					 chan_def->chan->center_freq,
+					 chan_def->center_freq1,
+					 chan_def->center_freq2);
+		}
 		len += scnprintf(p + len, size - len, "hw_crypto_enabled: %s\n",
 				 mwl_vif->is_hw_crypto_enabled ?
 				 "true" : "false");
