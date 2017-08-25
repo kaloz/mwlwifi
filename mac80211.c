@@ -143,6 +143,9 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
 	case NL80211_IFTYPE_MESH_POINT:
+		if (vif->type == NL80211_IFTYPE_MESH_POINT)
+			if (priv->chip_type != MWL8997)
+				return -EPERM;
 		macids_supported = priv->ap_macids_supported;
 		break;
 	case NL80211_IFTYPE_STATION:
