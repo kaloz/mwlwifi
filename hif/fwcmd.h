@@ -254,6 +254,8 @@ int mwl_fwcmd_get_pwr_tbl_sc4(struct ieee80211_hw *hw,
 int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 			 u32 duration, u32 next_offset);
 
+int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot);
+
 void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx);
 
 #endif /* _FWCMD_H_ */

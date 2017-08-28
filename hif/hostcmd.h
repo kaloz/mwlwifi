@@ -73,6 +73,7 @@
 #define HOSTCMD_CMD_GET_FW_REGION_CODE_SC4      0x118A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
+#define HOSTCMD_CMD_802_11_SLOT_TIME            0x1203
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -1100,6 +1101,14 @@ struct hostcmd_cmd_quiet_mode {
 	__le32 period;
 	__le32 duration;
 	__le32 next_offset;
+} __packed;
+
+/* HOSTCMD_CMD_802_11_SLOT_TIME */
+struct hostcmd_cmd_802_11_slot_time {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	/* 0:long slot; 1:short slot */
+	__le16 short_slot;
 } __packed;
 
 #endif /* _HOSTCMD_H_ */
