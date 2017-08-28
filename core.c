@@ -678,9 +678,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	ieee80211_hw_set(hw, SIGNAL_DBM);
 	ieee80211_hw_set(hw, HAS_RATE_CONTROL);
 
-	if (priv->chip_type == MWL8997)
-		ieee80211_hw_set(hw, SUPPORTS_PS);
-
 	/* Ask mac80211 not to trigger PS mode
 	 * based on PM bit of incoming frames.
 	 */
@@ -688,15 +685,10 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	ieee80211_hw_set(hw, SUPPORTS_PER_STA_GTK);
 	ieee80211_hw_set(hw, MFP_CAPABLE);
-	ieee80211_hw_set(hw, SPECTRUM_MGMT);
 
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
 	hw->wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
-	hw->wiphy->flags |= WIPHY_FLAG_HAS_REMAIN_ON_CHANNEL;
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
-
-	hw->wiphy->features |= NL80211_FEATURE_NEED_OBSS_SCAN;
-	hw->wiphy->max_remain_on_channel_duration = 5000;
 
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
