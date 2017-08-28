@@ -158,6 +158,8 @@
 #define WSC_IE_SET_BEACON                       0
 #define WSC_IE_SET_PROBE_RESPONSE               1
 
+#define HW_SET_PARMS_FEATURES_HOST_PROBE_RESP   0x00000020
+
 #define EDMAC_2G_ENABLE_MASK                    0x00000001
 #define EDMAC_2G_ENABLE_SHIFT                   0x0
 #define EDMAC_5G_ENABLE_MASK                    0x00000002

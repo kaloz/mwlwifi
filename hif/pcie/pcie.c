@@ -266,6 +266,7 @@ static int pcie_init(struct ieee80211_hw *hw)
 		set_hw_spec.tx_wcb_num_per_queue =
 			cpu_to_le32(PCIE_MAX_TXRX_BD);
 		set_hw_spec.num_tx_queues = cpu_to_le32(1);
+		set_hw_spec.features |= HW_SET_PARMS_FEATURES_HOST_PROBE_RESP;
 	} else {
 		set_hw_spec.wcb_base[0] =
 			cpu_to_le32(pcie_priv->desc_data[0].pphys_tx_ring);
