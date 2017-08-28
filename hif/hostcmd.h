@@ -74,6 +74,7 @@
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
 #define HOSTCMD_CMD_802_11_SLOT_TIME            0x1203
+#define HOSTCMD_CMD_EDMAC_CTRL                  0x1204
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -156,6 +157,17 @@
 #define WSC_IE_MAX_LENGTH                       251
 #define WSC_IE_SET_BEACON                       0
 #define WSC_IE_SET_PROBE_RESPONSE               1
+
+#define EDMAC_2G_ENABLE_MASK                    0x00000001
+#define EDMAC_2G_ENABLE_SHIFT                   0x0
+#define EDMAC_5G_ENABLE_MASK                    0x00000002
+#define EDMAC_5G_ENABLE_SHIFT                   0x1
+#define EDMAC_2G_THRESHOLD_OFFSET_MASK          0x00000FF0
+#define EDMAC_2G_THRESHOLD_OFFSET_SHIFT         0x4
+#define EDMAC_5G_THRESHOLD_OFFSET_MASK          0x000FF000
+#define EDMAC_5G_THRESHOLD_OFFSET_SHIFT         0xC
+#define EDMAC_QLOCK_BITMAP_MASK                 0x0FF00000
+#define EDMAC_QLOCK_BITMAP_SHIFT                0x14
 
 enum {
 	WL_DISABLE = 0,
@@ -1109,6 +1121,17 @@ struct hostcmd_cmd_802_11_slot_time {
 	__le16 action;
 	/* 0:long slot; 1:short slot */
 	__le16 short_slot;
+} __packed;
+
+/* HOSTCMD_CMD_EDMAC_CTRL */
+struct hostcmd_cmd_edmac_ctrl {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;
+	__le16 ed_ctrl_2g;
+	__le16 ed_offset_2g;
+	__le16 ed_ctrl_5g;
+	__le16 ed_offset_5g;
+	__le16 ed_bitmap_txq_lock;
 } __packed;
 
 #endif /* _HOSTCMD_H_ */

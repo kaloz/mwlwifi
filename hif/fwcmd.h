@@ -256,6 +256,8 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 
 int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot);
 
+int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl);
+
 void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx);
 
 #endif /* _FWCMD_H_ */

@@ -100,6 +100,11 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	rc = mwl_fwcmd_set_optimization_level(hw, 1);
 	if (rc)
 		goto fwcmd_fail;
+	if (priv->chip_type == MWL8997) {
+		rc = mwl_fwcmd_config_EDMACCtrl(hw, 0);
+		if (rc)
+			goto fwcmd_fail;
+	}
 	if (priv->chip_type == MWL8964) {
 		rc = mwl_fwcmd_newdp_dmathread_start(hw);
 		if (rc)

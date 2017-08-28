@@ -95,6 +95,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 		{ HOSTCMD_CMD_802_11_SLOT_TIME, "80211SlotTime" },
+		{ HOSTCMD_CMD_EDMAC_CTRL, "EDMACCtrl" },
 	};
 
 	max_entries = ARRAY_SIZE(cmds);
@@ -3378,6 +3379,43 @@ int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
 	pcmd->short_slot = cpu_to_le16(short_slot ? 1 : 0);
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_SLOT_TIME)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl)
+{
+	struct hostcmd_cmd_edmac_ctrl *pcmd;
+	struct mwl_priv *priv = hw->priv;
+
+	pcmd = (struct hostcmd_cmd_edmac_ctrl *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_EDMAC_CTRL);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->ed_ctrl_2g = cpu_to_le16((EDMAC_Ctrl & EDMAC_2G_ENABLE_MASK)
+				       >> EDMAC_2G_ENABLE_SHIFT);
+	pcmd->ed_ctrl_5g = cpu_to_le16((EDMAC_Ctrl & EDMAC_5G_ENABLE_MASK)
+				       >> EDMAC_5G_ENABLE_SHIFT);
+	pcmd->ed_offset_2g = cpu_to_le16((EDMAC_Ctrl &
+					 EDMAC_2G_THRESHOLD_OFFSET_MASK)
+					 >> EDMAC_2G_THRESHOLD_OFFSET_SHIFT);
+	pcmd->ed_offset_5g = cpu_to_le16((EDMAC_Ctrl &
+					 EDMAC_5G_THRESHOLD_OFFSET_MASK)
+					 >> EDMAC_5G_THRESHOLD_OFFSET_SHIFT);
+	pcmd->ed_bitmap_txq_lock = cpu_to_le16((EDMAC_Ctrl &
+					       EDMAC_QLOCK_BITMAP_MASK)
+					       >> EDMAC_QLOCK_BITMAP_SHIFT);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_EDMAC_CTRL)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		return -EIO;
 	}
