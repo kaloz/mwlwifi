@@ -22,6 +22,9 @@
 #include <net/ip.h>
 #include <net/icmp.h>
 
+#define BOOTP_REQUEST	1
+#define BOOTP_REPLY	2
+
 static inline int utils_tid_to_ac(u8 tid)
 {
 	switch (tid) {
@@ -130,8 +133,12 @@ bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
 
 bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);
 
+bool utils_is_bootp_dhcp(const void *packet, bool mac80211, u8 *type);
+
 void utils_dump_arp(const void *packet, bool mac80211, size_t len);
 
 void utils_dump_icmp_echo(const void *packet, bool mac80211, size_t len);
+
+void utils_dump_bootp_dhcp(const void *packet, bool mac80211, size_t len);
 
 #endif /* _UTILS_H_ */
