@@ -29,7 +29,8 @@
 #define PCIE_DRV_NAME    KBUILD_MODNAME
 #define PCIE_DRV_VERSION "10.3.6.0-20170912"
 
-#define PCIE_MIN_BYTES_HEADROOM   128
+#define PCIE_MIN_BYTES_HEADROOM   64
+#define PCIE_MIN_TX_HEADROOM_KF2  96
 #define PCIE_NUM_OF_DESC_DATA     SYSADPT_TOTAL_TX_QUEUES
 #define PCIE_AMPDU_QUEUES         4
 #define PCIE_MAX_NUM_TX_DESC      256
@@ -640,6 +641,7 @@ struct pcie_priv {
 	struct tasklet_struct tx_done_task;
 	struct tasklet_struct rx_task;
 	struct tasklet_struct qe_task;
+	unsigned int tx_head_room;
 	int txq_limit;
 	int txq_wake_threshold;
 	bool is_tx_schedule;

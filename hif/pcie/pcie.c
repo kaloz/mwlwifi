@@ -180,6 +180,8 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	return 0;
 }
 
+static struct mwl_hif_ops pcie_hif_ops;
+
 static int pcie_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -202,6 +204,13 @@ static int pcie_init(struct ieee80211_hw *hw)
 	tasklet_init(&pcie_priv->qe_task,
 		     (void *)pcie_tx_flush_amsdu, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->qe_task);
+	pcie_priv->tx_head_room = PCIE_MIN_BYTES_HEADROOM;
+	if (priv->chip_type == MWL8997) {
+		if (NET_SKB_PAD < PCIE_MIN_TX_HEADROOM_KF2) {
+			pcie_priv->tx_head_room = PCIE_MIN_TX_HEADROOM_KF2;
+			pcie_hif_ops.tx_head_room = PCIE_MIN_TX_HEADROOM_KF2;
+		}
+	}
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->is_tx_done_schedule = false;
@@ -615,7 +624,7 @@ static int pcie_reg_access(struct ieee80211_hw *hw, bool write)
 	return ret;
 }
 
-static const struct mwl_hif_ops pcie_hif_ops = {
+static struct mwl_hif_ops pcie_hif_ops = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
 	.tx_head_room          = PCIE_MIN_BYTES_HEADROOM,
@@ -1110,7 +1119,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 	writel(acnt_tail, pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
 }
 
-static const struct mwl_hif_ops pcie_hif_ops_ndp = {
+static struct mwl_hif_ops pcie_hif_ops_ndp = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
 	.tx_head_room          = PCIE_MIN_BYTES_HEADROOM,

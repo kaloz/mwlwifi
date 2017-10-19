@@ -536,6 +536,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 				 struct sk_buff *tx_skb,
 				 struct ieee80211_tx_info *tx_info)
 {
+	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct ieee80211_sta *sta;
 	struct mwl_sta *sta_info;
 	struct pcie_tx_ctrl *tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
@@ -606,7 +607,7 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 			return tx_skb;
 		}
 		newskb = dev_alloc_skb(amsdu_allow_size +
-				       PCIE_MIN_BYTES_HEADROOM);
+				       pcie_priv->tx_head_room);
 		if (!newskb) {
 			spin_unlock_bh(&sta_info->amsdu_lock);
 			kfree(amsdu_pkts);
@@ -614,9 +615,9 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 		}
 
 		headroom = skb_headroom(newskb);
-		if (headroom < PCIE_MIN_BYTES_HEADROOM)
+		if (headroom < pcie_priv->tx_head_room)
 			skb_reserve(newskb,
-				    (PCIE_MIN_BYTES_HEADROOM - headroom));
+				    (pcie_priv->tx_head_room - headroom));
 
 		data = newskb->data;
 		memcpy(data, tx_skb->data, wh_len);
