@@ -386,7 +386,7 @@ void pcie_rx_recv(unsigned long data)
 	int work_done = 0;
 	struct sk_buff *prx_skb = NULL;
 	int pkt_len;
-	struct ieee80211_rx_status status;
+	struct ieee80211_rx_status *status;
 	struct mwl_vif *mwl_vif = NULL;
 	struct ieee80211_hdr *wh;
 
@@ -422,7 +422,8 @@ void pcie_rx_recv(unsigned long data)
 			goto out;
 		}
 
-		pcie_rx_status(priv, curr_hndl->pdesc, &status);
+		status = IEEE80211_SKB_RXCB(prx_skb);
+		pcie_rx_status(priv, curr_hndl->pdesc, status);
 
 		priv->noise = -curr_hndl->pdesc->noise_floor;
 
@@ -461,7 +462,7 @@ void pcie_rx_recv(unsigned long data)
 				 * 0 for triggering Counter
 				 * Measure of MMIC failure.
 				 */
-				if (status.flag & RX_FLAG_MMIC_ERROR) {
+				if (status->flag & RX_FLAG_MMIC_ERROR) {
 					struct pcie_dma_data *dma_data;
 
 					dma_data = (struct pcie_dma_data *)
@@ -471,7 +472,7 @@ void pcie_rx_recv(unsigned long data)
 				}
 
 				if (!ieee80211_is_auth(wh->frame_control))
-					status.flag |= RX_FLAG_IV_STRIPPED |
+					status->flag |= RX_FLAG_IV_STRIPPED |
 						       RX_FLAG_DECRYPTED |
 						       RX_FLAG_MMIC_STRIPPED;
 			}
@@ -500,11 +501,10 @@ void pcie_rx_recv(unsigned long data)
 
 			if (*qc & IEEE80211_QOS_CTL_A_MSDU_PRESENT)
 				if (pcie_rx_process_mesh_amsdu(priv, prx_skb,
-							      &status))
+							      status))
 					goto out;
 		}
 
-		memcpy(IEEE80211_SKB_RXCB(prx_skb), &status, sizeof(status));
 		ieee80211_rx(hw, prx_skb);
 out:
 		pcie_rx_refill(priv, curr_hndl);
