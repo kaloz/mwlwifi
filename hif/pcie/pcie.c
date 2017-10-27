@@ -180,8 +180,6 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	return 0;
 }
 
-static struct mwl_hif_ops pcie_hif_ops;
-
 static int pcie_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -204,13 +202,6 @@ static int pcie_init(struct ieee80211_hw *hw)
 	tasklet_init(&pcie_priv->qe_task,
 		     (void *)pcie_tx_flush_amsdu, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->qe_task);
-	pcie_priv->tx_head_room = PCIE_MIN_BYTES_HEADROOM;
-	if (priv->chip_type == MWL8997) {
-		if (NET_SKB_PAD < PCIE_MIN_TX_HEADROOM_KF2) {
-			pcie_priv->tx_head_room = PCIE_MIN_TX_HEADROOM_KF2;
-			pcie_hif_ops.tx_head_room = PCIE_MIN_TX_HEADROOM_KF2;
-		}
-	}
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->is_tx_done_schedule = false;
@@ -1203,6 +1194,17 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pcie_priv = priv->hif.priv;
 	pcie_priv->mwl_priv = priv;
 	pcie_priv->pdev = pdev;
+	if (id->driver_data != MWL8964) {
+		pcie_priv->tx_head_room = PCIE_MIN_BYTES_HEADROOM;
+		if (id->driver_data == MWL8997) {
+			if (NET_SKB_PAD < PCIE_MIN_TX_HEADROOM_KF2) {
+				pcie_priv->tx_head_room =
+					PCIE_MIN_TX_HEADROOM_KF2;
+				pcie_hif_ops.tx_head_room =
+					PCIE_MIN_TX_HEADROOM_KF2;
+			}
+		}
+	}
 
 	rc = pcie_alloc_resource(pcie_priv);
 	if (rc)
