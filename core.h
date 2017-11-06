@@ -178,6 +178,7 @@ struct mwl_priv {
 	bool disable_5g;
 	int antenna_tx;
 	int antenna_rx;
+	bool tx_amsdu;
 
 	struct mwl_tx_pwr_tbl tx_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
 	bool cdd;
