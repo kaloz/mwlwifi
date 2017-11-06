@@ -250,6 +250,8 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			  mwl_vif->beacon_info.ie_rsn_len, "RSN:");
 		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn48_ptr,
 			  mwl_vif->beacon_info.ie_rsn48_len, "RSN48:");
+		dump_data(p, size, &len, mwl_vif->beacon_info.ie_mde_ptr,
+			  mwl_vif->beacon_info.ie_mde_len, "MDE:");
 		dump_data(p, size, &len, mwl_vif->beacon_info.ie_ht_ptr,
 			  mwl_vif->beacon_info.ie_ht_len, "HT:");
 		dump_data(p, size, &len, mwl_vif->beacon_info.ie_vht_ptr,
