@@ -533,7 +533,8 @@ static int mwl_mac80211_sta_remove(struct ieee80211_hw *hw,
 	else
 		mwl_hif_set_sta_id(hw, sta, false, false);
 
-	utils_free_stnid(priv, sta_info->stnid);
+	if (priv->chip_type != MWL8964)
+		utils_free_stnid(priv, sta_info->stnid);
 	if (vif->type == NL80211_IFTYPE_STATION)
 		utils_free_stnid(priv, sta_info->sta_stnid);
 
