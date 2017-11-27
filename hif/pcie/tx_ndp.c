@@ -655,6 +655,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	if (eapol_frame)
 		tx_ctrl->flags |= TX_CTRL_EAPOL;
 	tx_ctrl->rate = sta ? sta_info->tx_rate_info : 0;
+	if (ieee80211_is_nullfunc(wh->frame_control) ||
+	    ieee80211_is_qos_nullfunc(wh->frame_control))
+		tx_ctrl->rate = 0;
 	pcie_tx_check_tcp_ack(skb, tx_ctrl);
 
 	if (skb_queue_len(&pcie_priv->txq[index]) > pcie_priv->txq_limit)
