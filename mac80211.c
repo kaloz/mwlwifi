@@ -447,6 +447,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	u16 stnid, sta_stnid;
 	struct mwl_vif *mwl_vif;
+	struct wireless_dev *wdev = ieee80211_vif_to_wdev(vif);
+	bool use_4addr = wdev->use_4addr;
 	struct mwl_sta *sta_info;
 	struct ieee80211_key_conf *key;
 	int rc;
@@ -494,12 +496,17 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	if (vif->type == NL80211_IFTYPE_STATION)
 		mwl_fwcmd_set_new_stn_del(hw, vif, sta->addr);
 
-	if (priv->chip_type == MWL8964)
-		rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta, 0);
-	else
+	if (priv->chip_type == MWL8964) {
+		if (use_4addr) {
+			sta_info->wds = true;
+			rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta,
+							   WDS_MODE);
+		} else
+			rc = mwl_fwcmd_set_new_stn_add_sc4(hw, vif, sta, 0);
+	} else
 		rc = mwl_fwcmd_set_new_stn_add(hw, vif, sta);
 
-	if (vif->type == NL80211_IFTYPE_STATION)
+	if ((vif->type == NL80211_IFTYPE_STATION) && !use_4addr)
 		mwl_hif_set_sta_id(hw, sta, true, true);
 	else
 		mwl_hif_set_sta_id(hw, sta, false, true);

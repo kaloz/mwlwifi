@@ -48,6 +48,8 @@
 #define CAC_START                       1
 #define MONITOR_START                   3
 
+#define WDS_MODE                        4
+
 enum {
 	WL_ANTENNATYPE_RX = 1,
 	WL_ANTENNATYPE_TX = 2,
