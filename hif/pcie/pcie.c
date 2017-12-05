@@ -510,8 +510,12 @@ static struct device_node *pcie_get_device_node(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
+	struct device_node *dev_node;
 
-	return pci_bus_to_OF_node(pcie_priv->pdev->bus);
+	dev_node = pci_bus_to_OF_node(pcie_priv->pdev->bus);
+	wiphy_info(priv->hw->wiphy, "device node: %s\n", dev_node->full_name);
+
+	return dev_node;
 }
 
 static void pcie_get_survey(struct ieee80211_hw *hw,
