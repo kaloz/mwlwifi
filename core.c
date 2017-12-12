@@ -593,6 +593,35 @@ static void mwl_account_handle(struct work_struct *work)
 	mwl_hif_process_account(priv->hw);
 }
 
+static void mwl_wds_check_handle(struct work_struct *work)
+{
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, wds_check_handle);
+	struct mwl_sta *sta_info;
+	struct ieee80211_sta *sta;
+	bool wds_sta = false;
+
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		if (sta_info->wds)
+			continue;
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
+		if (ether_addr_equal(sta->addr, priv->wds_check_sta)) {
+			wds_sta = true;
+			break;
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
+
+	if (wds_sta) {
+		mwl_fwcmd_set_new_stn_wds_sc4(priv->hw, sta->addr);
+		sta_info->wds = true;
+	}
+
+	priv->wds_check = false;
+}
+
 static void mwl_chnl_switch_event(struct work_struct *work)
 {
 	struct mwl_priv *priv =
@@ -682,6 +711,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->radio_short_preamble = false;
 	priv->wmm_enabled = false;
 	priv->powinited = 0;
+	priv->wds_check = false;
 	priv->csa_active = false;
 	priv->dfs_chirp_count_min = 5;
 	priv->dfs_chirp_time_interval = 1000;
@@ -692,6 +722,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	/* Handle watchdog ba events */
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
 	INIT_WORK(&priv->account_handle, mwl_account_handle);
+	INIT_WORK(&priv->wds_check_handle, mwl_wds_check_handle);
 	INIT_WORK(&priv->chnl_switch_handle, mwl_chnl_switch_event);
 
 	mutex_init(&priv->fwcmd_mutex);
@@ -818,6 +849,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	mwl_thermal_unregister(priv);
 	cancel_work_sync(&priv->chnl_switch_handle);
 	cancel_work_sync(&priv->account_handle);
+	cancel_work_sync(&priv->wds_check_handle);
 	cancel_work_sync(&priv->watchdog_ba_handle);
 	mwl_hif_deinit(hw);
 }

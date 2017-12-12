@@ -377,7 +377,6 @@ void pcie_rx_recv(unsigned long data)
 			if  ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
 			     is_multicast_ether_addr(wh->addr1) ||
 			     (ieee80211_is_mgmt(wh->frame_control) &&
-			     ieee80211_has_protected(wh->frame_control) &&
 			     !is_multicast_ether_addr(wh->addr1))) {
 				/* When MMIC ERROR is encountered
 				 * by the firmware, payload is

@@ -153,6 +153,8 @@ int mwl_fwcmd_set_new_stn_add_sc4(struct ieee80211_hw *hw,
 				  struct ieee80211_sta *sta,
 				  u32 wds);
 
+int mwl_fwcmd_set_new_stn_wds_sc4(struct ieee80211_hw *hw, u8 *addr);
+
 int mwl_fwcmd_set_new_stn_add_self(struct ieee80211_hw *hw,
 				   struct ieee80211_vif *vif);
 

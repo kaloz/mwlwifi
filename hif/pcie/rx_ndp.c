@@ -248,24 +248,23 @@ static inline void pcie_rx_process_fast_data(struct mwl_priv *priv,
 	memset(&hdr, 0, sizeof(hdr));
 	switch (mwl_vif->type) {
 	case NL80211_IFTYPE_AP:
-		fc |= cpu_to_le16(IEEE80211_FCTL_TODS);
-		/* BSSID SA DA */
-		ether_addr_copy(hdr.addr1, mwl_vif->bssid);
-		ether_addr_copy(hdr.addr2, skb->data + ETH_ALEN);
-		ether_addr_copy(hdr.addr3, skb->data);
-		hdrlen = 24;
-		break;
-	case NL80211_IFTYPE_AP_VLAN:
-		if (!sta_info->wds)
-			goto drop_packet;
-		fc |= (cpu_to_le16(IEEE80211_FCTL_TODS) |
-			cpu_to_le16(IEEE80211_FCTL_FROMDS));
-		/* RA TA DA SA */
-		ether_addr_copy(hdr.addr1, mwl_vif->bssid);
-		ether_addr_copy(hdr.addr2, sta->addr);
-		ether_addr_copy(hdr.addr3, skb->data);
-		ether_addr_copy(hdr.addr4, skb->data + ETH_ALEN);
-		hdrlen = 30;
+		if (sta_info->wds) {
+			fc |= (cpu_to_le16(IEEE80211_FCTL_TODS) |
+				cpu_to_le16(IEEE80211_FCTL_FROMDS));
+			/* RA TA DA SA */
+			ether_addr_copy(hdr.addr1, mwl_vif->bssid);
+			ether_addr_copy(hdr.addr2, sta->addr);
+			ether_addr_copy(hdr.addr3, skb->data);
+			ether_addr_copy(hdr.addr4, skb->data + ETH_ALEN);
+			hdrlen = 30;
+		} else {
+			fc |= cpu_to_le16(IEEE80211_FCTL_TODS);
+			/* BSSID SA DA */
+			ether_addr_copy(hdr.addr1, mwl_vif->bssid);
+			ether_addr_copy(hdr.addr2, skb->data + ETH_ALEN);
+			ether_addr_copy(hdr.addr3, skb->data);
+			hdrlen = 24;
+		}
 		break;
 	case NL80211_IFTYPE_STATION:
 		if (sta_info->wds) {
@@ -338,6 +337,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 {
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
+	struct mwl_vif *mwl_vif = NULL;
 
 	pcie_rx_remove_dma_header(skb, 0);
 	status = IEEE80211_SKB_RXCB(skb);
@@ -351,12 +351,33 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	else {
 		wh = (struct ieee80211_hdr *)skb->data;
 
-		if (ieee80211_is_mgmt(wh->frame_control) &&
-		    ieee80211_has_protected(wh->frame_control) &&
-		    !is_multicast_ether_addr(wh->addr1)) {
-			status->flag |= RX_FLAG_IV_STRIPPED |
-					RX_FLAG_DECRYPTED |
-					RX_FLAG_MMIC_STRIPPED;
+		if (ieee80211_has_protected(wh->frame_control)) {
+			if (ieee80211_has_tods(wh->frame_control)) {
+				mwl_vif = utils_find_vif_bss(priv, wh->addr1);
+				if (!mwl_vif &&
+				    ieee80211_has_a4(wh->frame_control))
+					mwl_vif =
+						utils_find_vif_bss(priv,
+								   wh->addr2);
+			} else {
+				mwl_vif = utils_find_vif_bss(priv, wh->addr2);
+			}
+
+			if ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
+			    is_multicast_ether_addr(wh->addr1) ||
+			    (ieee80211_is_mgmt(wh->frame_control) &&
+			    !is_multicast_ether_addr(wh->addr1))) {
+				if (!ieee80211_is_auth(wh->frame_control))
+					status->flag |= RX_FLAG_IV_STRIPPED |
+							RX_FLAG_DECRYPTED |
+							RX_FLAG_MMIC_STRIPPED;
+			}
+		}
+
+		if (ieee80211_has_a4(wh->frame_control) && !priv->wds_check) {
+			ether_addr_copy(priv->wds_check_sta, wh->addr2);
+			ieee80211_queue_work(priv->hw, &priv->wds_check_handle);
+			priv->wds_check = true;
 		}
 	}
 

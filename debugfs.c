@@ -292,6 +292,8 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 				 sta_info->is_ampdu_allowed ? "true" : "false");
 		len += scnprintf(p + len, size - len, "amsdu: %s\n",
 				 sta_info->is_amsdu_allowed ? "true" : "false");
+		len += scnprintf(p + len, size - len, "wds: %s\n",
+				 sta_info->wds ? "true" : "false");
 		if (sta_info->is_amsdu_allowed) {
 			len += scnprintf(p + len, size - len,
 					 "amsdu cap: 0x%02x\n",

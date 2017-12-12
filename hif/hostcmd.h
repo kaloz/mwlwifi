@@ -115,6 +115,7 @@
 
 /* Define station related constants */
 #define HOSTCMD_ACT_STA_ACTION_ADD              0
+#define HOSTCMD_ACT_STA_ACTION_MODIFY           1
 #define HOSTCMD_ACT_STA_ACTION_REMOVE           2
 
 /* Define key related constants */
