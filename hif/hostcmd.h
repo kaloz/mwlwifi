@@ -1017,6 +1017,7 @@ struct hostcmd_cmd_newdp_dmathread_start {
 /* HOSTCMD_CMD_GET_FW_REGION_CODE_SC4 */
 struct hostcmd_cmd_get_fw_region_code_sc4 {
 	struct hostcmd_header cmd_hdr;
+	__le32 status; /* 0 = Found, 1 = Error */
 	__le32 fw_region_code;
 } __packed;
 

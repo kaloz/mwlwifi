@@ -3118,7 +3118,10 @@ int mwl_fwcmd_get_fw_region_code_sc4(struct ieee80211_hw *hw,
 		return -EINVAL;
 	}
 
-	*fw_region_code = le32_to_cpu(pcmd->fw_region_code);
+	if (pcmd->status)
+		*fw_region_code = (pcmd->status == 1) ? 0 : pcmd->status;
+	else
+		*fw_region_code = le32_to_cpu(pcmd->fw_region_code);
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
