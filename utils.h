@@ -20,7 +20,18 @@
 
 #include <net/arp.h>
 #include <net/ip.h>
+#include <net/udp.h>
 #include <net/icmp.h>
+
+/* DHCP message types */
+#define DHCPDISCOVER    1
+#define DHCPOFFER       2
+#define DHCPREQUEST     3
+#define DHCPDECLINE     4
+#define DHCPACK         5
+#define DHCPNAK         6
+#define DHCPRELEASE     7
+#define DHCPINFORM      8
 
 static inline int utils_tid_to_ac(u8 tid)
 {
@@ -127,8 +138,12 @@ bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
 
 bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);
 
+bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op);
+
 void utils_dump_arp(const void *packet, bool mac80211, size_t len);
 
 void utils_dump_icmp_echo(const void *packet, bool mac80211, size_t len);
+
+void utils_dump_dhcp(const void *packet, bool mac80211, size_t len);
 
 #endif /* _UTILS_H_ */

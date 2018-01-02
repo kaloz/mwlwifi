@@ -275,6 +275,45 @@ bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type)
 	return false;
 }
 
+bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op)
+{
+	const u8 *data = packet;
+	struct ieee80211_hdr *wh;
+	__be16 *protocol;
+	struct iphdr *iph;
+	struct udphdr *udph;
+
+	if (mac80211) {
+		/* mac80211 packet */
+		wh = (struct ieee80211_hdr *)data;
+		data += ieee80211_hdrlen(wh->frame_control) + 6;
+		protocol = (__be16 *)data;
+	} else {
+		/* mac802.3 packet */
+		data += (2 * ETH_ALEN);
+		protocol = (__be16 *)data;
+	}
+
+	if (*protocol == htons(ETH_P_IP)) {
+		data += sizeof(__be16);
+		iph = (struct iphdr *)data;
+		if (iph->protocol == IPPROTO_UDP) {
+			data += (iph->ihl * 4);
+			udph = (struct udphdr *)data;
+			if (((udph->source == htons(68)) &&
+			    (udph->dest == htons(67))) ||
+			    ((udph->source == htons(67)) &&
+			    (udph->dest == htons(68)))) {
+				data += sizeof(struct udphdr);
+				*op = *data;
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void utils_dump_arp(const void *packet, bool mac80211, size_t len)
 {
 	const u8 *data = packet;
@@ -334,6 +373,53 @@ void utils_dump_icmp_echo(const void *packet, bool mac80211, size_t len)
 			else if (icmph->type == ICMP_ECHOREPLY)
 				utils_dump_data_info("ECHO REPLY: ",
 						     packet, len);
+		}
+	}
+}
+
+void utils_dump_dhcp(const void *packet, bool mac80211, size_t len)
+{
+	const u8 *data = packet;
+	struct ieee80211_hdr *wh;
+	__be16 *protocol;
+	struct iphdr *iph;
+	struct udphdr *udph;
+	const char *dhcp_op[8] = {
+		"DHCPDISCOVER",
+		"DHCPOFFER",
+		"DHCPREQUEST",
+		"DHCPDECLINE",
+		"DHCPACK",
+		"DHCPNAK",
+		"DHCPRELEASE",
+		"DHCPINFORM"
+	};
+
+	if (mac80211) {
+		/* mac80211 packet */
+		wh = (struct ieee80211_hdr *)data;
+		data += ieee80211_hdrlen(wh->frame_control) + 6;
+		protocol = (__be16 *)data;
+	} else {
+		/* mac802.3 packet */
+		data += (2 * ETH_ALEN);
+		protocol = (__be16 *)data;
+	}
+
+	if (*protocol == htons(ETH_P_IP)) {
+		data += sizeof(__be16);
+		iph = (struct iphdr *)data;
+		if (iph->protocol == IPPROTO_UDP) {
+			data += (iph->ihl * 4);
+			udph = (struct udphdr *)data;
+			if (((udph->source == htons(68)) &&
+			    (udph->dest == htons(67))) ||
+			    ((udph->source == htons(67)) &&
+			    (udph->dest == htons(68)))) {
+				data += sizeof(struct udphdr);
+				utils_dump_data_info(dhcp_op[*data - 1],
+						     packet, len);
+			}
 		}
 	}
 }
