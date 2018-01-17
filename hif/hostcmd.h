@@ -71,6 +71,8 @@
 #define HOSTCMD_CMD_GET_FW_REGION_CODE_SC4      0x118A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
+#define HOSTCMD_CMD_CORE_DUMP_DIAG_MODE         0x1202
+#define HOSTCMD_CMD_GET_FW_CORE_DUMP            0x1203
 
 /* Define general result code for each command */
 #define HOSTCMD_RESULT_OK                       0x0000
@@ -1057,6 +1059,77 @@ struct hostcmd_cmd_quiet_mode {
 	__le32 period;
 	__le32 duration;
 	__le32 next_offset;
+} __packed;
+
+/* HOSTCMD_CMD_CORE_DUMP_DIAG_MODE */
+struct hostcmd_cmd_core_dump_diag_mode {
+	struct hostcmd_header cmd_hdr;
+	__le16 status;
+} __packed;
+
+/* HOSTCMD_CMD_GET_FW_CORE_DUMP */
+#define MAX_CORE_REGIONS       20
+#define MAX_CORE_SYMBOLS       30
+#define MVL_COREDUMP_DIAG_MODE 0x00000001
+#define MVL_COREDUMP_INCL_EXT  0x00000002
+#define MAX_CORE_DUMP_BUFFER   2048
+
+struct core_region {
+	__le32 address;
+	__le32 length;
+} __packed;
+
+struct core_symbol {
+	u8 name[16];
+	__le32 address;
+	__le32 length;
+	__le16 entries;
+} __packed;
+
+struct coredump {
+	u8 version_major;
+	u8 version_minor;
+	u8 version_patch;
+	u8 hdr_version;
+	u8 num_regions;
+	u8 num_symbols;
+	u8 fill[2];
+	struct core_region region[MAX_CORE_REGIONS];
+	struct core_symbol symbol[MAX_CORE_SYMBOLS];
+	__le32 fill_end[40];
+} __packed;
+
+struct coredump_cmd {
+	__le32 context;
+	__le32 buffer;
+	__le32 buffer_len;
+	__le16 size_kb;
+	__le16 flags;
+} __packed;
+
+struct debug_mem_cmd {
+	__le32 set;
+	__le32 type;
+	__le32 addr;
+	__le32 val;
+} __packed;
+
+struct hostcmd_cmd_get_fw_core_dump {
+	struct hostcmd_header cmd_hdr;
+	union {
+		struct coredump_cmd coredump;
+		struct debug_mem_cmd debug_mem;
+	} cmd_data;
+	/*Buffer where F/W Copies the Core Dump*/
+	char buffer[MAX_CORE_DUMP_BUFFER];
+} __packed;
+
+struct hostcmd_cmd_get_fw_core_dump_ {
+	struct hostcmd_header cmd_hdr;
+	union {
+		struct coredump_cmd coredump;
+		struct debug_mem_cmd debug_mem;
+	} cmd_data;
 } __packed;
 
 #endif /* _HOSTCMD_H_ */

@@ -274,6 +274,7 @@ struct mwl_priv {
 	u32 reg_offset;
 	u32 reg_value;
 	int sta_aid;
+	bool coredump_text;
 };
 
 struct beacon_info {

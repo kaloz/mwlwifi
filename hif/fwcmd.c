@@ -3201,6 +3201,71 @@ int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 	return 0;
 }
 
+int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
+			       struct coredump_cmd *core_dump, char *buff)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_get_fw_core_dump *pcmd;
+
+	pcmd = (struct hostcmd_cmd_get_fw_core_dump *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_FW_CORE_DUMP);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->cmd_data.coredump.context = core_dump->context;
+	pcmd->cmd_data.coredump.buffer = cpu_to_le32(priv->pphys_cmd_buf +
+		sizeof(struct hostcmd_cmd_get_fw_core_dump) -
+		sizeof(struct hostcmd_cmd_get_fw_core_dump_));
+	pcmd->cmd_data.coredump.buffer_len = cpu_to_le32(MAX_CORE_DUMP_BUFFER);
+	pcmd->cmd_data.coredump.size_kb = core_dump->size_kb;
+	pcmd->cmd_data.coredump.flags = core_dump->flags;
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_GET_FW_CORE_DUMP)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	/* update core dump buffer */
+	core_dump->context = pcmd->cmd_data.coredump.context;
+	core_dump->size_kb = pcmd->cmd_data.coredump.size_kb;
+	core_dump->flags = pcmd->cmd_data.coredump.flags;
+	memcpy(buff,
+	       (const void *)((u32)pcmd +
+	       sizeof(struct hostcmd_cmd_get_fw_core_dump) -
+	       sizeof(struct hostcmd_cmd_get_fw_core_dump_)),
+	       MAX_CORE_DUMP_BUFFER);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_core_dump_diag_mode *pcmd;
+
+	pcmd = (struct hostcmd_cmd_core_dump_diag_mode *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_CORE_DUMP_DIAG_MODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->status = cpu_to_le16(status);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_CORE_DUMP_DIAG_MODE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx)
 {
 	struct mwl_priv *priv = hw->priv;

@@ -83,6 +83,60 @@ static void dump_data(char *p, int size, int *len, u8 *data,
 	}
 }
 
+static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
+			   u32 append, u32 totallen, bool textmode)
+{
+	struct file *filp_core = NULL;
+	mm_segment_t oldfs;
+	char file_name[40];
+	u8 *buf = kmalloc(length * 3, GFP_KERNEL);
+	u8 *data_p = buf;
+	u32 i, j = 0;
+
+	if (!buf)
+		return;
+
+	memset(file_name, 0, sizeof(file_name));
+	sprintf(file_name, "/dev/shm/coredump-%x-%x",
+		region, (region + totallen));
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+
+	if (append)
+		filp_core = filp_open(file_name, O_RDWR | O_APPEND, 0);
+	else
+		filp_core = filp_open(file_name, O_RDWR | O_CREAT | O_TRUNC, 0);
+
+	if (!IS_ERR(filp_core)) {
+		if (textmode) {
+			for (i = 0; i < length; i += 4) {
+				u32 val = 0;
+
+				val = le32_to_cpu(*(__le32 *)(&valbuf[i]));
+
+				if (i % 16 == 0) {
+					sprintf(buf + j, "\n0x%08x",
+						(int)(address + i));
+					j = strlen(buf);
+				}
+				sprintf(buf + j, "  %08x", val);
+				j = strlen(buf);
+			}
+			data_p = buf + j;
+			data_p += sprintf(data_p, "\n");
+			vfs_write(filp_core, buf, strlen(buf),
+				  &filp_core->f_pos);
+		} else
+			vfs_write(filp_core, valbuf, length, &filp_core->f_pos);
+
+		filp_close(filp_core, current->files);
+	}
+
+	set_fs(oldfs);
+	kfree(buf);
+}
+
 static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 				     size_t count, loff_t *ppos)
 {
@@ -978,6 +1032,148 @@ err:
 	return ret;
 }
 
+static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
+					  size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct coredump_cmd *core_dump = NULL;
+	struct coredump *cd;
+	char  *buff = NULL;
+	u32 i, offset;
+	u32 address, length;
+	ssize_t ret;
+
+	if (priv->chip_type != MWL8964)
+		return -EPERM;
+
+	if (*ppos)
+		return len;
+
+	if (!p)
+		return -ENOMEM;
+
+	core_dump = kmalloc(sizeof(*core_dump), GFP_ATOMIC);
+	if (!core_dump) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	buff = kmalloc(MAX_CORE_DUMP_BUFFER, GFP_ATOMIC);
+	if (!buff) {
+		ret = -ENOMEM;
+		goto err;
+	}
+	memset((char *)buff, 0, MAX_CORE_DUMP_BUFFER);
+
+	cd = kmalloc(sizeof(*cd), GFP_ATOMIC);
+	if (!cd) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	core_dump->context = 0;
+	core_dump->flags = 0;
+	core_dump->size_kb = 0;
+	if (mwl_fwcmd_get_fw_core_dump(priv->hw, core_dump, buff)) {
+		ret = -EIO;
+		goto err;
+	}
+	memcpy(cd, buff, sizeof(*cd));
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len, "Major Version : %d\n",
+			 cd->version_major);
+	len += scnprintf(p + len, size - len, "Minor Version : %d\n",
+			 cd->version_minor);
+	len += scnprintf(p + len, size - len, "Patch Version : %d\n",
+			 cd->version_patch);
+	len += scnprintf(p + len, size - len, "Num of Regions: %d\n",
+			 cd->num_regions);
+	len += scnprintf(p + len, size - len, "Num of Symbols: %d\n",
+			 cd->num_symbols);
+
+	for (i = 0; i < cd->num_regions; i++) {
+		address = le32_to_cpu(cd->region[i].address);
+		length = le32_to_cpu(cd->region[i].length);
+		len += scnprintf(p + len, size - len,
+				 "\ncd.region[%d]: address=%x, length=%x\n",
+				 i, address, length);
+
+		for (offset = 0; offset < length;
+		     offset += MAX_CORE_DUMP_BUFFER) {
+			core_dump->context = cpu_to_le32((i << 28) | offset);
+			core_dump->flags = 0;
+			core_dump->size_kb = 0;
+			if (mwl_fwcmd_get_fw_core_dump(priv->hw,
+			    core_dump, buff)) {
+				wiphy_info(priv->hw->wiphy,
+					   "region:%d offset:%x\n", i, offset);
+				break;
+			}
+			core_dump_file(buff, MAX_CORE_DUMP_BUFFER,
+				       address, address + offset,
+				       offset, length, priv->coredump_text);
+		}
+	}
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+
+err:
+	kfree(core_dump);
+	kfree(buff);
+	kfree(cd);
+	free_page(page);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_core_dump_write(struct file *file,
+					   const char __user *ubuf,
+					   size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int text_mode;
+	ssize_t ret;
+
+	if (priv->chip_type != MWL8964)
+		return -EPERM;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &text_mode)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if ((text_mode < 0) || (text_mode > 1)) {
+		wiphy_warn(priv->hw->wiphy,
+			   "text mode should be 0 (false) or 1 (true): %d\n",
+			   text_mode);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	mwl_fwcmd_core_dump_diag_mode(priv->hw, 1);
+	priv->coredump_text = text_mode ? true : false;
+	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
 MWLWIFI_DEBUGFS_FILE_READ_OPS(info);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(tx_status);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(rx_status);
@@ -992,6 +1188,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
+MWLWIFI_DEBUGFS_FILE_OPS(core_dump);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
 {
@@ -1018,6 +1215,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
+	MWLWIFI_DEBUGFS_ADD_FILE(core_dump);
 }
 
 void mwl_debugfs_remove(struct ieee80211_hw *hw)
