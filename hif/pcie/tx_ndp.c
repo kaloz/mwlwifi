@@ -627,6 +627,13 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		if (is_multicast_ether_addr(ieee80211_get_DA(wh))
 		    && (mwl_vif->macid != SYSADPT_NUM_OF_AP)) {
 			tx_que_priority = mwl_vif->macid * SYSADPT_MAX_TID;
+
+			if (ieee80211_has_a4(wh->frame_control)) {
+				if (sta && sta_info->wds)
+					tx_que_priority = SYSADPT_MAX_TID *
+						(sta_info->stnid +
+						QUEUE_STAOFFSET) + 6;
+			}
 		} else {
 			if (sta) {
 				if (!eapol_frame)
