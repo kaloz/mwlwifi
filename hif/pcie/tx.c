@@ -808,7 +808,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	wh = (struct ieee80211_hdr *)skb->data;
 
 	if (ieee80211_is_data_qos(wh->frame_control))
-		qos = *((u16 *)ieee80211_get_qos_ctl(wh));
+		qos = le16_to_cpu(*((__le16 *)ieee80211_get_qos_ctl(wh)));
 	else
 		qos = 0;
 
