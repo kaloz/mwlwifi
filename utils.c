@@ -275,7 +275,7 @@ bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type)
 	return false;
 }
 
-bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op)
+bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op, u8 *dhcp_client)
 {
 	const u8 *data = packet;
 	struct ieee80211_hdr *wh;
@@ -306,6 +306,7 @@ bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op)
 			    (udph->dest == htons(68)))) {
 				data += sizeof(struct udphdr);
 				*op = *data;
+				ether_addr_copy(dhcp_client, data + 28);
 				return true;
 			}
 		}

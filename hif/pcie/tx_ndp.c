@@ -626,7 +626,14 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 		if (is_multicast_ether_addr(ieee80211_get_DA(wh))
 		    && (mwl_vif->macid != SYSADPT_NUM_OF_AP)) {
+			u8 dhcp_op;
+			u8 client[ETH_ALEN];
+
 			tx_que_priority = mwl_vif->macid * SYSADPT_MAX_TID;
+
+			if (utils_is_dhcp(skb->data, true, &dhcp_op, client))
+				if (dhcp_op == DHCPOFFER)
+					tx_que_priority += 7;
 
 			if (ieee80211_has_a4(wh->frame_control)) {
 				if (sta && sta_info->wds)

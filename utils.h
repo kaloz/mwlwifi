@@ -138,7 +138,7 @@ bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
 
 bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);
 
-bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op);
+bool utils_is_dhcp(const void *packet, bool mac80211, u8 *op, u8 *dhcp_client);
 
 void utils_dump_arp(const void *packet, bool mac80211, size_t len);
 
