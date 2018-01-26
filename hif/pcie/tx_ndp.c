@@ -511,6 +511,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	struct ieee80211_sta *sta;
 	struct mwl_sta *sta_info;
 	struct ieee80211_hdr *wh;
+	u8 *da;
 	u16 qos;
 	u8 tid = 0;
 	struct mwl_ampdu_stream *stream = NULL;
@@ -624,16 +625,15 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			spin_unlock_bh(&priv->stream_lock);
 		}
 
-		if (is_multicast_ether_addr(ieee80211_get_DA(wh))
+		da = ieee80211_get_DA(wh);
+
+		if (is_multicast_ether_addr(da)
 		    && (mwl_vif->macid != SYSADPT_NUM_OF_AP)) {
-			u8 dhcp_op;
-			u8 client[ETH_ALEN];
 
 			tx_que_priority = mwl_vif->macid * SYSADPT_MAX_TID;
 
-			if (utils_is_dhcp(skb->data, true, &dhcp_op, client))
-				if (dhcp_op == DHCPOFFER)
-					tx_que_priority += 7;
+			if (da[ETH_ALEN - 1] == 0xff)
+				tx_que_priority += 7;
 
 			if (ieee80211_has_a4(wh->frame_control)) {
 				if (sta && sta_info->wds)
