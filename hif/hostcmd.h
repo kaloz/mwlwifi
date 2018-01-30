@@ -63,6 +63,7 @@
 #define HOSTCMD_CMD_DWDS_ENABLE                 0x1144
 #define HOSTCMD_CMD_FW_FLUSH_TIMER              0x1148
 #define HOSTCMD_CMD_SET_CDD                     0x1150
+#define HOSTCMD_CMD_SET_BFTYPE                  0x1155
 #define HOSTCMD_CMD_CAU_REG_ACCESS              0x1157
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
 #define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
@@ -974,6 +975,13 @@ struct hostcmd_cmd_fw_flush_timer {
 struct hostcmd_cmd_set_cdd {
 	struct hostcmd_header cmd_hdr;
 	__le32 enable;
+} __packed;
+
+/* HOSTCMD_CMD_SET_BFTYPE */
+struct hostcmd_cmd_set_bftype {
+	struct hostcmd_header cmd_hdr;
+	__le32 action;
+	__le32 mode;
 } __packed;
 
 /* HOSTCMD_CMD_GET_TEMP */
