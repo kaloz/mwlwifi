@@ -243,33 +243,6 @@ static inline void pcie_tx_add_ccmp_hdr(u8 *pccmp_hdr,
 	ccmp_h->iv32 = cpu_to_le32(iv32);
 }
 
-static inline void pcie_tx_count_packet(struct ieee80211_sta *sta, u8 tid)
-{
-	struct mwl_sta *sta_info;
-	struct mwl_tx_info *tx_stats;
-
-	if (WARN_ON(tid >= SYSADPT_MAX_TID))
-		return;
-
-	sta_info = mwl_dev_get_sta(sta);
-
-	tx_stats = &sta_info->tx_stats[tid];
-
-	if (tx_stats->start_time == 0)
-		tx_stats->start_time = jiffies;
-
-	/* reset the packet count after each second elapses.  If the number of
-	 * packets ever exceeds the ampdu_min_traffic threshold, we will allow
-	 * an ampdu stream to be started.
-	 */
-	if (jiffies - tx_stats->start_time > HZ) {
-		tx_stats->pkts = 0;
-		tx_stats->start_time = jiffies;
-	} else {
-		tx_stats->pkts++;
-	}
-}
-
 static inline bool pcie_tx_available(struct mwl_priv *priv, int desc_num)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
