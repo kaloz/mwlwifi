@@ -348,6 +348,9 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 				 sta_info->is_amsdu_allowed ? "true" : "false");
 		len += scnprintf(p + len, size - len, "wds: %s\n",
 				 sta_info->wds ? "true" : "false");
+		len += scnprintf(p + len, size - len, "ba_hist: %s\n",
+				 sta_info->ba_hist.enable ?
+				 "enable" : "disable");
 		if (sta_info->is_amsdu_allowed) {
 			len += scnprintf(p + len, size - len,
 					 "amsdu cap: 0x%02x\n",
@@ -901,7 +904,7 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 	if (!p)
 		return -ENOMEM;
 
-	if (!priv->sta_aid) {
+	if (!priv->ra_aid) {
 		ret = -EINVAL;
 		goto err;
 	}
@@ -910,7 +913,7 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
-		if (priv->sta_aid == sta->aid) {
+		if (priv->ra_aid == sta->aid) {
 			ether_addr_copy(addr, sta->addr);
 			break;
 		}
@@ -1024,8 +1027,193 @@ static ssize_t mwl_debugfs_ratetable_write(struct file *file,
 		goto err;
 	}
 
-	priv->sta_aid = sta_aid;
+	priv->ra_aid = sta_aid;
 	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
+					size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct mwl_sta *sta_info;
+	struct mwl_tx_ba_stats *ba_stats;
+	u32 i, data;
+	u32 baholecnt, baexpcnt, bmap0cnt, nobacnt;
+	u8 bmap0flag, nobaflag;
+	char buff[500], file_location[20];
+	struct file *filp_bahisto;
+	mm_segment_t oldfs;
+	u8 *data_p = buff;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	if (!priv->ba_aid) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	memset(buff, 0, sizeof(buff));
+	memset(file_location, 0, sizeof(file_location));
+	sprintf(file_location, "/tmp/ba_histo-%d", priv->ba_aid);
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	filp_bahisto = filp_open(file_location,
+				 O_RDWR | O_CREAT | O_TRUNC, 0);
+
+	if (IS_ERR(filp_bahisto)) {
+		set_fs(oldfs);
+		ret = -EIO;
+		goto err;
+	}
+
+	sta_info = utils_find_sta_by_aid(priv, priv->ba_aid);
+	if (sta_info && sta_info->ba_hist.enable &&
+	    sta_info->ba_hist.ba_stats) {
+		ba_stats = sta_info->ba_hist.ba_stats;
+		len += scnprintf(p + len, size - len,
+				 "BA histogram aid: %d, stnid: %d type: %s\n",
+				 priv->ba_aid, sta_info->stnid,
+				 sta_info->ba_hist.type ? "MU" : "SU");
+		data_p += sprintf(data_p,
+				  "BA histogram aid: %d, stnid: %d type: %s\n",
+				  priv->ba_aid, sta_info->stnid,
+				  sta_info->ba_hist.type ? "MU" : "SU");
+		data_p += sprintf(data_p, "%8s,%8s,%8s,%8s\n",
+				  "BAhole", "Expect", "Bmap0", "NoBA");
+		data = *(u32 *)&ba_stats[0];
+		baholecnt = 0;
+		baexpcnt = 0;
+		bmap0cnt = 0;
+		nobacnt = 0;
+		for (i = 0; i < ACNT_BA_SIZE && data; i++) {
+			data = *(u32 *)&ba_stats[i];
+			if (data == 0)
+				break;
+
+			/* If no BA event does not happen, check BA hole and BA
+			 * expected to mark BA bitmap all 0 event
+			 */
+			if (!ba_stats[i].no_ba)
+				bmap0flag = (ba_stats[i].ba_hole ==
+					     ba_stats[i].ba_expected) ? 1 : 0;
+			else
+				bmap0flag = 0;
+			nobaflag = ba_stats[i].no_ba;
+
+			/* Buffer is full. Write to file and reset buf */
+			if ((strlen(buff) + 36) >= 500) {
+				vfs_write(filp_bahisto, buff, strlen(buff),
+					  &filp_bahisto->f_pos);
+				mdelay(2);
+				memset(buff, 0, sizeof(buff));
+				data_p = buff;
+			}
+
+			data_p += sprintf(data_p, "%8d,%8d,",
+					  ba_stats[i].ba_hole,
+					  ba_stats[i].ba_expected);
+
+			baholecnt += ba_stats[i].ba_hole;
+			baexpcnt += ba_stats[i].ba_expected;
+			if (bmap0flag) {
+				data_p += sprintf(data_p, "       #,");
+				bmap0cnt++;
+			} else
+				data_p += sprintf(data_p, "%8d,", bmap0flag);
+			if (nobaflag) {
+				data_p += sprintf(data_p, "       *\n");
+				nobacnt++;
+			} else
+				data_p += sprintf(data_p, "%8d\n", nobaflag);
+		}
+
+		vfs_write(filp_bahisto, buff, strlen(buff),
+			  &filp_bahisto->f_pos);
+		len += scnprintf(p + len, size - len,
+				 "hole: %d, expect: %d, bmap0: %d, noba: %d\n",
+				 baholecnt, baexpcnt, bmap0cnt, nobacnt);
+		len += scnprintf(p + len, size - len,
+				 "BA histogram data written to %s\n",
+				 file_location);
+	} else
+		len += scnprintf(p + len, size - len,
+				 "No BA histogram for sta aid: %d\n",
+				 priv->ba_aid);
+
+	filp_close(filp_bahisto, current->files);
+	set_fs(oldfs);
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+
+err:
+	free_page(page);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_ba_hist_write(struct file *file,
+					 const char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int sta_aid;
+	struct mwl_sta *sta_info;
+	int size;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &sta_aid)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if ((sta_aid <= 0) || (sta_aid > SYSADPT_MAX_STA_SC4)) {
+		wiphy_warn(priv->hw->wiphy,
+			   "station aid is exceeding the limit %d\n", sta_aid);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (priv->ba_aid) {
+		sta_info = utils_find_sta_by_aid(priv, priv->ba_aid);
+		if (sta_info) {
+			sta_info->ba_hist.enable = false;
+			kfree(sta_info->ba_hist.ba_stats);
+		}
+	}
+	priv->ba_aid = 0;
+	sta_info = utils_find_sta_by_aid(priv, sta_aid);
+	if (sta_info) {
+		sta_info->ba_hist.enable = true;
+		sta_info->ba_hist.index = 0;
+		size = sizeof(struct mwl_tx_ba_stats) * ACNT_BA_SIZE;
+		sta_info->ba_hist.ba_stats = kmalloc(size, GFP_KERNEL);
+		if (sta_info->ba_hist.ba_stats) {
+			memset(sta_info->ba_hist.ba_stats, 0, size);
+			priv->ba_aid = sta_aid;
+		}
+		ret = count;
+	} else
+		ret = -EINVAL;
 
 err:
 	free_page(addr);
@@ -1188,6 +1376,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
+MWLWIFI_DEBUGFS_FILE_OPS(ba_hist);
 MWLWIFI_DEBUGFS_FILE_OPS(core_dump);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
@@ -1215,6 +1404,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
+	MWLWIFI_DEBUGFS_ADD_FILE(ba_hist);
 	MWLWIFI_DEBUGFS_ADD_FILE(core_dump);
 }
 

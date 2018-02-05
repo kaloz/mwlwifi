@@ -130,6 +130,10 @@ struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);
 
 struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr);
 
+struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid);
+
+struct mwl_sta *utils_find_sta_by_id(struct mwl_priv *priv, u16 stnid);
+
 void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
 
 void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len);

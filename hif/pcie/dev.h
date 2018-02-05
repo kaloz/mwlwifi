@@ -610,6 +610,18 @@ struct acnt_rx_s { /* Accounting Record for Rx PPDU */
 	struct rx_info rx_info;/* Receive parameters from 1st valid MPDU/AMPDU*/
 } __packed;
 
+struct acnt_ba_s { /* Accounting Record w/ rateinfo PER */
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 ba_hole;           /* Total missing pkt in a BA                    */
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+	__le16 stnid;         /* sta index for this BA                        */
+	u8 no_ba;             /* No BA received                               */
+	u8 ba_expected;       /* Total expected pkt to be BA'd                */
+	u8 type;              /* SU:0 or MU:1                                 */
+	u8 pad[3];            /* Unused                                       */
+} __packed;
+
 static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 					 struct sk_buff *skb,
 					 int head_pad,

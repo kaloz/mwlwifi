@@ -999,6 +999,30 @@ static void pcie_rx_account(struct mwl_priv *priv,
 		RXINFO_RSSI_X_SHIFT) & RXINFO_RSSI_X_MASK);
 }
 
+static void pcie_ba_account(struct mwl_priv *priv,
+			    struct mwl_sta *sta_info,
+			    struct acnt_ba_s *acnt_ba)
+{
+	struct mwl_tx_ba_hist *ba_hist = &sta_info->ba_hist;
+
+	if (sta_info->stnid != le16_to_cpu(acnt_ba->stnid))
+		return;
+
+	if (ba_hist->enable && ba_hist->ba_stats &&
+	    (ba_hist->index < ACNT_BA_SIZE)) {
+		ba_hist->type = acnt_ba->type;
+		ba_hist->ba_stats[ba_hist->index].ba_hole = acnt_ba->ba_hole;
+		ba_hist->ba_stats[ba_hist->index].ba_expected =
+			acnt_ba->ba_expected;
+		ba_hist->ba_stats[ba_hist->index].no_ba = acnt_ba->no_ba;
+		ba_hist->index++;
+		if (ba_hist->index == ACNT_BA_SIZE)
+			wiphy_info(priv->hw->wiphy,
+				   "Aid:%d BA histo collection done\n",
+				   priv->ba_aid);
+	}
+}
+
 static void pcie_process_account(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -1011,6 +1035,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 	struct acnt_s *acnt;
 	struct acnt_tx_s *acnt_tx;
 	struct acnt_rx_s *acnt_rx;
+	struct acnt_ba_s *acnt_ba;
 	struct pcie_dma_data *dma_data;
 	struct mwl_sta *sta_info;
 	u16 nf_a, nf_b, nf_c, nf_d;
@@ -1088,6 +1113,19 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				spin_lock_bh(&priv->sta_lock);
 				pcie_rx_account(priv, sta_info, acnt_rx);
 				spin_unlock_bh(&priv->sta_lock);
+			}
+			break;
+		case ACNT_CODE_BA_STATS:
+			acnt_ba = (struct acnt_ba_s *)pstart;
+			if (priv->ba_aid) {
+				sta_info = utils_find_sta_by_aid(priv,
+								 priv->ba_aid);
+				if (sta_info) {
+					spin_lock_bh(&priv->sta_lock);
+					pcie_ba_account(priv, sta_info,
+							acnt_ba);
+					spin_unlock_bh(&priv->sta_lock);
+				}
 			}
 			break;
 		default:

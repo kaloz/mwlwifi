@@ -88,6 +88,8 @@
 #define MWL_TX_RATE_ANTSELECT_MASK    0xFF000000
 #define MWL_TX_RATE_ANTSELECT_SHIFT   24
 
+#define ACNT_BA_SIZE                  1000
+
 enum {
 	MWL8864 = 0,
 	MWL8897,
@@ -273,7 +275,8 @@ struct mwl_priv {
 	u32 reg_type;
 	u32 reg_offset;
 	u32 reg_value;
-	int sta_aid;
+	int ra_aid;
+	int ba_aid;
 	bool coredump_text;
 };
 
@@ -341,6 +344,20 @@ struct mwl_amsdu_ctrl {
 	u8 cap;
 };
 
+struct mwl_tx_ba_stats {
+	u8 ba_hole;     /* Total pkt not acked in a BA bitmap */
+	u8 ba_expected; /* Total Tx pkt expected to be acked  */
+	u8 no_ba;       /* No BA is received                  */
+	u8 pad;         /* Unused                             */
+};
+
+struct mwl_tx_ba_hist {
+	u16 index;      /* Current buffer index               */
+	u8 type;        /* 0:SU, 1: MU                        */
+	bool enable;
+	struct mwl_tx_ba_stats *ba_stats;
+};
+
 struct mwl_sta {
 	struct list_head list;
 	struct mwl_vif *mwl_vif;
@@ -351,6 +368,7 @@ struct mwl_sta {
 	bool is_ampdu_allowed;
 	struct mwl_tx_info tx_stats[MWL_MAX_TID];
 	u32 check_ba_failed[MWL_MAX_TID];
+	struct mwl_tx_ba_hist ba_hist;
 	bool is_amsdu_allowed;
 	/* for amsdu aggregation */
 	struct {

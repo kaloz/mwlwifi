@@ -202,6 +202,41 @@ struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr)
 	return NULL;
 }
 
+struct mwl_sta *utils_find_sta_by_aid(struct mwl_priv *priv, u16 aid)
+{
+	struct mwl_sta *sta_info;
+	struct ieee80211_sta *sta;
+
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
+		if (sta->aid == aid) {
+			spin_unlock_bh(&priv->sta_lock);
+			return sta_info;
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
+
+	return NULL;
+}
+
+struct mwl_sta *utils_find_sta_by_id(struct mwl_priv *priv, u16 stnid)
+{
+	struct mwl_sta *sta_info;
+
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		if (sta_info->stnid == stnid) {
+			spin_unlock_bh(&priv->sta_lock);
+			return sta_info;
+		}
+	}
+	spin_unlock_bh(&priv->sta_lock);
+
+	return NULL;
+}
+
 void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len)
 {
 	print_hex_dump(KERN_INFO, prefix_str, DUMP_PREFIX_OFFSET,
