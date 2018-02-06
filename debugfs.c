@@ -1220,6 +1220,71 @@ err:
 	return ret;
 }
 
+static ssize_t mwl_debugfs_fixed_rate_read(struct file *file, char __user *ubuf,
+					   size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len, "fixed rate: 0x%08x\n",
+			 priv->fixed_rate);
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_fixed_rate_write(struct file *file,
+					    const char __user *ubuf,
+					    size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	ssize_t ret;
+	int fixed_rate = 0, fwcmd_ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	ret = sscanf(buf, "%08x", &fixed_rate);
+	if (!ret) {
+		ret = -EIO;
+		goto err;
+	}
+
+	priv->fixed_rate = fixed_rate;
+
+	if (fixed_rate != 0)
+		fwcmd_ret = mwl_fwcmd_set_rate_drop(priv->hw, 3,
+						    priv->fixed_rate, 0);
+	else
+		fwcmd_ret = mwl_fwcmd_set_rate_drop(priv->hw, 1,
+						    priv->fixed_rate, 0);
+	if (fwcmd_ret)
+		ret = -EIO;
+	else
+		ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
 static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 					  size_t count, loff_t *ppos)
 {
@@ -1377,6 +1442,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
 MWLWIFI_DEBUGFS_FILE_OPS(ba_hist);
+MWLWIFI_DEBUGFS_FILE_OPS(fixed_rate);
 MWLWIFI_DEBUGFS_FILE_OPS(core_dump);
 
 void mwl_debugfs_init(struct ieee80211_hw *hw)
@@ -1405,6 +1471,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
 	MWLWIFI_DEBUGFS_ADD_FILE(ba_hist);
+	MWLWIFI_DEBUGFS_ADD_FILE(fixed_rate);
 	MWLWIFI_DEBUGFS_ADD_FILE(core_dump);
 }
 

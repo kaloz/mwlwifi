@@ -277,6 +277,7 @@ struct mwl_priv {
 	u32 reg_value;
 	int ra_aid;
 	int ba_aid;
+	int fixed_rate;
 	bool coredump_text;
 };
 
