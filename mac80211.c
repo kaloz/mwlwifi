@@ -52,6 +52,40 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 	{ .bitrate = 540, .hw_value = 108, },
 };
 
+static void mwl_get_rateinfo(struct mwl_priv *priv, u8 *addr,
+			     struct mwl_sta *sta_info)
+{
+	int table_size = (sizeof(__le32) * 2 * SYSADPT_MAX_RATE_ADAPT_RATES);
+	u8 *rate_table;
+	u32 rate_info;
+	struct mwl_tx_hist_data *tx_hist_data;
+	int ret, idx;
+
+	rate_table = kzalloc(table_size, GFP_KERNEL);
+	if (!rate_table)
+		return;
+
+	ret = mwl_fwcmd_get_ratetable(priv->hw, addr, rate_table,
+				      table_size, 0);
+	if (ret) {
+		kfree(rate_table);
+		return;
+	}
+
+	idx = 0;
+	rate_info = le32_to_cpu(*(__le32 *)rate_table);
+	tx_hist_data = &sta_info->tx_hist.su_rate[0];
+	while (rate_info) {
+		if (idx < SYSADPT_MAX_RATE_ADAPT_RATES)
+			tx_hist_data[idx].rateinfo = rate_info;
+		idx++;
+		rate_table += (2 * sizeof(__le32));
+		rate_info = le32_to_cpu(*(__le32 *)rate_table);
+	}
+
+	kfree(rate_table);
+}
+
 static void mwl_mac80211_tx(struct ieee80211_hw *hw,
 			    struct ieee80211_tx_control *control,
 			    struct sk_buff *skb)
@@ -520,6 +554,8 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 		if (mwl_vif->wep_key_conf[i].enabled)
 			mwl_mac80211_set_key(hw, SET_KEY, vif, sta, key);
 	}
+
+	mwl_get_rateinfo(priv, sta->addr, sta_info);
 
 	return rc;
 }

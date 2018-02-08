@@ -90,6 +90,27 @@
 
 #define ACNT_BA_SIZE                  1000
 
+/* Q stats */
+#define QS_MAX_DATA_RATES_G           14
+#define QS_NUM_SUPPORTED_11N_BW       2
+#define QS_NUM_SUPPORTED_GI           2
+#define QS_NUM_SUPPORTED_MCS          24
+#define QS_NUM_SUPPORTED_11AC_NSS     3
+#define QS_NUM_SUPPORTED_11AC_BW      4
+#define QS_NUM_SUPPORTED_11AC_MCS     10
+#define TX_RATE_HISTO_CUSTOM_CNT      1
+#define TX_RATE_HISTO_PER_CNT         5
+#define MAX_DATA_RATES_G              14
+#define MAX_SUPPORTED_MCS             24
+#define MAX_SUPPORTED_11AC_RATES      20
+/* MAX_DATA_RATES_G + MAX_SUPPORTED_MCS + MAX_SUPPORTED_11AC_RATES */
+#define MAX_SUPPORTED_RATES           58
+#define SU_MIMO                       0
+#define MU_MIMO                       1
+#define SU_MU_TYPE_CNT                2 /* traffic type, SU and MU */
+
+static const u8 TX_HISTO_PER_THRES[TX_RATE_HISTO_PER_CNT - 1] = {6, 12, 20, 30};
+
 enum {
 	MWL8864 = 0,
 	MWL8897,
@@ -279,6 +300,7 @@ struct mwl_priv {
 	int ba_aid;
 	int fixed_rate;
 	bool coredump_text;
+	u32 ra_tx_attempt[2][6];
 };
 
 struct beacon_info {
@@ -359,6 +381,25 @@ struct mwl_tx_ba_hist {
 	struct mwl_tx_ba_stats *ba_stats;
 };
 
+struct mwl_tx_hist_data {
+	u32 rateinfo;
+	u32 cnt;
+	/* store according to TX_HISTO_PER_THRES threshold    */
+	u32 per[TX_RATE_HISTO_PER_CNT];
+} __packed;
+
+struct mwl_tx_hist {
+	struct mwl_tx_hist_data su_rate[MAX_SUPPORTED_RATES];
+	struct mwl_tx_hist_data mu_rate
+		[QS_NUM_SUPPORTED_11AC_NSS - 1][QS_NUM_SUPPORTED_11AC_BW]
+		[QS_NUM_SUPPORTED_GI][QS_NUM_SUPPORTED_11AC_MCS];
+	struct mwl_tx_hist_data custom_rate[TX_RATE_HISTO_CUSTOM_CNT];
+	/* Current rate for 0:SU, 1:MU         */
+	u32 cur_rate_info[SU_MU_TYPE_CNT];
+	/* Total tx attempt cnt for 0:SU, 1:MU */
+	u32 total_tx_cnt[SU_MU_TYPE_CNT];
+} __packed;
+
 struct mwl_sta {
 	struct list_head list;
 	struct mwl_vif *mwl_vif;
@@ -376,6 +417,7 @@ struct mwl_sta {
 		spinlock_t amsdu_lock;   /* for amsdu */
 		struct mwl_amsdu_ctrl amsdu_ctrl;
 	} ____cacheline_aligned_in_smp;
+	struct mwl_tx_hist tx_hist;
 	u32 tx_rate_info;
 	u16 rx_format;
 	u16 rx_nss;

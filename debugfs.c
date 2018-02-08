@@ -83,6 +83,198 @@ static void dump_data(char *p, int size, int *len, u8 *data,
 	}
 }
 
+static void _dump_tx_hist_mu(char *p, int size, int *len, bool *printed,
+			     u32 *total, u8 nss, u8 bw, u8 mcs, u8 sgi,
+			     struct mwl_sta *sta_info)
+{
+	char *bw_str[4] = {"ht20", "ht40", "ht80", "ht160"};
+	char *sgi_str[2] = {"lgi", "sgi"};
+	struct mwl_tx_hist_data *tx_hist_data;
+	u32 cnt, rateinfo, per0, per1, per2, per3, per4, ratemask;
+
+	tx_hist_data = &sta_info->tx_hist.mu_rate[nss][bw][sgi][mcs];
+	cnt = le32_to_cpu(tx_hist_data->cnt);
+	rateinfo = le32_to_cpu(tx_hist_data->rateinfo);
+	if (cnt && (rateinfo > 0)) {
+		*total += cnt;
+		per4 = le32_to_cpu(tx_hist_data->per[4]);
+		per3 = le32_to_cpu(tx_hist_data->per[3]);
+		per2 = le32_to_cpu(tx_hist_data->per[2]);
+		per1 = le32_to_cpu(tx_hist_data->per[1]);
+		per0 = le32_to_cpu(tx_hist_data->per[0]);
+		if (!*printed) {
+			*len += scnprintf(p + *len, size - *len,
+				"%s %26s  <%2d %8s%2d%8s%2d%8s%2d%8s%2d\n",
+				"MU_MIMO rate", " PER%", TX_HISTO_PER_THRES[0],
+				">=", TX_HISTO_PER_THRES[0],
+				">=", TX_HISTO_PER_THRES[1],
+				">=", TX_HISTO_PER_THRES[2],
+				">=", TX_HISTO_PER_THRES[3]);
+			*len += scnprintf(p + *len, size - *len,
+				"TOTAL MPDU tx pkt: %d\n",
+				sta_info->tx_hist.total_tx_cnt[MU_MIMO]);
+				*printed = true;
+		}
+		if ((rateinfo & 0x3) == 0)
+			ratemask = 0xfff;
+		else
+			ratemask = 0xffff;
+		if ((sta_info->tx_hist.cur_rate_info[MU_MIMO] & ratemask) ==
+		    (rateinfo & ratemask))
+			 /* mark as current rate */
+			*len += scnprintf(p + *len, size - *len, "*");
+		else
+			*len += scnprintf(p + *len, size - *len, " ");
+		*len += scnprintf(p + *len, size - *len,
+			"%5s_%3s_%1dSS_MCS%2d: %10u, %9d, %9d, %9d, %9d, %9d\n",
+			bw_str[bw], sgi_str[sgi], (nss + 1), mcs, cnt, per0,
+			per1, per2, per3, per4);
+	}
+}
+
+static void dump_tx_hist_mu(char *p, int size, int *len, bool *printed,
+			    u32 *total, struct mwl_sta *sta_info)
+{
+	u8 nss, bw, mcs, sgi;
+
+	for (nss = 0; nss < (QS_NUM_SUPPORTED_11AC_NSS - 1); nss++) {
+		for (bw = 0; bw < QS_NUM_SUPPORTED_11AC_BW; bw++) {
+			for (mcs = 0; mcs < QS_NUM_SUPPORTED_11AC_MCS; mcs++) {
+				for (sgi = 0; sgi < QS_NUM_SUPPORTED_GI;
+				     sgi++) {
+					_dump_tx_hist_mu(p, size, len, printed,
+							 total, nss, bw, mcs,
+							 sgi, sta_info);
+				}
+			}
+		}
+	}
+}
+
+
+static void dump_tx_hist_su(char *p, int size, int *len, bool su, bool *printed,
+			    u32 *total, struct mwl_sta *sta_info)
+{
+	int g_rate[14] = {1, 2, 5, 11, 22, 6, 9, 12, 18, 24, 36, 48, 54, 72};
+	char *bw_str[4] = {"ht20", "ht40", "ht80", "ht160"};
+	char *sgi_str[2] = {"lgi", "sgi"};
+	char title_str[32];
+	struct mwl_tx_hist *tx_hist;
+	struct mwl_tx_hist_data *tx_hist_data;
+	u32 j, loopcnt;
+	u32 cnt, rateinfo, per0, per1, per2, per3, per4, ratemask;
+	u8 format, bw, sgi, mcs, nss;
+
+	tx_hist = &sta_info->tx_hist;
+	if (su) {
+		loopcnt = MAX_SUPPORTED_RATES;
+		tx_hist_data = &tx_hist->su_rate[0];
+	} else {
+		loopcnt = TX_RATE_HISTO_CUSTOM_CNT;
+		tx_hist_data = &tx_hist->custom_rate[0];
+	}
+
+	for (j = 0; j < loopcnt; j++) {
+		cnt = le32_to_cpu(tx_hist_data[j].cnt);
+		rateinfo = le32_to_cpu(tx_hist_data[j].rateinfo);
+		if (cnt && (rateinfo > 0)) {
+			*total += cnt;
+			per4 = le32_to_cpu(tx_hist_data[j].per[4]);
+			per3 = le32_to_cpu(tx_hist_data[j].per[3]);
+			per2 = le32_to_cpu(tx_hist_data[j].per[2]);
+			per1 = le32_to_cpu(tx_hist_data[j].per[1]);
+			per0 = le32_to_cpu(tx_hist_data[j].per[0]);
+			if (!*printed) {
+				*len += scnprintf(p + *len, size - *len,
+				"%s %26s  <%2d %8s%2d%8s%2d%8s%2d%8s%2d\n",
+				su ? "SU_MIMO rate" : " Custom rate",
+				" PER%", TX_HISTO_PER_THRES[0],
+				">=", TX_HISTO_PER_THRES[0],
+				">=", TX_HISTO_PER_THRES[1],
+				">=", TX_HISTO_PER_THRES[2],
+				">=", TX_HISTO_PER_THRES[3]);
+			*len += scnprintf(p + *len, size - *len,
+				"TOTAL MPDU tx pkt: %d\n",
+				tx_hist->total_tx_cnt[SU_MIMO]);
+				*printed = true;
+			}
+			format = rateinfo & MWL_TX_RATE_FORMAT_MASK;
+			bw = (rateinfo & MWL_TX_RATE_BANDWIDTH_MASK) >>
+				MWL_TX_RATE_BANDWIDTH_SHIFT;
+			sgi = (rateinfo & MWL_TX_RATE_SHORTGI_MASK) >>
+				MWL_TX_RATE_SHORTGI_SHIFT;
+			mcs = (rateinfo & MWL_TX_RATE_RATEIDMCS_MASK) >>
+				MWL_TX_RATE_RATEIDMCS_SHIFT;
+			if (format == TX_RATE_FORMAT_LEGACY)
+				ratemask = 0xfff;
+			else
+				ratemask = 0xffff;
+			if ((tx_hist->cur_rate_info[SU_MIMO] & ratemask) ==
+			    (rateinfo & ratemask))
+				/* mark as current rate */
+				*len += scnprintf(p + *len, size - *len, "*");
+			else
+				*len += scnprintf(p + *len, size - *len, " ");
+			if (format == TX_RATE_FORMAT_LEGACY) {
+				if (mcs == 2) {
+					*len += scnprintf(p + *len, size - *len,
+					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
+					"5.5Mbps             :", cnt, per0,
+					per1, per2, per3, per4);
+				} else {
+					sprintf(title_str,
+						"%-3dMbps             :",
+						g_rate[mcs]);
+					*len += scnprintf(p + *len, size - *len,
+					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
+					title_str, cnt, per0, per1, per2, per3,
+					per4);
+				}
+			} else if (format ==  TX_RATE_FORMAT_11N) {
+				sprintf(title_str, "%4s_%3s_MCS%2d	    :",
+					bw_str[bw], sgi_str[sgi], mcs);
+				*len += scnprintf(p + *len, size - *len,
+					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
+					title_str, cnt, per0, per1, per2, per3,
+					per4);
+			} else {
+				nss = (mcs >> 4);
+				sprintf(title_str, "%5s_%3s_%1dSS_MCS%2d :",
+					bw_str[bw], sgi_str[sgi], (nss+1),
+					(mcs & 0xf));
+				*len += scnprintf(p + *len, size - *len,
+					"%s %10u, %9d, %9d, %9d, %9d, %9d\n",
+					title_str, cnt, per0, per1, per2, per3,
+					per4);
+			}
+		}
+	}
+}
+
+static void dump_tx_hist(char *p, int size, int *len, struct mwl_sta *sta_info)
+{
+	int type;
+	bool printed, su;
+	u32 total;
+
+	for (type = 0; type <= SU_MU_TYPE_CNT; type++) {
+		printed = false;
+		total = 0;
+		if (type == MU_MIMO) {
+			dump_tx_hist_mu(p, size, len, &printed,
+					&total, sta_info);
+		} else {
+			su = (type == SU_MIMO) ? true : false;
+			dump_tx_hist_su(p, size, len, su, &printed,
+					&total, sta_info);
+		}
+		if (printed)
+			*len += scnprintf(p + *len, size - *len,
+					  "  TOTAL              : %10u\n\n",
+					  total);
+	}
+}
+
 static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
 			   u32 append, u32 totallen, bool textmode)
 {
@@ -928,8 +1120,10 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 
 	ret = mwl_fwcmd_get_ratetable(priv->hw, addr, rate_table,
 				      table_size, 0);
-	if (ret)
+	if (ret) {
+		kfree(rate_table);
 		goto err;
+	}
 
 	len += scnprintf(p + len, size - len, "\n");
 	len += scnprintf(p + len, size - len,
@@ -938,7 +1132,7 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 		"GF/Pre", "PId", "LDPC", "BF", "TxAnt", "Rate");
 	idx = 0;
 	rate_info = le32_to_cpu(*(__le32 *)rate_table);
-	while (rate_info != 0) {
+	while (rate_info) {
 		fmt = rate_info & MWL_TX_RATE_FORMAT_MASK;
 		stbc = (rate_info & MWL_TX_RATE_STBC_MASK) >>
 			MWL_TX_RATE_STBC_SHIFT;
@@ -989,6 +1183,7 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 	}
 	len += scnprintf(p + len, size - len, "\n");
 
+	kfree(rate_table);
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
 err:
@@ -1028,6 +1223,100 @@ static ssize_t mwl_debugfs_ratetable_write(struct file *file,
 	}
 
 	priv->ra_aid = sta_aid;
+	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_tx_hist_read(struct file *file, char __user *ubuf,
+					size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	struct ieee80211_sta *sta;
+	struct mwl_sta *sta_info;
+	ssize_t ret;
+
+	if (priv->chip_type != MWL8964)
+		return -EPERM;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len,
+			 "SU: <4:%d >=4:%d >=15:%d >=50:%d >=100:%d >=250:%d\n",
+			 priv->ra_tx_attempt[SU_MIMO][0],
+			 priv->ra_tx_attempt[SU_MIMO][1],
+			 priv->ra_tx_attempt[SU_MIMO][2],
+			 priv->ra_tx_attempt[SU_MIMO][3],
+			 priv->ra_tx_attempt[SU_MIMO][4],
+			 priv->ra_tx_attempt[SU_MIMO][5]);
+	len += scnprintf(p + len, size - len,
+			 "MU: <4:%d >=4:%d >=15:%d >=50:%d >=100:%d >=250:%d\n",
+			 priv->ra_tx_attempt[MU_MIMO][0],
+			 priv->ra_tx_attempt[MU_MIMO][1],
+			 priv->ra_tx_attempt[MU_MIMO][2],
+			 priv->ra_tx_attempt[MU_MIMO][3],
+			 priv->ra_tx_attempt[MU_MIMO][4],
+			 priv->ra_tx_attempt[MU_MIMO][5]);
+	spin_lock_bh(&priv->sta_lock);
+	list_for_each_entry(sta_info, &priv->sta_list, list) {
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
+				   drv_priv);
+		len += scnprintf(p + len, size - len, "\nSTA %pM\n", sta->addr);
+		len += scnprintf(p + len, size - len,
+				 "============================\n");
+		dump_tx_hist(p, size, &len, sta_info);
+		len += scnprintf(p + len, size - len,
+				 "============================\n");
+	}
+	spin_unlock_bh(&priv->sta_lock);
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+	return ret;
+}
+
+static ssize_t mwl_debugfs_tx_hist_write(struct file *file,
+					 const char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int reset;
+	struct mwl_sta *sta_info;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &reset)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (!reset) {
+		memset(&priv->ra_tx_attempt, 0, 2 * 6 * sizeof(u32));
+		spin_lock_bh(&priv->sta_lock);
+		list_for_each_entry(sta_info, &priv->sta_list, list) {
+			memset(&sta_info->tx_hist, 0,
+			       sizeof(sta_info->tx_hist));
+		}
+		spin_unlock_bh(&priv->sta_lock);
+	}
+
 	ret = count;
 
 err:
@@ -1441,6 +1730,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
+MWLWIFI_DEBUGFS_FILE_OPS(tx_hist);
 MWLWIFI_DEBUGFS_FILE_OPS(ba_hist);
 MWLWIFI_DEBUGFS_FILE_OPS(fixed_rate);
 MWLWIFI_DEBUGFS_FILE_OPS(core_dump);
@@ -1470,6 +1760,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
+	MWLWIFI_DEBUGFS_ADD_FILE(tx_hist);
 	MWLWIFI_DEBUGFS_ADD_FILE(ba_hist);
 	MWLWIFI_DEBUGFS_ADD_FILE(fixed_rate);
 	MWLWIFI_DEBUGFS_ADD_FILE(core_dump);

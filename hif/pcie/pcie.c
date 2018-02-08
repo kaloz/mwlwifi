@@ -929,6 +929,105 @@ static void pcie_set_sta_id(struct ieee80211_hw *hw,
 	pcie_priv->sta_link[stnid] = set ? sta : NULL;
 }
 
+static void pcie_tx_account(struct mwl_priv *priv,
+			    struct mwl_sta *sta_info,
+			    struct acnt_tx_s *acnt_tx)
+{
+	u32 rate_info, tx_cnt;
+	u8 index, type, rate_ac, format, bw, gi, mcs, nss;
+	u16 ratemask;
+	u8 i, found;
+	struct mwl_tx_hist *tx_hist;
+	struct mwl_tx_hist_data *tx_hist_data;
+
+	rate_info = le32_to_cpu(acnt_tx->tx_info.rate_info);
+	tx_cnt = le32_to_cpu(acnt_tx->tx_cnt);
+	index = acnt_tx->rate_tbl_index;
+	type = acnt_tx->type;
+
+	if (!rate_info)
+		return;
+	sta_info->tx_rate_info = rate_info;
+
+	tx_hist = &sta_info->tx_hist;
+	if (!tx_hist || (type >= SU_MU_TYPE_CNT))
+		return;
+
+	format = rate_info & MWL_TX_RATE_FORMAT_MASK;
+	bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
+		MWL_TX_RATE_BANDWIDTH_SHIFT;
+	gi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
+		MWL_TX_RATE_SHORTGI_SHIFT;
+	mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
+		MWL_TX_RATE_RATEIDMCS_SHIFT;
+
+	tx_hist->cur_rate_info[type] = rate_info;
+
+	/* Rate table index is valid */
+	if (index != 0xff) {
+		if (type == MU_MIMO) {
+			rate_ac = mcs & 0xf;
+			nss = mcs >> 4;
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+				tx_hist_data =
+					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
+				tx_hist_data->rateinfo = rate_info;
+				tx_hist_data->cnt++;
+				tx_hist->total_tx_cnt[type] += tx_cnt;
+			}
+		} else {
+			/* If legacy, skip legacy preamble bit 15 */
+			if (format == TX_RATE_FORMAT_LEGACY)
+				ratemask = 0xfff;
+			else
+				ratemask = 0xffff;
+			tx_hist_data = &tx_hist->su_rate[0];
+			if ((tx_hist_data[index].rateinfo & ratemask) ==
+			    (rate_info & ratemask)) {
+				tx_hist_data[index].cnt++;
+				tx_hist->total_tx_cnt[type] += tx_cnt;
+			}
+		}
+	} else {
+		if (type == MU_MIMO) {
+			rate_ac = mcs & 0xf;
+			nss = mcs >> 4;
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+				tx_hist_data =
+					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
+				tx_hist_data->rateinfo = rate_info;
+				tx_hist_data->cnt++;
+				tx_hist->total_tx_cnt[type] += tx_cnt;
+			}
+		} else {
+			/* If legacy, skip legacy preamble bit 15 */
+			if (format == TX_RATE_FORMAT_LEGACY)
+				ratemask = 0xfff;
+			else
+				ratemask = 0xffff;
+			tx_hist_data = &tx_hist->custom_rate[0];
+			/* Go through non rate table buffer to see if any has
+			 * been used. If all used up, recycle by using index 0
+			 */
+			for (i = 0; i < TX_RATE_HISTO_CUSTOM_CNT; i++) {
+				if (!tx_hist_data[i].rateinfo ||
+				    ((tx_hist_data[i].rateinfo & ratemask) ==
+				    (rate_info & ratemask))) {
+					found = 1;
+					break;
+				}
+			}
+			if (found)
+				index = i;
+			else
+				index = 0; /* reuse index 0 buffer */
+			tx_hist_data[index].rateinfo = rate_info;
+			tx_hist_data[index].cnt++;
+			tx_hist->total_tx_cnt[type] += tx_cnt;
+		}
+	}
+}
+
 static void pcie_rx_account(struct mwl_priv *priv,
 			    struct mwl_sta *sta_info,
 			    struct acnt_rx_s *acnt_rx)
@@ -999,6 +1098,109 @@ static void pcie_rx_account(struct mwl_priv *priv,
 		RXINFO_RSSI_X_SHIFT) & RXINFO_RSSI_X_MASK);
 }
 
+static void pcie_tx_per(struct mwl_priv *priv, struct mwl_sta *sta_info,
+			struct acnt_ra_s *acnt_ra)
+{
+	u32 rate_info;
+	u8 index, per, type, rate_ac, per_index, format, bw, gi, mcs, nss;
+	u16 ratemask;
+	u8 i, found;
+	struct mwl_tx_hist *tx_hist;
+	struct mwl_tx_hist_data *tx_hist_data;
+
+	rate_info = le32_to_cpu(acnt_ra->rate_info);
+	index = acnt_ra->rate_tbl_index;
+	per = acnt_ra->per;
+	type = acnt_ra->type;
+
+	tx_hist = &sta_info->tx_hist;
+
+	if (!tx_hist || !rate_info || (type >= SU_MU_TYPE_CNT))
+		return;
+
+	if ((type == SU_MIMO) && (index >= MAX_SUPPORTED_RATES) &&
+	    (index != 0xFF))
+		return;
+
+	if (per >= TX_HISTO_PER_THRES[3])
+		per_index = 4;
+	else if (per >= TX_HISTO_PER_THRES[2])
+		per_index = 3;
+	else if (per >= TX_HISTO_PER_THRES[1])
+		per_index = 2;
+	else if (per >= TX_HISTO_PER_THRES[0])
+		per_index = 1;
+	else
+		per_index = 0;
+
+	format = rate_info & MWL_TX_RATE_FORMAT_MASK;
+	bw = (rate_info & MWL_TX_RATE_BANDWIDTH_MASK) >>
+		MWL_TX_RATE_BANDWIDTH_SHIFT;
+	gi = (rate_info & MWL_TX_RATE_SHORTGI_MASK) >>
+		MWL_TX_RATE_SHORTGI_SHIFT;
+	mcs = (rate_info & MWL_TX_RATE_RATEIDMCS_MASK) >>
+		MWL_TX_RATE_RATEIDMCS_SHIFT;
+
+	/* Rate table index is valid */
+	if (index != 0xff) {
+		if (type == MU_MIMO) {
+			rate_ac = mcs & 0xf;
+			nss = mcs >> 4;
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+				tx_hist_data =
+					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
+				tx_hist_data->rateinfo = rate_info;
+				tx_hist_data->per[per_index]++;
+			}
+		} else {
+			/* If legacy, skip legacy preamble bit 15 */
+			if (format == TX_RATE_FORMAT_LEGACY)
+				ratemask = 0xfff;
+			else
+				ratemask = 0xffff;
+			tx_hist_data = &tx_hist->su_rate[0];
+			if ((tx_hist_data[index].rateinfo & ratemask) ==
+			    (rate_info & ratemask))
+				tx_hist_data[index].per[per_index]++;
+		}
+	} else {
+		if (type == MU_MIMO) {
+			rate_ac = mcs & 0xf;
+			nss = mcs >> 4;
+			if (nss < (QS_NUM_SUPPORTED_11AC_NSS - 1)) {
+				tx_hist_data =
+					&tx_hist->mu_rate[nss][bw][gi][rate_ac];
+				tx_hist_data->rateinfo = rate_info;
+				tx_hist_data->per[per_index]++;
+			}
+		} else {
+			/* If legacy, skip legacy preamble bit 15 */
+			if (format == TX_RATE_FORMAT_LEGACY)
+				ratemask = 0xfff;
+			else
+				ratemask = 0xffff;
+			tx_hist_data = &tx_hist->custom_rate[0];
+			/* Go through non rate table buffer to see if any has
+			 * been used. If all used up, recycle by using index 0
+			 */
+			for (i = 0; i < TX_RATE_HISTO_CUSTOM_CNT; i++) {
+				if (!tx_hist_data[i].rateinfo ||
+				    ((tx_hist_data[i].rateinfo & ratemask) ==
+				    (rate_info & ratemask))) {
+					found = 1;
+					break;
+				}
+			}
+			if (found)
+				index = i;
+			else
+				index = 0; /* reuse index 0 buffer */
+			tx_hist_data[index].rateinfo = rate_info;
+			tx_hist_data[index].per[per_index]++;
+		}
+	}
+}
+
 static void pcie_ba_account(struct mwl_priv *priv,
 			    struct mwl_sta *sta_info,
 			    struct acnt_ba_s *acnt_ba)
@@ -1035,10 +1237,13 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 	struct acnt_s *acnt;
 	struct acnt_tx_s *acnt_tx;
 	struct acnt_rx_s *acnt_rx;
+	struct acnt_ra_s *acnt_ra;
 	struct acnt_ba_s *acnt_ba;
 	struct pcie_dma_data *dma_data;
 	struct mwl_sta *sta_info;
 	u16 nf_a, nf_b, nf_c, nf_d;
+	u16 stnid;
+	u8 type;
 
 	acnt_head = readl(pcie_priv->iobase1 + MACREG_REG_ACNTHEAD);
 	acnt_tail = readl(pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
@@ -1082,8 +1287,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
 			if (sta_info) {
 				spin_lock_bh(&priv->sta_lock);
-				sta_info->tx_rate_info =
-					le32_to_cpu(acnt_tx->tx_info.rate_info);
+				pcie_tx_account(priv, sta_info, acnt_tx);
 				spin_unlock_bh(&priv->sta_lock);
 			}
 			break;
@@ -1113,6 +1317,33 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 				spin_lock_bh(&priv->sta_lock);
 				pcie_rx_account(priv, sta_info, acnt_rx);
 				spin_unlock_bh(&priv->sta_lock);
+			}
+			break;
+		case ACNT_CODE_RA_STATS:
+			acnt_ra = (struct acnt_ra_s *)pstart;
+			stnid = le16_to_cpu(acnt_ra->stn_id);
+			if ((stnid > 0) && (stnid <= priv->stnid_num)) {
+				type = acnt_ra->type;
+				if (type < 2) {
+					if (acnt_ra->tx_attempt_cnt >= 250)
+						priv->ra_tx_attempt[type][5]++;
+					else if (acnt_ra->tx_attempt_cnt >= 100)
+						priv->ra_tx_attempt[type][4]++;
+					else if (acnt_ra->tx_attempt_cnt >= 50)
+						priv->ra_tx_attempt[type][3]++;
+					else if (acnt_ra->tx_attempt_cnt >= 15)
+						priv->ra_tx_attempt[type][2]++;
+					else if (acnt_ra->tx_attempt_cnt >= 4)
+						priv->ra_tx_attempt[type][1]++;
+					else
+						priv->ra_tx_attempt[type][0]++;
+				}
+				sta_info = utils_find_sta_by_id(priv, stnid);
+				if (sta_info) {
+					spin_lock_bh(&priv->sta_lock);
+					pcie_tx_per(priv, sta_info, acnt_ra);
+					spin_unlock_bh(&priv->sta_lock);
+				}
 			}
 			break;
 		case ACNT_CODE_BA_STATS:

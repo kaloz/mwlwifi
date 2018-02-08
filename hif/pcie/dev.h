@@ -610,6 +610,18 @@ struct acnt_rx_s { /* Accounting Record for Rx PPDU */
 	struct rx_info rx_info;/* Receive parameters from 1st valid MPDU/AMPDU*/
 } __packed;
 
+struct acnt_ra_s { /* Accounting Record w/ rateinfo PER */
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 per;               /* PER for this rateinfo                        */
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+	__le16 stn_id;        /* sta index this rateinfo is tied to           */
+	u8 type;              /* SU:0 or MU:1                                 */
+	u8 rate_tbl_index;    /* ratetbl index                                */
+	__le32 rate_info;     /* rateinfo for this ratetbl index              */
+	__le32 tx_attempt_cnt;/* Total tx pkt during rate adapt interval      */
+} __packed;
+
 struct acnt_ba_s { /* Accounting Record w/ rateinfo PER */
 	__le16 code;          /* Unique code for each type                    */
 	u8 len;               /* Length in DWORDS, including header           */
