@@ -386,7 +386,7 @@ struct mwl_tx_hist_data {
 	u32 cnt;
 	/* store according to TX_HISTO_PER_THRES threshold    */
 	u32 per[TX_RATE_HISTO_PER_CNT];
-} __packed;
+};
 
 struct mwl_tx_hist {
 	struct mwl_tx_hist_data su_rate[MAX_SUPPORTED_RATES];
@@ -398,7 +398,7 @@ struct mwl_tx_hist {
 	u32 cur_rate_info[SU_MU_TYPE_CNT];
 	/* Total tx attempt cnt for 0:SU, 1:MU */
 	u32 total_tx_cnt[SU_MU_TYPE_CNT];
-} __packed;
+};
 
 struct mwl_sta {
 	struct list_head list;

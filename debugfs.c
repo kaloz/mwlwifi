@@ -1087,7 +1087,7 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 	struct ieee80211_sta *sta;
 	u8 addr[ETH_ALEN];
 	int table_size = (sizeof(__le32) * 2 * SYSADPT_MAX_RATE_ADAPT_RATES);
-	u8 *rate_table;
+	u8 *rate_table, *rate_idx;
 	u32 rate_info;
 	u8 fmt, stbc, bw, sgi, mcs, preamble_gf, power_id, ldpc, bf, ant;
 	int idx, rate, nss;
@@ -1131,7 +1131,8 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 		"Num", "Fmt", "STBC", "BW", "SGI", "Nss", "RateId",
 		"GF/Pre", "PId", "LDPC", "BF", "TxAnt", "Rate");
 	idx = 0;
-	rate_info = le32_to_cpu(*(__le32 *)rate_table);
+	rate_idx = rate_table;
+	rate_info = le32_to_cpu(*(__le32 *)rate_idx);
 	while (rate_info) {
 		fmt = rate_info & MWL_TX_RATE_FORMAT_MASK;
 		stbc = (rate_info & MWL_TX_RATE_STBC_MASK) >>
@@ -1178,8 +1179,8 @@ static ssize_t mwl_debugfs_ratetable_read(struct file *file, char __user *ubuf,
 			utils_get_phy_rate(fmt, bw, sgi, mcs));
 
 		idx++;
-		rate_table += (2 * sizeof(__le32));
-		rate_info = le32_to_cpu(*(__le32 *)rate_table);
+		rate_idx += (2 * sizeof(__le32));
+		rate_info = le32_to_cpu(*(__le32 *)rate_idx);
 	}
 	len += scnprintf(p + len, size - len, "\n");
 
