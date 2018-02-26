@@ -74,7 +74,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     a. Establish a symbolic link to your working mwlwifi directory with current mwlwifi package name under directory "dl":
 
-    #ls -l mwlwifi*
+    #### ls -l mwlwifi*
 
     lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
 
@@ -82,7 +82,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     b. Back up original mwlwifi package and tar your working mwlwifi to replace oringial mwlwifi package:
 
-    #tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
+    #### tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
 
     c. You can use "make V=s" to build the whole image or "make V=s package/kernel/mwlwifi/compile" to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
 
