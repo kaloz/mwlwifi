@@ -2669,11 +2669,11 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 			stream = &priv->ampdu[idx + i];
 
 			if (stream->sta == sta) {
-				mwl_fwcmd_remove_stream(hw, stream);
 				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream,
 						     BA_FLAG_DIRECTION_UP);
 				spin_lock_bh(&priv->stream_lock);
+				mwl_fwcmd_remove_stream(hw, stream);
 			}
 		}
 	} else {
@@ -2681,11 +2681,11 @@ void mwl_fwcmd_del_sta_streams(struct ieee80211_hw *hw,
 			stream = &priv->ampdu[idx];
 
 			if (stream->sta == sta) {
-				mwl_fwcmd_remove_stream(hw, stream);
 				spin_unlock_bh(&priv->stream_lock);
 				mwl_fwcmd_destroy_ba(hw, stream,
 						     BA_FLAG_DIRECTION_UP);
 				spin_lock_bh(&priv->stream_lock);
+				mwl_fwcmd_remove_stream(hw, stream);
 			}
 		}
 	}
