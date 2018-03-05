@@ -531,8 +531,7 @@ int pcie_tx_init(struct ieee80211_hw *hw)
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int rc;
-
-	skb_queue_head_init(&pcie_priv->delay_q);
+	int i;
 
 	rc = pcie_tx_ring_alloc(priv);
 	if (rc) {
@@ -547,6 +546,10 @@ int pcie_tx_init(struct ieee80211_hw *hw)
 		return rc;
 	}
 
+	pcie_priv->delay_q_idx = 0;
+	for (i = 0; i < PCIE_DELAY_FREE_Q_LIMIT; i++)
+		pcie_priv->delay_q[i] = NULL;
+
 	return 0;
 }
 
@@ -554,8 +557,11 @@ void pcie_tx_deinit(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
+	int i;
 
-	skb_queue_purge(&pcie_priv->delay_q);
+	for (i = 0; i < PCIE_DELAY_FREE_Q_LIMIT; i++)
+		if (!pcie_priv->delay_q[i])
+			dev_kfree_skb_any(pcie_priv->delay_q[i]);
 
 	pcie_tx_ring_cleanup(priv);
 	pcie_tx_ring_free(priv);
@@ -655,6 +661,7 @@ void pcie_tx_done(unsigned long data)
 	struct pcie_tx_hndl *tx_hndl;
 	struct pcie_tx_desc *tx_desc;
 	struct sk_buff *done_skb;
+	int idx;
 	u32 rate;
 	struct pcie_dma_data *dma_data;
 	struct ieee80211_hdr *wh;
@@ -693,11 +700,14 @@ void pcie_tx_done(unsigned long data)
 			wmb(); /*Data Memory Barrier*/
 
 			skb_get(done_skb);
-			skb_queue_tail(&pcie_priv->delay_q, done_skb);
-			if (skb_queue_len(&pcie_priv->delay_q) >
-			    PCIE_DELAY_FREE_Q_LIMIT)
-				dev_kfree_skb_any(
-					skb_dequeue(&pcie_priv->delay_q));
+			idx = pcie_priv->delay_q_idx;
+			if (pcie_priv->delay_q[idx])
+				dev_kfree_skb_any(pcie_priv->delay_q[idx]);
+			pcie_priv->delay_q[idx] = done_skb;
+			idx++;
+			if (idx >= PCIE_DELAY_FREE_Q_LIMIT)
+				idx = 0;
+			pcie_priv->delay_q_idx = idx;
 
 			dma_data = (struct pcie_dma_data *)done_skb->data;
 			wh = &dma_data->wh;
