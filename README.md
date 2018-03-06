@@ -122,3 +122,21 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/compile` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
 
 Due to package version being the same as previous one, you need to add option `--force-reinstall` when you use `opkg` to update mwlwifi package on your device.
+
+## Monitor interface for debug
+
+1. Create moinitor interface mon0:
+    ```sh
+    iw wlan0/wlan1 interface add mon0 type monitor
+    ifconfig mon0 up
+    ```
+
+2. Use tcpdump to dump dhcp packets:
+    ```sh
+    tcpdump -vvvi mon0 -n port 67 and port 68
+    ```
+
+3. Use tcpdump to dump icmp packets:
+    ```sh
+    tcpdump -vvvi mon0 icmp
+    ```
