@@ -279,7 +279,6 @@ static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
 			   u32 append, u32 totallen, bool textmode)
 {
 	struct file *filp_core = NULL;
-	mm_segment_t oldfs;
 	char file_name[40];
 	u8 *buf = kmalloc(length * 3, GFP_KERNEL);
 	u8 *data_p = buf;
@@ -291,9 +290,6 @@ static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
 	memset(file_name, 0, sizeof(file_name));
 	sprintf(file_name, "/dev/shm/coredump-%x-%x",
 		region, (region + totallen));
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
 
 	if (append)
 		filp_core = filp_open(file_name, O_RDWR | O_APPEND, 0);
@@ -317,15 +313,15 @@ static void core_dump_file(u8 *valbuf, u32 length, u32 region, u32 address,
 			}
 			data_p = buf + j;
 			data_p += sprintf(data_p, "\n");
-			vfs_write(filp_core, buf, strlen(buf),
-				  &filp_core->f_pos);
+			__kernel_write(filp_core, buf, strlen(buf),
+				       &filp_core->f_pos);
 		} else
-			vfs_write(filp_core, valbuf, length, &filp_core->f_pos);
+			__kernel_write(filp_core, valbuf, length,
+				       &filp_core->f_pos);
 
 		filp_close(filp_core, current->files);
 	}
 
-	set_fs(oldfs);
 	kfree(buf);
 }
 
@@ -1339,7 +1335,6 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 	u8 bmap0flag, nobaflag;
 	char buff[500], file_location[20];
 	struct file *filp_bahisto;
-	mm_segment_t oldfs;
 	u8 *data_p = buff;
 	ssize_t ret;
 
@@ -1355,13 +1350,10 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 	memset(file_location, 0, sizeof(file_location));
 	sprintf(file_location, "/tmp/ba_histo-%d", priv->ba_aid);
 
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
 	filp_bahisto = filp_open(file_location,
 				 O_RDWR | O_CREAT | O_TRUNC, 0);
 
 	if (IS_ERR(filp_bahisto)) {
-		set_fs(oldfs);
 		ret = -EIO;
 		goto err;
 	}
@@ -1402,8 +1394,8 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 
 			/* Buffer is full. Write to file and reset buf */
 			if ((strlen(buff) + 36) >= 500) {
-				vfs_write(filp_bahisto, buff, strlen(buff),
-					  &filp_bahisto->f_pos);
+				__kernel_write(filp_bahisto, buff, strlen(buff),
+					       &filp_bahisto->f_pos);
 				mdelay(2);
 				memset(buff, 0, sizeof(buff));
 				data_p = buff;
@@ -1427,8 +1419,8 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 				data_p += sprintf(data_p, "%8d\n", nobaflag);
 		}
 
-		vfs_write(filp_bahisto, buff, strlen(buff),
-			  &filp_bahisto->f_pos);
+		__kernel_write(filp_bahisto, buff, strlen(buff),
+			       &filp_bahisto->f_pos);
 		len += scnprintf(p + len, size - len,
 				 "hole: %d, expect: %d, bmap0: %d, noba: %d\n",
 				 baholecnt, baexpcnt, bmap0cnt, nobacnt);
@@ -1441,7 +1433,6 @@ static ssize_t mwl_debugfs_ba_hist_read(struct file *file, char __user *ubuf,
 				 priv->ba_aid);
 
 	filp_close(filp_bahisto, current->files);
-	set_fs(oldfs);
 
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 
