@@ -107,7 +107,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
           * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
           * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
         
-    The best way is let mwlwifi set country code for you in the US version.
+    The best way is let mwlwifi set country code for you in the US version router.
 
     #### Note
 
@@ -124,14 +124,18 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 ## Replacing mwlwifi on a Current OpenWrt/LEDE Build
 
 1. Establish a symbolic link to your working mwlwifi directory with current mwlwifi package name under directory "dl":
-    ```sh
-    ls -l mwlwifi*
-    ```
 
     You should see something like the following:
     ```sh
-    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
+    cd dl
+    git clone https://github.com/kaloz/mwlwifi /home/dlin/home2/projects/github/mwlwifi
+    ln -s /home/dlin/home2/projects/github/mwlwifi ./mwlwifi-10.3.2.0-20170110
+    ls -all
+    ```
 
+    The output is like:    
+    ```text
+    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
     -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.2.0-20170110.tar.xz
     ```
 
@@ -141,7 +145,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
     ```
 
-3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/compile` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
+3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/{clean,prepare,compile}` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
 
 Due to package version being the same as previous one, you need to add option `--force-reinstall` when you use `opkg` to update mwlwifi package on your device.
 
