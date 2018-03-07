@@ -91,27 +91,31 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     
     1. Please don't change country code and let mwlwifi set it for you.   
     2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
-
-        ***For the European version, also requires to following:***
-          
-        * Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```    
-        * You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
-
     
         ```sh
         opkg remove kmod-mwifiex-sdio
         opkg remove mwifiex-sdio-firmware
         reboot
         ```
-       
-       
-    The better way is let mwlwifi set country code for you for the US version.
+        
+        ***For the European version, also requires to following:***
+          
+        * Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
+        * You find out you country: ```iw reg get``` (let's say it says ```FR``` - France), then
+          * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
+          * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
+        
+    The best way is let mwlwifi set country code for you in the US version.
 
     ##### Note
 
     There will be a change in the driver as is described in:  
     https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
     Once, it is implemented, the first option will be enough.
+
+    ###### The European version on the radio0 5ghz channel
+    
+    It usually works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
 
 
 
