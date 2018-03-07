@@ -4,18 +4,22 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 ## Building mwlwifi With OpenWrt/LEDE
 1. Modify `package/kernel/mwlwifi/Makefile`:
     ```
-    PKG_VERSION:=10.3.0.17-20160601
-    PKG_SOURCE_VERSION:=4bb95ba1aeccce506a95499b49b9b844ecfae8a1
+    PKG_VERSION:=10.3.4.0-20180305
+    PKG_SOURCE_URL:=https://github.com/kaloz/mwlwifi
+    PKG_SOURCE_PROTO:=git
+    PKG_SOURCE_VERSION:=b1b9a9e1c1beee30a8cce4038f4109727362ebe0
+    PKG_MIRROR_HASH:=7ca5604eb601784224bf2d9e6c4facbc82fbe90b18a19286511782095f3db640
     ```
 
 2. Rename `package/kernel/mwlwifi/patches` to `package/kernel/mwlwifi/patches.tmp`.
 3. Run the following commands:
     ```sh
-    make package/kernel/mwlwifi/clean
-    make V=s (-jx)
+    make V=s package/kernel/mwlwifi/{clean,prepare,compile} # -jx - where X is your cores/threads or just leave it out
+    make V=s # -jx - where X is your cores/threads or just leave it out
     ```
 
 ### Special Considerations
+
 * After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
 
 * Hostpad must include the following commit for 160 MHz operation:
@@ -83,43 +87,115 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     echo 2 > /proc/irq/irq number of phy0 or phy1/smp_affinity
     ```
 
-* Note for DFS of WRT3200ACM (88W8964):
+## Note for DFS of WRT3200ACM (88W8964)
 
-    All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
+All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
 
-    There are two ways to resolve this problem:
-    * Please don't change country code and let mwlwifi set it for you.
-    * Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+There are two ways to resolve this problem or for the European version, right now, only the 2nd option works:
     
-        ```sh
-        opkg remove kmod-mwifiex-sdio
-        opkg remove mwifiex-sdio-firmware
-        reboot
-        ```
+1. Please don't change country code and let mwlwifi set it for you.   
+2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+    
+```sh
+opkg remove kmod-mwifiex-sdio
+opkg remove mwifiex-sdio-firmware
+reboot
+```
+        
+The best way is let mwlwifi set country code for you in the US version router.
+        
+### For the European version, also requires the following, if you want 160Mhz and DTS
+      
+* Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
+* You find out your country
+  * ```iw reg get```
+    * Let's say it says ```FR``` - France), then
+      * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'```
+        * then execute ```uci commit wireless``` 
+      * or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it, then just ```Save and Apply```.
+* Next execute this command: ```opkg remove kmod-mwifiex-sdio mwifiex-sdio-firmware``` (sometimes you have to execute twice, not sure which should be first, but twice will work, because of the order of the dependencies )  
+* Reboot  
 
-    The better way is let mwlwifi set country code for you.
+
+#### Note
+
+There will be a change in the driver as is described in:  
+https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
+  
+Once this comment is implemented, the DTS and 160 mhz will work by default (not needed to remove packages installed by LEDE by default or deal with the ```phy2``` and ```radio2```).
+
+##### The radio0 5ghz 160 mhz channel note
+
+160 mhz works only with channel 100 upwards, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
+
+### For the European version, if you do not want 160Mhz and DTS
+
+All you have to do, you can keep every packages and use only non DTS frequencies as appear below that doesn't show ```DFS```.
+
+In that case, you can even use the ```radio2```, which must match with 80Mhz and same ```channel``` of the ```radio0```, and the max 18-21 dBm transit power (syslog shows, 18 is restricted, but I could set it to 21 dBm and it worked).
+
+```text
+country 98: DFS-UNSET
+	(2402 - 2472 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 23), (0 ms), DFS
+	(57240 - 63720 @ 2160), (N/A, 40), (N/A)
+
+phy#2
+country US: DFS-FCC
+	(2402 - 2472 @ 40), (N/A, 30), (N/A)
+	(5170 - 5250 @ 80), (N/A, 23), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 23), (0 ms), DFS, AUTO-BW
+	(5490 - 5730 @ 160), (N/A, 23), (0 ms), DFS
+	(5735 - 5835 @ 80), (N/A, 30), (N/A)
+	(57240 - 63720 @ 2160), (N/A, 40), (N/A)
+
+phy#1
+country FR: DFS-ETSI
+	(2402 - 2482 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 27), (0 ms), DFS
+	(57000 - 66000 @ 2160), (N/A, 40), (N/A)
+
+phy#0
+country FR: DFS-ETSI
+	(2402 - 2482 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 27), (0 ms), DFS
+	(57000 - 66000 @ 2160), (N/A, 40), (N/A)
+```
+
+
 
 ## Replacing mwlwifi on a Current OpenWrt/LEDE Build
 
 1. Establish a symbolic link to your working mwlwifi directory with current mwlwifi package name under directory "dl":
+
+    You should execute something like the following:
     ```sh
-    ls -l mwlwifi*
+    cd dl
+    git clone https://github.com/kaloz/mwlwifi /home/dlin/home2/projects/github/mwlwifi
+    ln -s /home/dlin/home2/projects/github/mwlwifi ./mwlwifi-10.3.2.0-20170110
+    ls -all
     ```
 
-    You should see something like the following:
-    ```sh
+    The output is like:    
+    ```text
     lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
-
     -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.2.0-20170110.tar.xz
     ```
 
 2. Back up original mwlwifi package and tar your working mwlwifi to replace original mwlwifi package:
 
     ```sh
+    mv mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110.backup.tar.xz
     tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
     ```
 
-3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/compile` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
+3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/{clean,prepare,compile}` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
 
 Due to package version being the same as previous one, you need to add option `--force-reinstall` when you use `opkg` to update mwlwifi package on your device.
 
