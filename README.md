@@ -98,10 +98,10 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
         reboot
         ```
         
-        ***For the European version, also requires to following:***  
-        Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```, then 
-    
-        You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
+        ***For the European version, also requires to following:***
+          
+        * Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```    
+        * You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
         
     The better way is let mwlwifi set country code for you for the US version.
 
