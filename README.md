@@ -122,15 +122,15 @@ The best way is let mwlwifi set country code for you in the US version router.
 There will be a change in the driver as is described in:  
 https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
   
-Once, it is implemented, the first option will be enough.
+Once this comment is implemented, the DTS and 160 mhz will work by default (not needed to remove packages installed by LEDE by default or deal with the ```phy2``` and ```radio2```).
 
-##### The European version on the radio0 5ghz 160 mhz channel
+##### The radio0 5ghz 160 mhz channel note
 
 160 mhz works only with channel 100 upwards, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
 
 ### For the European version, if you do not want 160Mhz and DTS
 
-All you have to do, you can keep every packages and use non DTS frequencies below that doesn't show ```DFS```.
+All you have to do, you can keep every packages and use only non DTS frequencies as appear below that doesn't show ```DFS```.
 
 In that case, you can even use the ```radio2```, which must match with 80Mhz and same ```channel``` of the ```radio0```, and the max 18-21 dBm transit power (syslog shows, 18 is restricted, but I could set it to 21 dBm and it worked).
 
