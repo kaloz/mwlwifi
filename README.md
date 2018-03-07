@@ -4,19 +4,21 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 ## Building mwlwifi With OpenWrt/LEDE
 1. Modify `package/kernel/mwlwifi/Makefile`:
     ```
-    PKG_VERSION:=10.3.0.17-20160601
-    PKG_SOURCE_VERSION:=4bb95ba1aeccce506a95499b49b9b844ecfae8a1
+    PKG_VERSION:=10.3.4.0-20180305
+    PKG_SOURCE_URL:=https://github.com/kaloz/mwlwifi
+    PKG_SOURCE_PROTO:=git
+    PKG_SOURCE_VERSION:=b1b9a9e1c1beee30a8cce4038f4109727362ebe0
+    PKG_MIRROR_HASH:=7ca5604eb601784224bf2d9e6c4facbc82fbe90b18a19286511782095f3db640
     ```
 
 2. Rename `package/kernel/mwlwifi/patches` to `package/kernel/mwlwifi/patches.tmp`.
 3. Run the following commands:
     ```sh
-    make package/kernel/mwlwifi/clean
-    make V=s (-jx)
+    make V=s package/kernel/mwlwifi/{clean,prepare,compile} # -jx - where X is your cores/threads or just leave it out
     ```
 
 ### Special Considerations
-* After driver 10.3.4.0-20180305, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
+* After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
 
 * Hostpad must include the following commit for 160 MHz operation:
     ```
@@ -107,15 +109,15 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
         
     The best way is let mwlwifi set country code for you in the US version.
 
-    ##### Note
+    #### Note
 
     There will be a change in the driver as is described in:  
     https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
     Once, it is implemented, the first option will be enough.
 
-    ###### The European version on the radio0 5ghz channel
+    ##### The European version on the radio0 5ghz channel
     
-    It usually works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
+    It usually, works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
 
 
 
@@ -128,15 +130,15 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     You should see something like the following:
     ```sh
-    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.4.0-20180305 -> /home/dlin/home2/projects/github/mwlwifi
+    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
 
-    -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.4.0-20180305.tar.xz
+    -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.2.0-20170110.tar.xz
     ```
 
 2. Back up original mwlwifi package and tar your working mwlwifi to replace original mwlwifi package:
 
     ```sh
-    tar Jcvf mwlwifi-10.3.4.0-20180305.tar.xz mwlwifi-10.3.4.0-20180305/.
+    tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
     ```
 
 3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/compile` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
