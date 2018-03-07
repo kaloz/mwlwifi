@@ -125,7 +125,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
 1. Establish a symbolic link to your working mwlwifi directory with current mwlwifi package name under directory "dl":
 
-    You should see something like the following:
+    You should execute something like the following:
     ```sh
     cd dl
     git clone https://github.com/kaloz/mwlwifi /home/dlin/home2/projects/github/mwlwifi
