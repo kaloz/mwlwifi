@@ -105,9 +105,11 @@ reboot
 ### For the European version, also requires the following
       
 * Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
-* You find out you country: ```iw reg get``` (let's say it says ```FR``` - France), then
-  * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
-  * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
+* You find out your country
+  * ```iw reg get```
+    * Let's say it says ```FR``` - France), then
+      * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
+      * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
     
 The best way is let mwlwifi set country code for you in the US version router.
 
