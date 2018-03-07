@@ -101,7 +101,7 @@ opkg remove mwifiex-sdio-firmware
 reboot
 ```
         
-### For the European version, also requires to following
+### For the European version, also requires the following
       
 * Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
 * You find out you country: ```iw reg get``` (let's say it says ```FR``` - France), then
