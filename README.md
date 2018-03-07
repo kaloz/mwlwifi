@@ -110,6 +110,7 @@ reboot
     * Let's say it says ```FR``` - France), then
       * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
       * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
+* Reboot  
     
 The best way is let mwlwifi set country code for you in the US version router.
 
