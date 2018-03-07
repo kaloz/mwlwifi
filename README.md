@@ -100,12 +100,15 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
         opkg remove mwifiex-sdio-firmware
         reboot
         ```
+    The better way is let mwlwifi set country code for you for the US version.
 
-    There will be a change in the driver as is described in:
-    https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269 
+    ##### Note
+
+    There will be a change in the driver as is described in:  
+    https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
     Once, it is implemented, the first option will be enough.
 
-    The better way is let mwlwifi set country code for you.
+
 
 ## Replacing mwlwifi on a Current OpenWrt/LEDE Build
 
