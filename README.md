@@ -117,11 +117,9 @@ There will be a change in the driver as is described in:
 https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
 Once, it is implemented, the first option will be enough.
 
-##### The European version on the radio0 5ghz channel
+##### The European version on the radio0 5ghz 160 mhz channel
 
-It usually, works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
-
-
+160 mhz works only with channel 100 upwards, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
 
 ## Replacing mwlwifi on a Current OpenWrt/LEDE Build
 
