@@ -18,6 +18,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     ```
 
 ### Special Considerations
+
 * After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
 
 * Hostpad must include the following commit for 160 MHz operation:
@@ -85,39 +86,39 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     echo 2 > /proc/irq/irq number of phy0 or phy1/smp_affinity
     ```
 
-* Note for DFS of WRT3200ACM (88W8964):
+## Note for DFS of WRT3200ACM (88W8964)
 
-    All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
+All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
 
-    There are two ways to resolve this problem or for the European version, right now, only the 2nd option works:
+There are two ways to resolve this problem or for the European version, right now, only the 2nd option works:
     
-    1. Please don't change country code and let mwlwifi set it for you.   
-    2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+1. Please don't change country code and let mwlwifi set it for you.   
+2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
     
-        ```sh
-        opkg remove kmod-mwifiex-sdio
-        opkg remove mwifiex-sdio-firmware
-        reboot
-        ```
+```sh
+opkg remove kmod-mwifiex-sdio
+opkg remove mwifiex-sdio-firmware
+reboot
+```
         
-        ***For the European version, also requires to following:***
-          
-        * Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
-        * You find out you country: ```iw reg get``` (let's say it says ```FR``` - France), then
-          * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
-          * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
-        
-    The best way is let mwlwifi set country code for you in the US version router.
-
-    #### Note
-
-    There will be a change in the driver as is described in:  
-    https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
-    Once, it is implemented, the first option will be enough.
-
-    ##### The European version on the radio0 5ghz channel
+### For the European version, also requires to following
+      
+* Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
+* You find out you country: ```iw reg get``` (let's say it says ```FR``` - France), then
+  * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
+  * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
     
-    It usually, works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
+The best way is let mwlwifi set country code for you in the US version router.
+
+#### Note
+
+There will be a change in the driver as is described in:  
+https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
+Once, it is implemented, the first option will be enough.
+
+##### The European version on the radio0 5ghz channel
+
+It usually, works with about ```100``` or ```120```, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
 
 
 
@@ -142,6 +143,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 2. Back up original mwlwifi package and tar your working mwlwifi to replace original mwlwifi package:
 
     ```sh
+    mv mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110.backup.tar.xz
     tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
     ```
 
