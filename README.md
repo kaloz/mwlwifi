@@ -102,27 +102,73 @@ opkg remove mwifiex-sdio-firmware
 reboot
 ```
         
-### For the European version, also requires the following
+The best way is let mwlwifi set country code for you in the US version router.
+        
+### For the European version, also requires the following, if you want 160Mhz and DTS
       
 * Remove the following ```radio2``` and ```default_radio2``` section from the ```/etc/config/wireless```    
 * You find out your country
   * ```iw reg get```
     * Let's say it says ```FR``` - France), then
-      * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'``` 
-      * Or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it.
+      * Either add this option to ```radio0``` and ```radio1``` section  in the  ```/etc/config/wireless``` as ```option country 'FR'```
+        * then execute ```uci commit wireless``` 
+      * or via ```LUCI``` at ```/cgi-bin/luci/admin/network/wireless```, click both wireless interfaces with ```EDIT``` and the country settings is in the ```Advanced Settings``` tab, where you can set it, then just ```Save and Apply```.
+* Next execute this command: ```opkg remove kmod-mwifiex-sdio mwifiex-sdio-firmware``` (sometimes you have to execute twice, not sure which should be first, but twice will work, because of the order of the dependencies )  
 * Reboot  
-    
-The best way is let mwlwifi set country code for you in the US version router.
+
 
 #### Note
 
 There will be a change in the driver as is described in:  
 https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269   
+  
 Once, it is implemented, the first option will be enough.
 
 ##### The European version on the radio0 5ghz 160 mhz channel
 
 160 mhz works only with channel 100 upwards, then ```mwlwifi``` auto set it up, ```auto``` is not working for now.
+
+### For the European version, if you do not want 160Mhz and DTS
+
+All you have to do, you can keep every packages and use non DTS frequencies below that doesn't show ```DFS```.
+
+In that case, you can even use the ```radio2```, which must match with 80Mhz and same ```channel``` of the ```radio0```, and the max 18-21 dBm transit power (syslog shows, 18 is restricted, but I could set it to 21 dBm and it worked).
+
+```text
+country 98: DFS-UNSET
+	(2402 - 2472 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 23), (0 ms), DFS
+	(57240 - 63720 @ 2160), (N/A, 40), (N/A)
+
+phy#2
+country US: DFS-FCC
+	(2402 - 2472 @ 40), (N/A, 30), (N/A)
+	(5170 - 5250 @ 80), (N/A, 23), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 23), (0 ms), DFS, AUTO-BW
+	(5490 - 5730 @ 160), (N/A, 23), (0 ms), DFS
+	(5735 - 5835 @ 80), (N/A, 30), (N/A)
+	(57240 - 63720 @ 2160), (N/A, 40), (N/A)
+
+phy#1
+country FR: DFS-ETSI
+	(2402 - 2482 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 27), (0 ms), DFS
+	(57000 - 66000 @ 2160), (N/A, 40), (N/A)
+
+phy#0
+country FR: DFS-ETSI
+	(2402 - 2482 @ 40), (N/A, 20), (N/A)
+	(5170 - 5250 @ 80), (N/A, 20), (N/A), AUTO-BW
+	(5250 - 5330 @ 80), (N/A, 20), (0 ms), DFS, AUTO-BW
+	(5490 - 5710 @ 160), (N/A, 27), (0 ms), DFS
+	(57000 - 66000 @ 2160), (N/A, 40), (N/A)
+```
+
+
 
 ## Replacing mwlwifi on a Current OpenWrt/LEDE Build
 
