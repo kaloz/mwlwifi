@@ -91,18 +91,20 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     
     1. Please don't change country code and let mwlwifi set it for you.   
     2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+
+        ***For the European version, also requires to following:***
+          
+        * Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```    
+        * You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
+
     
         ```sh
         opkg remove kmod-mwifiex-sdio
         opkg remove mwifiex-sdio-firmware
         reboot
         ```
-        
-        ***For the European version, also requires to following:***
-          
-        * Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```    
-        * You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
-        
+       
+       
     The better way is let mwlwifi set country code for you for the US version.
 
     ##### Note
