@@ -87,15 +87,23 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     All WRT3200ACM devices are programmed with device power table. Mwlwifi driver will base on region code to set country code for your device and it will not allow you to change country code. There are another wifi (phy2) on WRT3200ACM which is not mwlwifi. It will allow you to change country code. Under this case, country code setting will be conflicted and it will let DFS can't work.
 
-    There are two ways to resolve this problem:
-    * Please don't change country code and let mwlwifi set it for you.
-    * Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+    There are two ways to resolve this problem or for the European version, right now, only the 2nd option works:
+    
+    1. Please don't change country code and let mwlwifi set it for you.   
+    2. Remove phy2. Under this case, even though you change country code, mwlwifi will reject it. Because phy2 is not existed, country code setting won't be conflicted. To do this, run the following commands (for OpenWrt/LEDE):
+    
+        ***For the European version, also requires to following:***  
+        Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```, then 
     
         ```sh
         opkg remove kmod-mwifiex-sdio
         opkg remove mwifiex-sdio-firmware
         reboot
         ```
+
+    There will be a change in the driver as is described in:
+    https://github.com/kaloz/mwlwifi/issues/280#issuecomment-370997269 
+    Once, it is implemented, the first option will be enough.
 
     The better way is let mwlwifi set country code for you.
 
