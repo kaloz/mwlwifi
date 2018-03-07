@@ -96,7 +96,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
           
         * Remove the following ```radio2``` and ```default_radio2``` from the ```/etc/config/wireless```    
         * You need to find out you country: ```iw reg get```, then set the country for the ```radio0``` and ```radio1``` as it says (in Europe is usually FR - France).
-
+    
     
         ```sh
         opkg remove kmod-mwifiex-sdio
