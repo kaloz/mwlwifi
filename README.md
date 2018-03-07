@@ -16,7 +16,7 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
     ```
 
 ### Special Considerations
-* After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
+* After driver 10.3.4.0-20180305, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.
 
 * Hostpad must include the following commit for 160 MHz operation:
     ```
@@ -128,15 +128,15 @@ mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
     You should see something like the following:
     ```sh
-    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.2.0-20170110 -> /home/dlin/home2/projects/github/mwlwifi
+    lrwxrwxrwx 1 dlin dlin      48  mwlwifi-10.3.4.0-20180305 -> /home/dlin/home2/projects/github/mwlwifi
 
-    -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.2.0-20170110.tar.xz
+    -rw-r--r-- 1 dlin dlin 4175136  mwlwifi-10.3.4.0-20180305.tar.xz
     ```
 
 2. Back up original mwlwifi package and tar your working mwlwifi to replace original mwlwifi package:
 
     ```sh
-    tar Jcvf mwlwifi-10.3.2.0-20170110.tar.xz mwlwifi-10.3.2.0-20170110/.
+    tar Jcvf mwlwifi-10.3.4.0-20180305.tar.xz mwlwifi-10.3.4.0-20180305/.
     ```
 
 3. You can use `make V=s` to build the whole image or `make V=s package/kernel/mwlwifi/compile` to build mwlwifi package. The generated whole image or mwlwifi package can be found under directory "bin".
