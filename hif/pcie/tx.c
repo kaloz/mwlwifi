@@ -560,7 +560,7 @@ void pcie_tx_deinit(struct ieee80211_hw *hw)
 	int i;
 
 	for (i = 0; i < PCIE_DELAY_FREE_Q_LIMIT; i++)
-		if (!pcie_priv->delay_q[i])
+		if (pcie_priv->delay_q[i])
 			dev_kfree_skb_any(pcie_priv->delay_q[i]);
 
 	pcie_tx_ring_cleanup(priv);
