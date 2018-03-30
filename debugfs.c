@@ -1768,10 +1768,10 @@ static ssize_t mwl_debugfs_wmmedcaap_write(struct file *file,
 		ret = -EINVAL;
 		goto err;
 	}
+	wiphy_info(priv->hw->wiphy, "set TCQ%d wmm edca with:\n", index);
 	wiphy_info(priv->hw->wiphy,
-			"set TCQ%d wmm edca with cw_min=0x%x, cw_max=0x%x, "
-			"aifs_num=%d, txop=0x%x\n",
-			index, cw_min, cw_max, aifsn, txop);
+		   "cw_min=0x%x, cw_max=0x%x, aifs_num=%d, txop=0x%x\n",
+		   cw_min, cw_max, aifsn, txop);
 
 	ret = mwl_fwcmd_set_edca_params(priv->hw, index,
 			cw_min, cw_max, aifsn, txop);

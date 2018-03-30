@@ -76,5 +76,6 @@ struct mwl_hif_ops {
 			   struct ieee80211_sta *sta,
 			   bool sta_mode, bool set);
 	void (*process_account)(struct ieee80211_hw *hw);
+	int (*mcast_cts)(struct ieee80211_hw *hw, bool enable);
 };
 #endif /* _HIF_H_ */

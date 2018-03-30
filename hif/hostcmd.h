@@ -522,12 +522,6 @@ struct hostcmd_cmd_bss_start {
 	u8 amsdu;
 } __packed;
 
-/* HOSTCMD_CMD_MCAST_CTS */
-struct hostcmd_cmd_mcast_cts {
-	struct hostcmd_header cmd_hdr;
-	u8 enable;            /* 1:enable, 0:disable */
-} __packed;
-
 /* HOSTCMD_CMD_AP_BEACON */
 struct cf_params {
 	u8 elem_id;
@@ -1154,6 +1148,12 @@ struct hostcmd_cmd_get_fw_core_dump_ {
 		struct coredump_cmd coredump;
 		struct debug_mem_cmd debug_mem;
 	} cmd_data;
+} __packed;
+
+/* HOSTCMD_CMD_MCAST_CTS */
+struct hostcmd_cmd_mcast_cts {
+	struct hostcmd_header cmd_hdr;
+	u8 enable;            /* 1:enable, 0:disable */
 } __packed;
 
 #endif /* _HOSTCMD_H_ */

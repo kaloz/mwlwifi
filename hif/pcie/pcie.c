@@ -594,11 +594,6 @@ static int pcie_reg_access(struct ieee80211_hw *hw, bool write)
 	return ret;
 }
 
-static int pcie_mcast_cts(struct ieee80211_hw *hw, bool enable)
-{
-	return mwl_fwcmd_mcast_cts(hw, enable ? 1 : 0);
-}
-
 static const struct mwl_hif_ops pcie_hif_ops = {
 	.driver_name           = PCIE_DRV_NAME,
 	.driver_version        = PCIE_DRV_VERSION,
@@ -1376,6 +1371,11 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 process_next:
 	acnt_tail = acnt_head;
 	writel(acnt_tail, pcie_priv->iobase1 + MACREG_REG_ACNTTAIL);
+}
+
+static int pcie_mcast_cts(struct ieee80211_hw *hw, bool enable)
+{
+	return mwl_fwcmd_mcast_cts(hw, enable ? 1 : 0);
 }
 
 static const struct mwl_hif_ops pcie_hif_ops_ndp = {

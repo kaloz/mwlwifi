@@ -259,13 +259,13 @@ int mwl_fwcmd_get_pwr_tbl_sc4(struct ieee80211_hw *hw,
 int mwl_fwcmd_quiet_mode(struct ieee80211_hw *hw, bool enable, u32 period,
 			 u32 duration, u32 next_offset);
 
+int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status);
+
 int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 			       struct coredump_cmd *core_dump, char *buff);
 
-int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status);
+int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable);
 
 void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx);
-
-int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable);
 
 #endif /* _FWCMD_H_ */
