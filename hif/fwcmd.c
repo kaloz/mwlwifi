@@ -3335,3 +3335,27 @@ void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx)
 	       sizeof(struct ieee80211_channel));
 	mwl_hif_get_survey(hw, survey_info);
 }
+
+int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_mcast_cts *pcmd;
+
+	pcmd = (struct hostcmd_cmd_mcast_cts *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_MCAST_CTS);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->enable = enable;
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_MCAST_CTS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}

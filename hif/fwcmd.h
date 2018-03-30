@@ -266,4 +266,6 @@ int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status);
 
 void mwl_fwcmd_get_survey(struct ieee80211_hw *hw, int idx);
 
+int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable);
+
 #endif /* _FWCMD_H_ */
