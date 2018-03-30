@@ -284,4 +284,14 @@ static inline void mwl_hif_process_account(struct ieee80211_hw *hw)
 	if (priv->hif.ops->process_account)
 		priv->hif.ops->process_account(hw);
 }
+
+static inline int mwl_hif_mcast_cts(struct ieee80211_hw *hw, bool enable)
+{
+	struct mwl_priv *priv = hw->priv;
+
+	if (priv->hif.ops->mcast_cts)
+		return priv->hif.ops->mcast_cts(hw, enable);
+	else
+		return -ENOTSUPP;
+}
 #endif /* _HIF_OPS_H_ */
