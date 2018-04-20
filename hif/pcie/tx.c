@@ -396,7 +396,7 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	struct pcie_priv *pcie_priv = priv->hif.priv;
 	struct ieee80211_tx_info *tx_info;
 	struct pcie_tx_ctrl *tx_ctrl;
-	struct pcie_tx_hndl *tx_hndl;
+	struct pcie_tx_hndl *tx_hndl = NULL;
 	struct pcie_tx_desc *tx_desc;
 	struct ieee80211_sta *sta;
 	struct ieee80211_vif *vif;

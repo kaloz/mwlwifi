@@ -257,7 +257,7 @@ static inline bool pcie_rx_process_mesh_amsdu(struct mwl_priv *priv,
 
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
-		sta = container_of((char *)sta_info, struct ieee80211_sta,
+		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv[0]);
 		if (ether_addr_equal(sta->addr, wh->addr2)) {
 			if (!sta_info->is_mesh_node) {

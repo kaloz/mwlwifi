@@ -470,7 +470,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 				struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv = hw->priv;
-	u16 stnid, sta_stnid;
+	u16 stnid, sta_stnid = 0;
 	struct mwl_vif *mwl_vif;
 	struct mwl_sta *sta_info;
 	struct ieee80211_key_conf *key;
