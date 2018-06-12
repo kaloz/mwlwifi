@@ -781,10 +781,12 @@ static int pcie_get_rx_status_ndp(struct ieee80211_hw *hw, char *buf,
 			 readl(pcie_priv->iobase1 + MACREG_REG_RXDESCHEAD));
 	len += scnprintf(p + len, size - len, "rx_skb_trace: %d\n",
 			 skb_queue_len(&pcie_priv->rx_skb_trace));
-	len += scnprintf(p + len, size - len, "signature_err: %d\n",
-			 pcie_priv->signature_err);
 	len += scnprintf(p + len, size - len, "rx_skb_unlink_err: %d\n",
 			 pcie_priv->rx_skb_unlink_err);
+	len += scnprintf(p + len, size - len, "signature_err: %d\n",
+			 pcie_priv->signature_err);
+	len += scnprintf(p + len, size - len, "recheck_rxringdone: %d\n",
+			 pcie_priv->recheck_rxringdone);
 	len += scnprintf(p + len, size - len, "fast_data_cnt: %d\n",
 			 pcie_priv->rx_cnts.fast_data_cnt);
 	len += scnprintf(p + len, size - len, "fast_bad_amsdu_cnt: %d\n",

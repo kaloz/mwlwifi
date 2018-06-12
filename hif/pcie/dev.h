@@ -554,6 +554,7 @@ struct pcie_priv {
 	struct ndp_rx_counter rx_cnts;
 	u32 rx_skb_unlink_err;
 	u32 signature_err;
+	u32 recheck_rxringdone;
 };
 
 enum { /* Definition of accounting record codes */

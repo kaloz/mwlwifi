@@ -476,10 +476,17 @@ void pcie_rx_recv_ndp(unsigned long data)
 
 	while ((rx_done_tail != rx_done_head) &&
 	       (rx_cnt < pcie_priv->recv_limit)) {
-		prx_ring_done = &desc->prx_ring_done[rx_done_tail++];
+recheck:
+		prx_ring_done = &desc->prx_ring_done[rx_done_tail];
 		wmb(); /*Data Memory Barrier*/
-
+		if (le32_to_cpu(prx_ring_done->user) == 0xdeadbeef) {
+			pcie_priv->recheck_rxringdone++;
+			udelay(1);
+			goto recheck;
+		}
 		buf_idx = le32_to_cpu(prx_ring_done->user) & 0x3fff;
+		prx_ring_done->user = cpu_to_le32(0xdeadbeef);
+		rx_done_tail++;
 		prx_desc = &desc->prx_ring[buf_idx];
 		if (!prx_desc->data)
 			wiphy_err(hw->wiphy, "RX desc data is NULL\n");
