@@ -99,6 +99,8 @@ int mwl_fwcmd_rf_antenna(struct ieee80211_hw *hw, int dir, int antenna);
 int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif, bool enable);
 
+int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type);
+
 int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf);
 
@@ -125,6 +127,8 @@ int mwl_fwcmd_use_fixed_rate(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw,
 				    u16 cs_mode);
+
+int mwl_fwcmd_dump_otp_data(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw,
 				  u16 mode);
@@ -263,6 +267,10 @@ int mwl_fwcmd_core_dump_diag_mode(struct ieee80211_hw *hw, u16 status);
 
 int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 			       struct coredump_cmd *core_dump, char *buff);
+
+int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot);
+
+int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl);
 
 int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable);
 

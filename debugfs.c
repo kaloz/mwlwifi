@@ -54,7 +54,8 @@ static const struct file_operations mwl_debugfs_##name##_fops = { \
 static const char chipname[MWLUNKNOWN][8] = {
 	"88W8864",
 	"88W8897",
-	"88W8964"
+	"88W8964",
+	"88W8997"
 };
 
 static void dump_data(char *p, int size, int *len, u8 *data,
@@ -444,6 +445,8 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 	struct mwl_vif *mwl_vif;
 	struct ieee80211_vif *vif;
 	char ssid[IEEE80211_MAX_SSID_LEN + 1];
+	struct cfg80211_chan_def *chan_def;
+	struct beacon_info *beacon_info;
 	ssize_t ret;
 
 	if (!p)
@@ -467,6 +470,11 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 			len += scnprintf(p + len, size - len,
 					 "mac address: %pM\n", mwl_vif->bssid);
 			break;
+		case NL80211_IFTYPE_MESH_POINT:
+			len += scnprintf(p + len, size - len, "type: mesh\n");
+			len += scnprintf(p + len, size - len,
+					 "mac address: %pM\n", mwl_vif->bssid);
+			break;
 		case NL80211_IFTYPE_STATION:
 			len += scnprintf(p + len, size - len, "type: sta\n");
 			len += scnprintf(p + len, size - len,
@@ -478,6 +486,18 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 					 "type: unknown\n");
 			break;
 		}
+		if (vif->chanctx_conf) {
+			chan_def = &vif->chanctx_conf->def;
+			len += scnprintf(p + len, size - len,
+					 "channel: %d: width: %d\n",
+					 chan_def->chan->hw_value,
+					 chan_def->width);
+			len += scnprintf(p + len, size - len,
+					 "freq: %d freq1: %d freq2: %d\n",
+					 chan_def->chan->center_freq,
+					 chan_def->center_freq1,
+					 chan_def->center_freq2);
+		}
 		len += scnprintf(p + len, size - len, "hw_crypto_enabled: %s\n",
 				 mwl_vif->is_hw_crypto_enabled ?
 				 "true" : "false");
@@ -486,18 +506,27 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 		len += scnprintf(p + len, size - len,
 				 "IV: %08x%04x\n", mwl_vif->iv32,
 				 mwl_vif->iv16);
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_wmm_ptr,
-			  mwl_vif->beacon_info.ie_wmm_len, "WMM:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn_ptr,
-			  mwl_vif->beacon_info.ie_rsn_len, "RSN:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_rsn48_ptr,
-			  mwl_vif->beacon_info.ie_rsn48_len, "RSN48:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_mde_ptr,
-			  mwl_vif->beacon_info.ie_mde_len, "MDE:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_ht_ptr,
-			  mwl_vif->beacon_info.ie_ht_len, "HT:");
-		dump_data(p, size, &len, mwl_vif->beacon_info.ie_vht_ptr,
-			  mwl_vif->beacon_info.ie_vht_len, "VHT:");
+		beacon_info = &mwl_vif->beacon_info;
+		dump_data(p, size, &len, beacon_info->ie_wmm_ptr,
+			  beacon_info->ie_wmm_len, "WMM:");
+		dump_data(p, size, &len, beacon_info->ie_rsn_ptr,
+			  beacon_info->ie_rsn_len, "RSN:");
+		dump_data(p, size, &len, beacon_info->ie_rsn48_ptr,
+			  beacon_info->ie_rsn48_len, "RSN48:");
+		dump_data(p, size, &len, beacon_info->ie_mde_ptr,
+			  beacon_info->ie_mde_len, "MDE:");
+		dump_data(p, size, &len, beacon_info->ie_ht_ptr,
+			  beacon_info->ie_ht_len, "HT:");
+		dump_data(p, size, &len, beacon_info->ie_vht_ptr,
+			  beacon_info->ie_vht_len, "VHT:");
+		if (vif->type == NL80211_IFTYPE_MESH_POINT) {
+			dump_data(p, size, &len, beacon_info->ie_meshid_ptr,
+				  beacon_info->ie_meshid_len, "MESHID:");
+			dump_data(p, size, &len, beacon_info->ie_meshcfg_ptr,
+				  beacon_info->ie_meshcfg_len, "MESHCFG:");
+			dump_data(p, size, &len, beacon_info->ie_meshchsw_ptr,
+				  beacon_info->ie_meshchsw_len, "MESHCHSW:");
+		}
 		len += scnprintf(p + len, size - len, "\n");
 	}
 	spin_unlock_bh(&priv->vif_lock);
@@ -1574,7 +1603,7 @@ static ssize_t mwl_debugfs_core_dump_read(struct file *file, char __user *ubuf,
 	char *p = (char *)page;
 	int len = 0, size = PAGE_SIZE;
 	struct coredump_cmd *core_dump = NULL;
-	struct coredump *cd;
+	struct coredump *cd = NULL;
 	char  *buff = NULL;
 	u32 i, offset;
 	u32 address, length;

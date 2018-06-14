@@ -34,15 +34,19 @@
 					SYSADPT_MAX_MCS_RATES + \
 					SYSADPT_MAX_11AC_RATES)
 
-#define SYSADPT_TX_POWER_LEVEL_TOTAL   16
+#define SYSADPT_TX_POWER_LEVEL_TOTAL   16  /* SC3 */
 
-#define SYSADPT_TX_PWR_LEVEL_TOTAL_SC4 32
+#define SYSADPT_TX_GRP_PWR_LEVEL_TOTAL 28  /* KF2 */
+
+#define SYSADPT_TX_PWR_LEVEL_TOTAL_SC4 32  /* SC4 */
 
 #define SYSADPT_TX_WMM_QUEUES          4
 
 #define SYSADPT_NUM_OF_CLIENT          1
 
 #define SYSADPT_NUM_OF_AP              16
+
+#define SYSADPT_NUM_OF_MESH            1
 
 #define SYSADPT_TOTAL_TX_QUEUES        (SYSADPT_TX_WMM_QUEUES + \
 					SYSADPT_NUM_OF_AP)
@@ -74,5 +78,7 @@
 #define SYSADPT_THERMAL_THROTTLE_MAX   100
 
 #define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
+
+#define SYSADPT_OTP_BUF_SIZE           (256*8) /* 258 lines * 8 bytes */
 
 #endif /* _SYSADPT_H_ */
