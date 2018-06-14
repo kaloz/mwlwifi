@@ -18,6 +18,7 @@
  */
 
 #include <linux/etherdevice.h>
+#include <linux/ctype.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -50,7 +51,8 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_MEM_ADDR_ACCESS, "MEMAddrAccess" },
 		{ HOSTCMD_CMD_802_11_TX_POWER, "80211TxPower" },
 		{ HOSTCMD_CMD_802_11_RF_ANTENNA, "80211RfAntenna" },
-		{ HOSTCMD_CMD_BROADCAST_SSID_ENABLE, "broadcast_ssid_enable" },
+		{ HOSTCMD_CMD_BROADCAST_SSID_ENABLE, "BroadcastSsidEnable" },
+		{ HOSTCMD_CMD_SET_CFG, "SetCfg" },
 		{ HOSTCMD_CMD_SET_RF_CHANNEL, "SetRfChannel" },
 		{ HOSTCMD_CMD_SET_AID, "SetAid" },
 		{ HOSTCMD_CMD_SET_INFRA_MODE, "SetInfraMode" },
@@ -62,6 +64,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_FIXED_RATE, "SetFixedRate" },
 		{ HOSTCMD_CMD_SET_IES, "SetInformationElements" },
 		{ HOSTCMD_CMD_SET_LINKADAPT_CS_MODE, "LinkAdaptCsMode" },
+		{ HOSTCMD_CMD_DUMP_OTP_DATA, "DumpOtpData" },
 		{ HOSTCMD_CMD_SET_MAC_ADDR, "SetMacAddr" },
 		{ HOSTCMD_CMD_SET_RATE_ADAPT_MODE, "SetRateAdaptationMode" },
 		{ HOSTCMD_CMD_GET_WATCHDOG_BITMAP, "GetWatchdogBitMap" },
@@ -95,6 +98,8 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 		{ HOSTCMD_CMD_CORE_DUMP_DIAG_MODE, "CoreDumpDiagMode" },
 		{ HOSTCMD_CMD_GET_FW_CORE_DUMP, "GetFwCoreDump" },
+		{ HOSTCMD_CMD_802_11_SLOT_TIME, "80211SlotTime" },
+		{ HOSTCMD_CMD_EDMAC_CTRL, "EDMACCtrl" },
 		{ HOSTCMD_CMD_MCAST_CTS, "McastCts" },
 	};
 
@@ -139,8 +144,9 @@ static int mwl_fwcmd_802_11_radio_control(struct mwl_priv *priv,
 	return 0;
 }
 
-static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
-				   u16 band, u16 width, u16 sub_ch)
+static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist,
+				   u8 action, u16 ch, u16 band,
+				   u16 width, u16 sub_ch)
 {
 	struct hostcmd_cmd_802_11_tx_power *pcmd;
 	int i;
@@ -149,10 +155,17 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8997) {
+		memset(pcmd, 0x00,
+		       sizeof(struct hostcmd_cmd_802_11_tx_power_kf2));
+		pcmd->cmd_hdr.len = cpu_to_le16(
+			sizeof(struct hostcmd_cmd_802_11_tx_power_kf2));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_TX_POWER);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
-	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_GET_LIST);
+	pcmd->action = cpu_to_le16(action);
 	pcmd->ch = cpu_to_le16(ch);
 	pcmd->bw = cpu_to_le16(width);
 	pcmd->band = cpu_to_le16(band);
@@ -163,7 +176,7 @@ static int mwl_fwcmd_get_tx_powers(struct mwl_priv *priv, u16 *powlist, u16 ch,
 		return -EIO;
 	}
 
-	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++)
+	for (i = 0; i < priv->pwr_level; i++)
 		powlist[i] = le16_to_cpu(pcmd->power_level_list[i]);
 
 	mutex_unlock(&priv->fwcmd_mutex);
@@ -182,16 +195,23 @@ static int mwl_fwcmd_set_tx_powers(struct mwl_priv *priv, u16 txpow[],
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8997) {
+		memset(pcmd, 0x00,
+		       sizeof(struct hostcmd_cmd_802_11_tx_power_kf2));
+		pcmd->cmd_hdr.len = cpu_to_le16(
+			sizeof(struct hostcmd_cmd_802_11_tx_power_kf2));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_TX_POWER);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->action = cpu_to_le16(action);
 	pcmd->ch = cpu_to_le16(ch);
 	pcmd->bw = cpu_to_le16(width);
 	pcmd->band = cpu_to_le16(band);
 	pcmd->sub_ch = cpu_to_le16(sub_ch);
 
-	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++)
+	for (i = 0; i < priv->pwr_level; i++)
 		pcmd->power_level_list[i] = cpu_to_le16(txpow[i]);
 
 	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_TX_POWER)) {
@@ -481,6 +501,18 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 				beacon_info->ie_ht_ptr += elen;
 			}
 			break;
+		case WLAN_EID_MESH_CONFIG:
+			beacon_info->ie_meshcfg_len = (elen + 2);
+			beacon_info->ie_meshcfg_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MESH_ID:
+			beacon_info->ie_meshid_len = (elen + 2);
+			beacon_info->ie_meshid_ptr = (pos - 2);
+			break;
+		case WLAN_EID_CHAN_SWITCH_PARAM:
+			beacon_info->ie_meshchsw_len = (elen + 2);
+			beacon_info->ie_meshchsw_ptr = (pos - 2);
+			break;
 		case WLAN_EID_VHT_CAPABILITY:
 		case WLAN_EID_VHT_OPERATION:
 		case WLAN_EID_OPMODE_NOTIF:
@@ -557,6 +589,18 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 
 	memcpy(pcmd->ie_list_vht, beacon->ie_vht_ptr, beacon->ie_vht_len);
 	pcmd->ie_list_len_vht = cpu_to_le16(beacon->ie_vht_len);
+
+	memcpy(pcmd->ie_list_proprietary, beacon->ie_meshid_ptr,
+	       beacon->ie_meshid_len);
+	ie_list_len_proprietary = beacon->ie_meshid_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_meshcfg_ptr, beacon->ie_meshcfg_len);
+	ie_list_len_proprietary += beacon->ie_meshcfg_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_meshchsw_ptr, beacon->ie_meshchsw_len);
+	ie_list_len_proprietary += beacon->ie_meshchsw_len;
 
 	if (priv->chip_type == MWL8897) {
 		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
@@ -819,6 +863,33 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
+static u16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
+{
+	const u8 *ptr;
+	u8 *dptr;
+	long res;
+
+	ptr = src;
+	dptr = dst;
+
+	while (ptr - src < len) {
+		if (*ptr && (isspace(*ptr) || iscntrl(*ptr))) {
+			ptr++;
+			continue;
+		}
+
+		if (isxdigit(*ptr)) {
+			kstrtol(ptr, 16, &res);
+			*dptr++ = res;
+			ptr += 2;
+		} else {
+			ptr++;
+		}
+	}
+
+	return (dptr - dst);
+}
+
 const struct hostcmd_get_hw_spec
 *mwl_fwcmd_get_hw_specs(struct ieee80211_hw *hw)
 {
@@ -1028,11 +1099,11 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	int reduce_val = 0;
 	u16 band = 0, width = 0, sub_ch = 0;
-	u16 maxtxpow[SYSADPT_TX_POWER_LEVEL_TOTAL];
+	u16 maxtxpow[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL];
 	int i, tmp;
 	int rc = 0;
 
-	if (priv->forbidden_setting)
+	if ((priv->chip_type != MWL8997) && (priv->forbidden_setting))
 		return rc;
 
 	switch (fraction) {
@@ -1083,19 +1154,39 @@ int mwl_fwcmd_max_tx_power(struct ieee80211_hw *hw,
 		return -EINVAL;
 	}
 
+	if (priv->chip_type == MWL8997) {
+		mwl_fwcmd_get_tx_powers(priv, priv->max_tx_pow,
+					HOSTCMD_ACT_GET_MAX_TX_PWR,
+					channel->hw_value, band, width, sub_ch);
+
+		for (i = 0; i < priv->pwr_level; i++) {
+			tmp = priv->max_tx_pow[i];
+			maxtxpow[i] = ((tmp - reduce_val) > 0) ?
+				(tmp - reduce_val) : 0;
+		}
+
+		rc = mwl_fwcmd_set_tx_powers(priv, maxtxpow,
+					     HOSTCMD_ACT_SET_MAX_TX_PWR,
+					     channel->hw_value, band,
+					     width, sub_ch);
+		return rc;
+	}
+
 	if ((priv->powinited & MWL_POWER_INIT_2) == 0) {
 		mwl_fwcmd_get_tx_powers(priv, priv->max_tx_pow,
+					HOSTCMD_ACT_GEN_GET_LIST,
 					channel->hw_value, band, width, sub_ch);
 		priv->powinited |= MWL_POWER_INIT_2;
 	}
 
 	if ((priv->powinited & MWL_POWER_INIT_1) == 0) {
 		mwl_fwcmd_get_tx_powers(priv, priv->target_powers,
+					HOSTCMD_ACT_GEN_GET_LIST,
 					channel->hw_value, band, width, sub_ch);
 		priv->powinited |= MWL_POWER_INIT_1;
 	}
 
-	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
+	for (i = 0; i < priv->pwr_level; i++) {
 		if (priv->target_powers[i] > priv->max_tx_pow[i])
 			tmp = priv->max_tx_pow[i];
 		else
@@ -1116,12 +1207,12 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 	struct mwl_priv *priv = hw->priv;
 	int reduce_val = 0;
 	u16 band = 0, width = 0, sub_ch = 0;
-	u16 txpow[SYSADPT_TX_POWER_LEVEL_TOTAL];
+	u16 txpow[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL];
 	int index, found = 0;
 	int i, tmp;
 	int rc = 0;
 
-	if (priv->forbidden_setting)
+	if ((priv->chip_type != MWL8997) && (priv->forbidden_setting))
 		return rc;
 
 	switch (fraction) {
@@ -1170,6 +1261,25 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 		break;
 	default:
 		return -EINVAL;
+	}
+
+	if (priv->chip_type == MWL8997) {
+		mwl_fwcmd_get_tx_powers(priv, priv->target_powers,
+					HOSTCMD_ACT_GET_TARGET_TX_PWR,
+					channel->hw_value, band, width, sub_ch);
+
+		for (i = 0; i < priv->pwr_level; i++) {
+			tmp = priv->target_powers[i];
+			txpow[i] = ((tmp - reduce_val) > 0) ?
+				(tmp - reduce_val) : 0;
+		}
+
+		rc = mwl_fwcmd_set_tx_powers(priv, txpow,
+					     HOSTCMD_ACT_SET_TARGET_TX_PWR,
+					     channel->hw_value, band,
+					     width, sub_ch);
+
+		return rc;
 	}
 
 	/* search tx power table if exist */
@@ -1191,7 +1301,7 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 			else
 				priv->powinited = MWL_POWER_INIT_2;
 
-			for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
+			for (i = 0; i < priv->pwr_level; i++) {
 				if (tx_pwr->setcap)
 					priv->max_tx_pow[i] =
 						tx_pwr->tx_power[i];
@@ -1207,6 +1317,7 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 
 	if ((priv->powinited & MWL_POWER_INIT_2) == 0) {
 		mwl_fwcmd_get_tx_powers(priv, priv->max_tx_pow,
+					HOSTCMD_ACT_GEN_GET_LIST,
 					channel->hw_value, band, width, sub_ch);
 
 		priv->powinited |= MWL_POWER_INIT_2;
@@ -1214,12 +1325,13 @@ int mwl_fwcmd_tx_power(struct ieee80211_hw *hw,
 
 	if ((priv->powinited & MWL_POWER_INIT_1) == 0) {
 		mwl_fwcmd_get_tx_powers(priv, priv->target_powers,
+					HOSTCMD_ACT_GEN_GET_LIST,
 					channel->hw_value, band, width, sub_ch);
 
 		priv->powinited |= MWL_POWER_INIT_1;
 	}
 
-	for (i = 0; i < SYSADPT_TX_POWER_LEVEL_TOTAL; i++) {
+	for (i = 0; i < priv->pwr_level; i++) {
 		if (found) {
 			if ((priv->tx_pwr_tbl[index].setcap) &&
 			    (priv->tx_pwr_tbl[index].tx_power[i] >
@@ -1328,6 +1440,42 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_set_cfg *pcmd;
+
+	if (!priv->cal_data)
+		return 0;
+
+	pcmd = (struct hostcmd_cmd_set_cfg *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->data_len = mwl_fwcmd_parse_cal_cfg(priv->cal_data->data,
+		priv->cal_data->size, pcmd->data);
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
+		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
+	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
+	pcmd->type = cpu_to_le16(type);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_CFG)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		release_firmware(priv->cal_data);
+		priv->cal_data = NULL;
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	release_firmware(priv->cal_data);
+	priv->cal_data = NULL;
+
+	return 0;
+}
+
 int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 			     struct ieee80211_conf *conf)
 {
@@ -1340,9 +1488,16 @@ int mwl_fwcmd_set_rf_channel(struct ieee80211_hw *hw,
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	memset(pcmd, 0x00, sizeof(*pcmd));
+	if (priv->chip_type == MWL8997) {
+		memset(pcmd, 0x00,
+		       sizeof(struct hostcmd_cmd_set_rf_channel_kf2));
+		pcmd->cmd_hdr.len = cpu_to_le16(
+			sizeof(struct hostcmd_cmd_set_rf_channel_kf2));
+	} else {
+		memset(pcmd, 0x00, sizeof(*pcmd));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	}
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_RF_CHANNEL);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->action = cpu_to_le16(WL_SET);
 	pcmd->curr_chnl = channel->hw_value;
 
@@ -1671,6 +1826,40 @@ int mwl_fwcmd_set_linkadapt_cs_mode(struct ieee80211_hw *hw, u16 cs_mode)
 	return 0;
 }
 
+int mwl_fwcmd_dump_otp_data(struct ieee80211_hw *hw)
+{
+	int otp_data_len;
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_dump_otp_data *pcmd;
+
+	pcmd = (struct hostcmd_cmd_dump_otp_data *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_DUMP_OTP_DATA);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_DUMP_OTP_DATA)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	otp_data_len = pcmd->cmd_hdr.len - cpu_to_le16(sizeof(*pcmd));
+
+	if (otp_data_len <= SYSADPT_OTP_BUF_SIZE) {
+		wiphy_info(hw->wiphy, "OTP data len = %d\n", otp_data_len);
+		priv->otp_data.len = otp_data_len;
+		memcpy(priv->otp_data.buf, pcmd->pload, otp_data_len);
+	} else {
+		wiphy_err(hw->wiphy, "Driver OTP buf size is less\n");
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 int mwl_fwcmd_set_rate_adapt_mode(struct ieee80211_hw *hw, u16 mode)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -1907,7 +2096,10 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_STA_ACTION_ADD);
 	pcmd->aid = cpu_to_le16(sta->aid);
 	pcmd->stn_id = cpu_to_le16(sta_info->stnid);
-	pcmd->reserved = cpu_to_le16(1);
+	if (priv->chip_type == MWL8997)
+		pcmd->if_type = cpu_to_le16(vif->type);
+	else
+		pcmd->if_type = cpu_to_le16(1);
 	ether_addr_copy(pcmd->mac_addr, sta->addr);
 
 	if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
@@ -1957,7 +2149,7 @@ int mwl_fwcmd_set_new_stn_add(struct ieee80211_hw *hw,
 		ether_addr_copy(pcmd->mac_addr, mwl_vif->sta_mac);
 		pcmd->aid = cpu_to_le16(sta->aid + 1);
 		pcmd->stn_id = cpu_to_le16(sta_info->sta_stnid);
-		pcmd->reserved = cpu_to_le16(0);
+		pcmd->if_type = cpu_to_le16(0);
 		if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_SET_NEW_STN)) {
 			mutex_unlock(&priv->fwcmd_mutex);
 			return -EIO;
@@ -2349,8 +2541,13 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 
 	if (key->flags & IEEE80211_KEY_FLAG_PAIRWISE)
 		action = ENCR_ACTION_TYPE_SET_KEY;
-	else
+	else {
 		action = ENCR_ACTION_TYPE_SET_GROUP_KEY;
+		if (vif->type == NL80211_IFTYPE_MESH_POINT &&
+		    !ether_addr_equal(mwl_vif->bssid, addr))
+			pcmd->key_param.key_info |=
+				cpu_to_le32(ENCR_KEY_FLAG_RXGROUPKEY);
+	}
 
 	switch (key->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:
@@ -3083,7 +3280,7 @@ int mwl_fwcmd_get_device_pwr_tbl(struct ieee80211_hw *hw,
 
 	device_ch_pwrtbl->channel = pcmd->channel_pwr_tbl.channel;
 	memcpy(device_ch_pwrtbl->tx_pwr, pcmd->channel_pwr_tbl.tx_pwr,
-	       SYSADPT_TX_POWER_LEVEL_TOTAL);
+	       priv->pwr_level);
 	device_ch_pwrtbl->dfs_capable = pcmd->channel_pwr_tbl.dfs_capable;
 	device_ch_pwrtbl->ax_ant = pcmd->channel_pwr_tbl.ax_ant;
 	device_ch_pwrtbl->cdd = pcmd->channel_pwr_tbl.cdd;
@@ -3317,6 +3514,71 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	       sizeof(struct hostcmd_cmd_get_fw_core_dump) -
 	       sizeof(struct hostcmd_cmd_get_fw_core_dump_)),
 	       MAX_CORE_DUMP_BUFFER);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_802_11_slot_time *pcmd;
+
+	wiphy_debug(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
+		    __func__, short_slot);
+
+	pcmd = (struct hostcmd_cmd_802_11_slot_time *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_SLOT_TIME);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->short_slot = cpu_to_le16(short_slot ? 1 : 0);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_802_11_SLOT_TIME)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl)
+{
+	struct hostcmd_cmd_edmac_ctrl *pcmd;
+	struct mwl_priv *priv = hw->priv;
+
+	pcmd = (struct hostcmd_cmd_edmac_ctrl *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_EDMAC_CTRL);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->ed_ctrl_2g = cpu_to_le16((EDMAC_Ctrl & EDMAC_2G_ENABLE_MASK)
+				       >> EDMAC_2G_ENABLE_SHIFT);
+	pcmd->ed_ctrl_5g = cpu_to_le16((EDMAC_Ctrl & EDMAC_5G_ENABLE_MASK)
+				       >> EDMAC_5G_ENABLE_SHIFT);
+	pcmd->ed_offset_2g = cpu_to_le16((EDMAC_Ctrl &
+					 EDMAC_2G_THRESHOLD_OFFSET_MASK)
+					 >> EDMAC_2G_THRESHOLD_OFFSET_SHIFT);
+	pcmd->ed_offset_5g = cpu_to_le16((EDMAC_Ctrl &
+					 EDMAC_5G_THRESHOLD_OFFSET_MASK)
+					 >> EDMAC_5G_THRESHOLD_OFFSET_SHIFT);
+	pcmd->ed_bitmap_txq_lock = cpu_to_le16((EDMAC_Ctrl &
+					       EDMAC_QLOCK_BITMAP_MASK)
+					       >> EDMAC_QLOCK_BITMAP_SHIFT);
+
+	if (mwl_hif_exec_cmd(priv->hw, HOSTCMD_CMD_EDMAC_CTRL)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
 

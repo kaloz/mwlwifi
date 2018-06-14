@@ -135,6 +135,11 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 	rc = mwl_fwcmd_set_optimization_level(hw, 1);
 	if (rc)
 		goto fwcmd_fail;
+	if (priv->chip_type == MWL8997) {
+		rc = mwl_fwcmd_config_EDMACCtrl(hw, 0);
+		if (rc)
+			goto fwcmd_fail;
+	}
 	if (priv->chip_type == MWL8964) {
 		rc = mwl_fwcmd_newdp_dmathread_start(hw);
 		if (rc)
@@ -180,6 +185,10 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
+		if (vif->type == NL80211_IFTYPE_MESH_POINT)
+			if (priv->chip_type != MWL8997)
+				return -EPERM;
 		macids_supported = priv->ap_macids_supported;
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -218,6 +227,10 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 			mwl_fwcmd_bss_start(hw, vif, true);
 			mwl_fwcmd_bss_start(hw, vif, false);
 		}
+		break;
+	case NL80211_IFTYPE_MESH_POINT:
+		ether_addr_copy(mwl_vif->bssid, vif->addr);
+		mwl_fwcmd_set_new_stn_add_self(hw, vif);
 		break;
 	case NL80211_IFTYPE_STATION:
 		ether_addr_copy(mwl_vif->sta_mac, vif->addr);
@@ -260,6 +273,7 @@ static void mwl_mac80211_remove_interface(struct ieee80211_hw *hw,
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
 		mwl_fwcmd_set_new_stn_del(hw, vif, vif->addr);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -334,6 +348,11 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 					      struct ieee80211_bss_conf *info,
 					      u32 changed)
 {
+	struct mwl_priv *priv = hw->priv;
+
+	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997))
+		mwl_fwcmd_set_slot_time(hw, vif->bss_conf.use_short_slot);
+
 	if (changed & BSS_CHANGED_ERP_PREAMBLE)
 		mwl_fwcmd_set_radio_preamble(hw,
 					     vif->bss_conf.use_short_preamble);
@@ -348,6 +367,11 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 					     struct ieee80211_bss_conf *info,
 					     u32 changed)
 {
+	struct mwl_priv *priv = hw->priv;
+
+	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997))
+		mwl_fwcmd_set_slot_time(hw, vif->bss_conf.use_short_slot);
+
 	if (changed & BSS_CHANGED_ERP_PREAMBLE)
 		mwl_fwcmd_set_radio_preamble(hw,
 					     vif->bss_conf.use_short_preamble);
@@ -401,6 +425,7 @@ static void mwl_mac80211_bss_info_changed(struct ieee80211_hw *hw,
 {
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
+	case NL80211_IFTYPE_MESH_POINT:
 		mwl_mac80211_bss_info_changed_ap(hw, vif, info, changed);
 		break;
 	case NL80211_IFTYPE_STATION:
@@ -483,7 +508,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 				struct ieee80211_sta *sta)
 {
 	struct mwl_priv *priv = hw->priv;
-	u16 stnid, sta_stnid;
+	u16 stnid, sta_stnid = 0;
 	struct mwl_vif *mwl_vif;
 	struct wireless_dev *wdev = ieee80211_vif_to_wdev(vif);
 	bool use_4addr = wdev->use_4addr;
@@ -510,6 +535,9 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info = mwl_dev_get_sta(sta);
 	memset(sta_info, 0, sizeof(*sta_info));
 
+	if (vif->type == NL80211_IFTYPE_MESH_POINT)
+		sta_info->is_mesh_node = true;
+
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;
 		sta_info->is_amsdu_allowed = false;
@@ -524,6 +552,7 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	sta_info->stnid = stnid;
 	if (vif->type == NL80211_IFTYPE_STATION)
 		sta_info->sta_stnid = sta_stnid;
+	sta_info->tx_rate_info = utils_get_init_tx_rate(priv, &hw->conf, sta);
 	sta_info->iv16 = 1;
 	sta_info->iv32 = 0;
 	spin_lock_init(&sta_info->amsdu_lock);

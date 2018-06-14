@@ -126,6 +126,9 @@ int utils_get_phy_rate(u8 format, u8 bandwidth, u8 short_gi, u8 mcs_id);
 
 u8 utils_get_rate_id(u8 rate);
 
+u32 utils_get_init_tx_rate(struct mwl_priv *priv, struct ieee80211_conf *conf,
+			   struct ieee80211_sta *sta);
+
 struct mwl_vif *utils_find_vif_bss(struct mwl_priv *priv, u8 *bssid);
 
 struct mwl_sta *utils_find_sta(struct mwl_priv *priv, u8 *addr);

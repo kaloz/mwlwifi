@@ -27,9 +27,11 @@
 
 /* antenna control */
 #define ANTENNA_TX_4_AUTO             0
+#define ANTENNA_TX_1                  1
 #define ANTENNA_TX_2                  3
 #define ANTENNA_TX_3                  7
 #define ANTENNA_RX_4_AUTO             0
+#define ANTENNA_RX_1                  1
 #define ANTENNA_RX_2                  2
 #define ANTENNA_RX_3                  3
 
@@ -115,6 +117,7 @@ enum {
 	MWL8864 = 0,
 	MWL8897,
 	MWL8964,
+	MWL8997,
 	MWLUNKNOWN,
 };
 
@@ -138,6 +141,7 @@ enum {
 struct mwl_chip_info {
 	const char *part_name;
 	const char *fw_image;
+	const char *cal_file;
 	int antenna_tx;
 	int antenna_rx;
 };
@@ -176,10 +180,17 @@ struct mwl_stnid {
 	u16 aid;                    /* keep aid for related stnid   */
 };
 
+struct otp_data {
+	u8 buf[SYSADPT_OTP_BUF_SIZE];
+	u32 len; /* Actual size of data in buf[] */
+};
+
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	struct device *dev;
 	struct firmware *fw_ucode;
+	struct firmware *cal_data;
+	struct otp_data otp_data;
 	bool fw_device_pwrtbl;
 	bool forbidden_setting;
 	bool regulatory_set;
@@ -207,8 +218,9 @@ struct mwl_priv {
 	bool cdd;
 	u16 txantenna2;
 	u8 powinited;
-	u16 max_tx_pow[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* max tx power (dBm) */
-	u16 target_powers[SYSADPT_TX_POWER_LEVEL_TOTAL]; /* target powers   */
+	u8 pwr_level;
+	u16 max_tx_pow[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* max tx power (dBm) */
+	u16 target_powers[SYSADPT_TX_GRP_PWR_LEVEL_TOTAL]; /* target powers   */
 
 	struct mutex fwcmd_mutex;    /* for firmware command         */
 	unsigned short *pcmd_buf;    /* pointer to CmdBuf (virtual)  */
@@ -319,6 +331,9 @@ struct beacon_info {
 	u8 *ie_ht_ptr;
 	u8 *ie_vht_ptr;
 	u8 *ie_country_ptr;
+	u8 *ie_meshid_ptr;
+	u8 *ie_meshcfg_ptr;
+	u8 *ie_meshchsw_ptr;
 	u8 ie_wmm_len;
 	u8 ie_wsc_len;
 	u8 ie_rsn_len;
@@ -327,6 +342,9 @@ struct beacon_info {
 	u8 ie_ht_len;
 	u8 ie_vht_len;
 	u8 ie_country_len;
+	u8 ie_meshid_len;
+	u8 ie_meshcfg_len;
+	u8 ie_meshchsw_len;
 };
 
 struct mwl_vif {
@@ -447,7 +465,8 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 
 void mwl_free_hw(struct ieee80211_hw *hw);
 
-int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name);
+int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
+		const char *cal_name);
 
 void mwl_deinit_hw(struct ieee80211_hw *hw);
 

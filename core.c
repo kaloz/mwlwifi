@@ -99,7 +99,8 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 };
 
 static const struct ieee80211_iface_limit ap_if_limits[] = {
-	{ .max = SYSADPT_NUM_OF_AP,     .types = BIT(NL80211_IFTYPE_AP) },
+	{ .max = SYSADPT_NUM_OF_AP, .types = BIT(NL80211_IFTYPE_AP) },
+	{ .max = SYSADPT_NUM_OF_MESH, .types = BIT(NL80211_IFTYPE_MESH_POINT) },
 	{ .max = SYSADPT_NUM_OF_CLIENT, .types = BIT(NL80211_IFTYPE_STATION) },
 };
 
@@ -158,7 +159,8 @@ err:
 	return -EIO;
 }
 
-static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
+static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
+			     const char *cal_name)
 {
 	int rc = 0;
 
@@ -176,6 +178,13 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name)
 		wiphy_err(priv->hw->wiphy,
 			  "cannot download firmware image <%s>\n", fw_name);
 		goto err_download_fw;
+	}
+
+	if (cal_name) {
+		if ((request_firmware((const struct firmware **)&priv->cal_data,
+		     cal_name, priv->dev)) < 0)
+			wiphy_warn(priv->hw->wiphy,
+				   "cannot find calibtration data\n");
 	}
 
 	return rc;
@@ -261,7 +270,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	priv->dfs_region = request->dfs_region;
 
 #ifdef CONFIG_OF
-	if (priv->pwr_node) {
+	if ((priv->chip_type != MWL8997) && (priv->pwr_node)) {
 		for_each_property_of_node(priv->pwr_node, prop) {
 			if (strcmp(prop->name, "FCC") == 0)
 				fcc_prop = prop;
@@ -421,13 +430,20 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.cap |= IEEE80211_HT_CAP_SGI_40;
 	band->ht_cap.cap |= IEEE80211_HT_CAP_DSSSCCK40;
 
+	if ((priv->chip_type == MWL8997) &&
+	    (priv->antenna_tx != ANTENNA_TX_1)) {
+		band->ht_cap.cap |= IEEE80211_HT_CAP_TX_STBC;
+		band->ht_cap.cap |= (1 << IEEE80211_HT_CAP_RX_STBC_SHIFT);
+	}
+
 	ieee80211_hw_set(hw, AMPDU_AGGREGATION);
 	ieee80211_hw_set(hw, SUPPORTS_AMSDU_IN_AMPDU);
 	band->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 	band->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
 
 	band->ht_cap.mcs.rx_mask[0] = 0xff;
-	band->ht_cap.mcs.rx_mask[1] = 0xff;
+	if (priv->antenna_rx == ANTENNA_RX_2)
+		band->ht_cap.mcs.rx_mask[1] = 0xff;
 	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
 		band->ht_cap.mcs.rx_mask[2] = 0xff;
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
@@ -451,18 +467,28 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
-	band->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE;
+	if (priv->antenna_tx != ANTENNA_TX_1)
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN;
+	if (priv->chip_type == MWL8997) {
+		if (priv->antenna_tx != ANTENNA_TX_1)
+			band->vht_cap.cap |= IEEE80211_VHT_CAP_TXSTBC;
+	}
 
-	if (priv->antenna_rx == ANTENNA_RX_2)
+	if (priv->antenna_rx == ANTENNA_RX_1)
+		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xfffe);
+	else if (priv->antenna_rx == ANTENNA_RX_2)
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xfffa);
 	else
 		band->vht_cap.vht_mcs.rx_mcs_map = cpu_to_le16(0xffea);
 
-	if (priv->antenna_tx == ANTENNA_TX_2) {
+	if (priv->antenna_tx == ANTENNA_TX_1) {
+		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffe);
+		antenna_num = 1;
+	} else if (priv->antenna_tx == ANTENNA_TX_2) {
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffa);
 		antenna_num = 2;
 	} else
@@ -693,7 +719,6 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
 	hw->wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
-
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
 
 	hw->vif_data_size = sizeof(struct mwl_vif);
@@ -712,6 +737,10 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->wmm_enabled = false;
 	priv->powinited = 0;
 	priv->wds_check = false;
+	if (priv->chip_type == MWL8997)
+		priv->pwr_level = SYSADPT_TX_GRP_PWR_LEVEL_TOTAL;
+	else
+		priv->pwr_level = SYSADPT_TX_POWER_LEVEL_TOTAL;
 	priv->csa_active = false;
 	priv->dfs_chirp_count_min = 5;
 	priv->dfs_chirp_time_interval = 1000;
@@ -775,6 +804,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	wiphy_info(hw->wiphy,
 		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
 
+	if (priv->chip_type == MWL8997)
+		mwl_fwcmd_set_cfg_data(hw, 2);
+
 	if (priv->chip_type == MWL8964)
 		rc = mwl_fwcmd_get_fw_region_code_sc4(hw,
 						      &priv->fw_region_code);
@@ -787,12 +819,16 @@ static int mwl_wl_init(struct mwl_priv *priv)
 			   "firmware region code: %x\n", priv->fw_region_code);
 	}
 
+	if (priv->chip_type == MWL8997)
+		mwl_fwcmd_dump_otp_data(hw);
+
 	mwl_fwcmd_radio_disable(hw);
 	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_TX, priv->antenna_tx);
 	mwl_fwcmd_rf_antenna(hw, WL_ANTENNATYPE_RX, priv->antenna_rx);
 
 	hw->wiphy->interface_modes = 0;
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP);
+	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_MESH_POINT);
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_STATION);
 	hw->wiphy->iface_combinations = &ap_if_comb;
 	hw->wiphy->n_iface_combinations = 1;
@@ -922,7 +958,8 @@ void mwl_free_hw(struct ieee80211_hw *hw)
 	ieee80211_free_hw(hw);
 }
 
-int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name)
+int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
+		const char *cal_name)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
@@ -935,7 +972,7 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name)
 		return -ENOMEM;
 	}
 
-	rc = mwl_init_firmware(priv, fw_name);
+	rc = mwl_init_firmware(priv, fw_name, cal_name);
 	if (rc) {
 		wiphy_err(hw->wiphy, "fail to initialize firmware\n");
 		return -EIO;
