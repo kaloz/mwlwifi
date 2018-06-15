@@ -444,8 +444,10 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.mcs.rx_mask[0] = 0xff;
 	if (priv->antenna_rx == ANTENNA_RX_2)
 		band->ht_cap.mcs.rx_mask[1] = 0xff;
-	if (priv->antenna_rx == ANTENNA_RX_4_AUTO)
+	if (priv->antenna_rx == ANTENNA_RX_4_AUTO) {
+		band->ht_cap.mcs.rx_mask[1] = 0xff;
 		band->ht_cap.mcs.rx_mask[2] = 0xff;
+	}
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
 
 	band->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
