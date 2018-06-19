@@ -34,6 +34,7 @@
 #define ANTENNA_RX_1                  1
 #define ANTENNA_RX_2                  2
 #define ANTENNA_RX_3                  3
+#define ANTENNA_RX_MAX                4
 
 /* band related constants */
 #define BAND_24_CHANNEL_NUM           14

@@ -417,6 +417,8 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 			    struct ieee80211_supported_band *band)
 {
 	struct ieee80211_hw *hw;
+	const u8 ant_rx_no[ANTENNA_RX_MAX] = { 3, 1, 2, 3};
+	int i;
 
 	hw = priv->hw;
 
@@ -441,13 +443,8 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
 	band->ht_cap.ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
 
-	band->ht_cap.mcs.rx_mask[0] = 0xff;
-	if (priv->antenna_rx == ANTENNA_RX_2)
-		band->ht_cap.mcs.rx_mask[1] = 0xff;
-	if (priv->antenna_rx == ANTENNA_RX_4_AUTO) {
-		band->ht_cap.mcs.rx_mask[1] = 0xff;
-		band->ht_cap.mcs.rx_mask[2] = 0xff;
-	}
+	for (i = 0; i < ant_rx_no[priv->antenna_rx]; i++)
+		band->ht_cap.mcs.rx_mask[i] = 0xff;
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
 
 	band->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
