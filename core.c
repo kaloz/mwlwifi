@@ -100,7 +100,9 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 
 static const struct ieee80211_iface_limit ap_if_limits[] = {
 	{ .max = SYSADPT_NUM_OF_AP, .types = BIT(NL80211_IFTYPE_AP) },
+#if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
 	{ .max = SYSADPT_NUM_OF_MESH, .types = BIT(NL80211_IFTYPE_MESH_POINT) },
+#endif
 	{ .max = SYSADPT_NUM_OF_CLIENT, .types = BIT(NL80211_IFTYPE_STATION) },
 };
 
@@ -827,7 +829,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	hw->wiphy->interface_modes = 0;
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_AP);
+#if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_MESH_POINT);
+#endif
 	hw->wiphy->interface_modes |= BIT(NL80211_IFTYPE_STATION);
 	hw->wiphy->iface_combinations = &ap_if_comb;
 	hw->wiphy->n_iface_combinations = 1;
