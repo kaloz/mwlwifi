@@ -615,6 +615,9 @@ struct pcie_priv {
 	u32 rx_skb_unlink_err;
 	u32 signature_err;
 	u32 recheck_rxringdone;
+	u32 acnt_busy;
+	u32 acnt_wrap;
+	u32 acnt_drop;
 
 	/* KF2 - 88W8997 */
 	struct firmware *cal_data;
@@ -635,17 +638,18 @@ struct pcie_priv {
 
 enum { /* Definition of accounting record codes */
 	ACNT_CODE_BUSY = 0,   /* Marked busy until filled in                  */
-	ACNT_CODE_WRAP,       /* Used to pad when wrapping (no TSF sometimes) */
-	ACNT_CODE_DROP,       /* Count of dropped records (acnt_u32_t)        */
-	ACNT_CODE_TX_ENQUEUE, /* TXINFO when added to TCQ (acnt_tx_t)         */
-	ACNT_CODE_RX_PPDU,    /* RXINFO for each PPDu (acnt_rx_t)             */
-	ACNT_CODE_TX_FLUSH,   /* Flush Tx Queue (acnt_txflush_t)              */
-	ACNT_CODE_RX_RESET,   /* Channel Change / Rx Reset (acnt_u32_t)       */
-	ACNT_CODE_TX_RESET,   /* TCQ reset (acnt_u8_t)                        */
-	ACNT_CODE_QUOTE_LEVEL,/* Quota Level changes (acnt_u8_t)              */
-	ACNT_CODE_TX_DONE,    /* Tx status when done (acnt_tx2_t)             */
-	ACNT_CODE_RA_STATS,   /* rateinfo PER (acnt_RA_stats_t)               */
-	ACNT_CODE_BA_STATS,   /* BA stats (acnt_BA_stats_t)                   */
+	ACNT_CODE_WRAP,       /* Used to pad when wrapping                    */
+	ACNT_CODE_DROP,       /* Count of dropped records                     */
+	ACNT_CODE_TX_ENQUEUE, /* TXINFO when added to TCQ (acnt_tx_s)         */
+	ACNT_CODE_RX_PPDU,    /* RXINFO for each PPDu (acnt_rx_s)             */
+	ACNT_CODE_TX_FLUSH,   /* Flush Tx Queue                               */
+	ACNT_CODE_RX_RESET,   /* Channel Change / Rx Reset                    */
+	ACNT_CODE_TX_RESET,   /* TCQ reset                                    */
+	ACNT_CODE_QUOTE_LEVEL,/* Quota Level changes                          */
+	ACNT_CODE_TX_DONE,    /* Tx status when done                          */
+	ACNT_CODE_RA_STATS,   /* rateinfo PER (acnt_ra_s)                     */
+	ACNT_CODE_BA_STATS,   /* BA stats (acnt_ba_s)                         */
+	ACNT_CODE_BF_MIMO_CTRL,/* BF Mimo Ctrl Field Log (acnt_bf_mimo_ctrl_s)*/
 };
 
 struct acnt_s { /* Baseline Accounting Record format */
@@ -710,6 +714,17 @@ struct acnt_ba_s { /* Accounting Record w/ rateinfo PER */
 	u8 ba_expected;       /* Total expected pkt to be BA'd                */
 	u8 type;              /* SU:0 or MU:1                                 */
 	u8 pad[3];            /* Unused                                       */
+} __packed;
+
+struct acnt_bf_mimo_ctrl_s {/* Accounting Record w/ BF MIMO Control Field Data*/
+	__le16 code;          /* Unique code for each type                    */
+	u8 len;               /* Length in DWORDS, including header           */
+	u8 type;              /* SU:0, MU:1                                   */
+	__le32 tsf;           /* Timestamp for Entry (when len>1)             */
+	u8 rec_mac[6];        /* Received Packet Source MAC Address           */
+	__le16 pad;           /* Padding                                      */
+	__le32 mimo_ctrl;     /* BF MIMO Control Field Data                   */
+	__le64 comp_bf_rep;   /* First 8 bytes of Compressed BF Report        */
 } __packed;
 
 static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,

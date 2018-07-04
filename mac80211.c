@@ -144,7 +144,7 @@ static int mwl_mac80211_start(struct ieee80211_hw *hw)
 		rc = mwl_fwcmd_newdp_dmathread_start(hw);
 		if (rc)
 			goto fwcmd_fail;
-		rc = mwl_fwcmd_set_bftype(hw, 6);
+		rc = mwl_fwcmd_set_bftype(hw, priv->bf_type);
 		if (rc)
 			goto fwcmd_fail;
 	}

@@ -1252,6 +1252,40 @@ static void pcie_ba_account(struct mwl_priv *priv,
 	}
 }
 
+static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
+				     struct acnt_bf_mimo_ctrl_s *bf_mimo_ctrl)
+{
+	struct file *fp_data = NULL;
+	const char filename[] = "/tmp/BF_MIMO_Ctrl_Field_Output.txt";
+	char str_buf[256];
+	char *buf = &str_buf[0];
+	mm_segment_t oldfs;
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+
+	buf += sprintf(buf, "\nMAC: %pM\n", bf_mimo_ctrl->rec_mac);
+	buf += sprintf(buf, "SU_0_MU_1: %d\n", bf_mimo_ctrl->type);
+	buf += sprintf(buf, "MIMO_Ctrl_Field: 0x%x\n",
+		       le32_to_cpu(bf_mimo_ctrl->mimo_ctrl));
+	buf += sprintf(buf, "Comp_BF_Report_First_8Bytes: 0x%llx\n",
+		       le64_to_cpu(bf_mimo_ctrl->comp_bf_rep));
+
+	fp_data = filp_open(filename, O_RDWR | O_CREAT | O_TRUNC, 0);
+
+	if(!IS_ERR(fp_data)) {
+		__kernel_write(fp_data, str_buf, strlen(str_buf),
+			       &fp_data->f_pos);
+		filp_close(fp_data, current->files);
+		wiphy_info(priv->hw->wiphy, "Data written to %s\n", filename);
+	} else {
+		wiphy_err(priv->hw->wiphy, "Error opening %s! %x \n",
+			  filename, (unsigned int)fp_data);
+	}
+
+	set_fs(oldfs);
+}
+
 static void pcie_process_account(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -1266,6 +1300,7 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 	struct acnt_rx_s *acnt_rx;
 	struct acnt_ra_s *acnt_ra;
 	struct acnt_ba_s *acnt_ba;
+	struct acnt_bf_mimo_ctrl_s *acnt_bf_mimo_ctrl;
 	struct pcie_dma_data *dma_data;
 	struct mwl_sta *sta_info;
 	u16 nf_a, nf_b, nf_c, nf_d;
@@ -1309,6 +1344,15 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 		acnt = (struct acnt_s *)pstart;
 
 		switch (le16_to_cpu(acnt->code)) {
+		case ACNT_CODE_BUSY:
+			pcie_priv->acnt_busy++;
+			break;
+		case ACNT_CODE_WRAP:
+			pcie_priv->acnt_wrap++;
+			break;
+		case ACNT_CODE_DROP:
+			pcie_priv->acnt_drop++;
+			break;
 		case ACNT_CODE_TX_ENQUEUE:
 			acnt_tx = (struct acnt_tx_s *)pstart;
 			sta_info = utils_find_sta(priv, acnt_tx->hdr.wh.addr1);
@@ -1385,6 +1429,10 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 					spin_unlock_bh(&priv->sta_lock);
 				}
 			}
+			break;
+		case ACNT_CODE_BF_MIMO_CTRL:
+			acnt_bf_mimo_ctrl = (struct acnt_bf_mimo_ctrl_s *)pstart;
+			pcie_bf_mimo_ctrl_decode(priv, acnt_bf_mimo_ctrl);
 			break;
 		default:
 			break;

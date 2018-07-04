@@ -19,6 +19,7 @@
 
 #include "sysadpt.h"
 #include "core.h"
+#include "vendor_cmd.h"
 #include "thermal.h"
 #include "debugfs.h"
 #include "hif/fwcmd.h"
@@ -468,9 +469,15 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXLDPC;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RXSTBC_1;
-	if (priv->antenna_tx != ANTENNA_TX_1)
+	if (priv->antenna_tx != ANTENNA_TX_1) {
 		band->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE;
+		if (priv->chip_type == MWL8964)
+			band->vht_cap.cap |=
+				IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE;
+	}
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE;
+	if (priv->chip_type == MWL8964)
+		band->vht_cap.cap |= IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_RX_ANTENNA_PATTERN;
 	band->vht_cap.cap |= IEEE80211_VHT_CAP_TX_ANTENNA_PATTERN;
@@ -748,6 +755,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->dfs_pw_filter = 0;
 	priv->dfs_min_num_radar = 5;
 	priv->dfs_min_pri_count = 4;
+	priv->bf_type = TXBF_MODE_AUTO;
 
 	/* Handle watchdog ba events */
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
@@ -837,6 +845,8 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->wiphy->n_iface_combinations = 1;
 
 	mwl_set_caps(priv);
+
+	vendor_cmd_register(hw->wiphy);
 
 	rc = ieee80211_register_hw(hw);
 	if (rc) {
