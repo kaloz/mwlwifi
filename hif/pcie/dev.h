@@ -736,6 +736,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 	int dma_hdrlen;
 	int hdrlen;
 	int reqd_hdrlen;
+	int needed_room;
 	struct pcie_dma_data *dma_data;
 
 	dma_hdrlen = (priv->chip_type == MWL8997) ?
@@ -753,8 +754,15 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 
 	reqd_hdrlen = dma_hdrlen + head_pad;
 
-	if (hdrlen != reqd_hdrlen)
-		skb_push(skb, reqd_hdrlen - hdrlen);
+	if (hdrlen != reqd_hdrlen) {
+		needed_room = reqd_hdrlen - hdrlen;
+		if (skb_headroom(skb) < needed_room) {
+			wiphy_debug(priv->hw->wiphy, "headroom is short: %d %d",
+				    skb_headroom(skb), needed_room);
+			skb_cow(skb, needed_room);
+		}
+		skb_push(skb, needed_room);
+	}
 
 	if (ieee80211_is_data_qos(wh->frame_control))
 		hdrlen -= IEEE80211_QOS_CTL_LEN;
