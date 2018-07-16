@@ -470,7 +470,7 @@ void pcie_rx_recv(unsigned long data)
 					pkt_len += 4;
 				}
 
-				if (!ieee80211_is_auth(wh->frame_control))
+				if (!ieee80211_is_auth(wh->frame_control)) {
 					if (priv->chip_type != MWL8997)
 						status->flag |=
 							RX_FLAG_IV_STRIPPED |
@@ -480,6 +480,7 @@ void pcie_rx_recv(unsigned long data)
 						status->flag |=
 							RX_FLAG_DECRYPTED |
 							RX_FLAG_MMIC_STRIPPED;
+				}
 			}
 		}
 
