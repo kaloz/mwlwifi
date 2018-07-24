@@ -1277,7 +1277,6 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 		__kernel_write(fp_data, str_buf, strlen(str_buf),
 			       &fp_data->f_pos);
 		filp_close(fp_data, current->files);
-		wiphy_info(priv->hw->wiphy, "Data written to %s\n", filename);
 	} else {
 		wiphy_err(priv->hw->wiphy, "Error opening %s! %x \n",
 			  filename, (unsigned int)fp_data);
