@@ -840,10 +840,9 @@ static int mwl_mac80211_chnl_switch(struct ieee80211_hw *hw,
 				    struct ieee80211_vif *vif,
 				    struct ieee80211_channel_switch *ch_switch)
 {
-	struct mwl_priv *priv = hw->priv;
 	int rc = 0;
 
-	rc = mwl_fwcmd_set_switch_channel(priv, ch_switch);
+	rc = mwl_fwcmd_set_switch_channel(hw, ch_switch);
 
 	return rc;
 }

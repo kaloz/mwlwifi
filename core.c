@@ -163,7 +163,7 @@ err:
 }
 
 static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
-			     const char *cal_name)
+			     const char *cal_name, const char *txpwrlmt_name)
 {
 	int rc = 0;
 
@@ -186,8 +186,16 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	if (cal_name) {
 		if ((request_firmware((const struct firmware **)&priv->cal_data,
 		     cal_name, priv->dev)) < 0)
-			wiphy_warn(priv->hw->wiphy,
-				   "cannot find calibtration data\n");
+			wiphy_debug(priv->hw->wiphy,
+				    "cannot find calibtration data\n");
+	}
+
+	if (txpwrlmt_name) {
+		if ((request_firmware(
+		     (const struct firmware **)&priv->txpwrlmt_file,
+		     txpwrlmt_name, priv->dev)) < 0)
+			wiphy_debug(priv->hw->wiphy,
+				    "cannot find tx power limit data\n");
 	}
 
 	return rc;
@@ -813,8 +821,11 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	wiphy_info(hw->wiphy,
 		   "firmware version: 0x%x\n", priv->hw_data.fw_release_num);
 
-	if (priv->chip_type == MWL8997)
+	if (priv->chip_type == MWL8997) {
 		mwl_fwcmd_set_cfg_data(hw, 2);
+		mwl_fwcmd_set_txpwrlmt_cfg_data(hw);
+		mwl_fwcmd_get_txpwrlmt_cfg_data(hw);
+	}
 
 	if (priv->chip_type == MWL8964)
 		rc = mwl_fwcmd_get_fw_region_code_sc4(hw,
@@ -972,7 +983,7 @@ void mwl_free_hw(struct ieee80211_hw *hw)
 }
 
 int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
-		const char *cal_name)
+		const char *cal_name, const char *txpwrlmt_name)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
@@ -985,7 +996,7 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 		return -ENOMEM;
 	}
 
-	rc = mwl_init_firmware(priv, fw_name, cal_name);
+	rc = mwl_init_firmware(priv, fw_name, cal_name, txpwrlmt_name);
 	if (rc) {
 		wiphy_err(hw->wiphy, "fail to initialize firmware\n");
 		return -EIO;

@@ -49,6 +49,7 @@ static struct mwl_chip_info pcie_chip_tbl[] = {
 		.part_name	= "88W8864",
 		.fw_image	= "mwlwifi/88W8864.bin",
 		.cal_file	= NULL,
+		.txpwrlmt_file  = NULL,
 		.antenna_tx	= ANTENNA_TX_4_AUTO,
 		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
@@ -56,6 +57,7 @@ static struct mwl_chip_info pcie_chip_tbl[] = {
 		.part_name	= "88W8897",
 		.fw_image	= "mwlwifi/88W8897.bin",
 		.cal_file	= NULL,
+		.txpwrlmt_file  = NULL,
 		.antenna_tx	= ANTENNA_TX_2,
 		.antenna_rx	= ANTENNA_RX_2,
 	},
@@ -63,6 +65,7 @@ static struct mwl_chip_info pcie_chip_tbl[] = {
 		.part_name	= "88W8964",
 		.fw_image	= "mwlwifi/88W8964.bin",
 		.cal_file	= NULL,
+		.txpwrlmt_file  = NULL,
 		.antenna_tx	= ANTENNA_TX_4_AUTO,
 		.antenna_rx	= ANTENNA_RX_4_AUTO,
 	},
@@ -70,6 +73,7 @@ static struct mwl_chip_info pcie_chip_tbl[] = {
 		.part_name	= "88W8997",
 		.fw_image	= "mwlwifi/88W8997.bin",
 		.cal_file	= "mwlwifi/WlanCalData_ext.conf",
+		.txpwrlmt_file  = "mwlwifi/txpwrlmt_cfg.conf",
 		.antenna_tx	= ANTENNA_TX_2,
 		.antenna_rx	= ANTENNA_RX_2,
 	},
@@ -1273,12 +1277,12 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 
 	fp_data = filp_open(filename, O_RDWR | O_CREAT | O_TRUNC, 0);
 
-	if(!IS_ERR(fp_data)) {
+	if (!IS_ERR(fp_data)) {
 		__kernel_write(fp_data, str_buf, strlen(str_buf),
 			       &fp_data->f_pos);
 		filp_close(fp_data, current->files);
 	} else {
-		wiphy_err(priv->hw->wiphy, "Error opening %s! %x \n",
+		wiphy_err(priv->hw->wiphy, "Error opening %s! %x\n",
 			  filename, (unsigned int)fp_data);
 	}
 
@@ -1430,7 +1434,8 @@ static void pcie_process_account(struct ieee80211_hw *hw)
 			}
 			break;
 		case ACNT_CODE_BF_MIMO_CTRL:
-			acnt_bf_mimo_ctrl = (struct acnt_bf_mimo_ctrl_s *)pstart;
+			acnt_bf_mimo_ctrl =
+				(struct acnt_bf_mimo_ctrl_s *)pstart;
 			pcie_bf_mimo_ctrl_decode(priv, acnt_bf_mimo_ctrl);
 			break;
 		default:
@@ -1554,7 +1559,8 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_alloc_pci_resource;
 
 	rc = mwl_init_hw(hw, pcie_chip_tbl[priv->chip_type].fw_image,
-			 pcie_chip_tbl[priv->chip_type].cal_file);
+			 pcie_chip_tbl[priv->chip_type].cal_file,
+			 pcie_chip_tbl[priv->chip_type].txpwrlmt_file);
 	if (rc)
 		goto err_wl_init;
 

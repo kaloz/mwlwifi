@@ -81,4 +81,6 @@
 
 #define SYSADPT_OTP_BUF_SIZE           (256*8) /* 258 lines * 8 bytes */
 
+#define SYSADPT_TXPWRLMT_CFG_BUF_SIZE  (3650)
+
 #endif /* _SYSADPT_H_ */

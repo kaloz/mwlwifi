@@ -79,6 +79,7 @@
 #define HOSTCMD_CMD_GET_FW_CORE_DUMP            0x1203
 #define HOSTCMD_CMD_802_11_SLOT_TIME            0x1203
 #define HOSTCMD_CMD_EDMAC_CTRL                  0x1204
+#define HOSTCMD_CMD_TXPWRLMT_CFG                0x1211
 #define HOSTCMD_CMD_MCAST_CTS                   0x4001
 
 /* Define general result code for each command */
@@ -1227,6 +1228,37 @@ struct hostcmd_cmd_edmac_ctrl {
 	__le16 ed_ctrl_5g;
 	__le16 ed_offset_5g;
 	__le16 ed_bitmap_txq_lock;
+} __packed;
+
+/* HOSTCMD_CMD_TXPWRLMT_CFG */
+#define TXPWRLMT_CFG_VERSION_INFO_LEN 0x4
+#define TXPWRLMT_CFG_MAX_SUBBAND_INFO 0x5
+#define TXPWRLMT_CFG_SIG_LEN          0x4
+#define TXPWRLMT_CFG_SIGNATURE        0xA1240E01
+
+struct hostcmd_cmd_txpwrlmt_cfg {
+	struct hostcmd_header cmd_hdr;
+	/* Action */
+	__le16 action;
+	/*Sub band id*/
+	u8 subband_id;
+	/* Cfg Complete Info*/
+	u8 cfgComplete;
+	/* Data length */
+	__le16 data_len;
+	/*number of entries*/
+	__le16 num_entries;
+	/* Data */
+	u8 data[1];
+} __packed;
+
+struct mwl_txpwrlmt_cfg_entry_hdr {
+	/* subband id */
+	__le16 id;
+	/* length */
+	__le16 len;
+	/* number of entries */
+	__le16 num_entries;
 } __packed;
 
 /* HOSTCMD_CMD_MCAST_CTS */

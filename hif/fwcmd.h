@@ -167,7 +167,7 @@ int mwl_fwcmd_set_new_stn_del(struct ieee80211_hw *hw,
 
 int mwl_fwcmd_set_apmode(struct ieee80211_hw *hw, u8 apmode);
 
-int mwl_fwcmd_set_switch_channel(struct mwl_priv *priv,
+int mwl_fwcmd_set_switch_channel(struct ieee80211_hw *hw,
 				 struct ieee80211_channel_switch *ch_switch);
 
 int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
@@ -271,6 +271,10 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot);
 
 int mwl_fwcmd_config_EDMACCtrl(struct ieee80211_hw *hw, int EDMAC_Ctrl);
+
+int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw);
+
+int mwl_fwcmd_get_txpwrlmt_cfg_data(struct ieee80211_hw *hw);
 
 int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable);
 

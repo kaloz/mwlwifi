@@ -148,6 +148,7 @@ struct mwl_chip_info {
 	const char *part_name;
 	const char *fw_image;
 	const char *cal_file;
+	const char *txpwrlmt_file;
 	int antenna_tx;
 	int antenna_rx;
 };
@@ -191,12 +192,19 @@ struct otp_data {
 	u32 len; /* Actual size of data in buf[] */
 };
 
+struct txpwrlmt_cfg_data {
+	u8 buf[SYSADPT_TXPWRLMT_CFG_BUF_SIZE];
+	u32 len; /* Actual size of data in buf[] */
+};
+
 struct mwl_priv {
 	struct ieee80211_hw *hw;
 	struct device *dev;
 	struct firmware *fw_ucode;
 	struct firmware *cal_data;
+	struct firmware *txpwrlmt_file;
 	struct otp_data otp_data;
+	struct txpwrlmt_cfg_data txpwrlmt_data;
 	bool fw_device_pwrtbl;
 	bool forbidden_setting;
 	bool regulatory_set;
@@ -474,7 +482,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 void mwl_free_hw(struct ieee80211_hw *hw);
 
 int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
-		const char *cal_name);
+		const char *cal_name, const char *txpwrlmt_name);
 
 void mwl_deinit_hw(struct ieee80211_hw *hw);
 

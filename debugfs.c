@@ -746,6 +746,17 @@ static ssize_t mwl_debugfs_device_pwrtbl_read(struct file *file,
 	return ret;
 }
 
+static ssize_t mwl_debugfs_txpwrlmt_read(struct file *file,
+					 char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+
+	return simple_read_from_buffer(ubuf, count, ppos,
+				       priv->txpwrlmt_data.buf,
+				       priv->txpwrlmt_data.len);
+}
+
 static ssize_t mwl_debugfs_tx_amsdu_read(struct file *file,
 					 char __user *ubuf,
 					 size_t count, loff_t *ppos)
@@ -1822,6 +1833,7 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(stnid);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
+MWLWIFI_DEBUGFS_FILE_READ_OPS(txpwrlmt);
 MWLWIFI_DEBUGFS_FILE_OPS(tx_amsdu);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
@@ -1854,6 +1866,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(ampdu);
 	MWLWIFI_DEBUGFS_ADD_FILE(stnid);
 	MWLWIFI_DEBUGFS_ADD_FILE(device_pwrtbl);
+	MWLWIFI_DEBUGFS_ADD_FILE(txpwrlmt);
 	MWLWIFI_DEBUGFS_ADD_FILE(tx_amsdu);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
