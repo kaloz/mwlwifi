@@ -864,14 +864,16 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 	return 0;
 }
 
-static u16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
+static __le16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
 {
 	const u8 *ptr;
 	u8 *dptr;
+	char byte_str[3];
 	long res;
 
 	ptr = src;
 	dptr = dst;
+	byte_str[2] = '\0';
 
 	while (ptr - src < len) {
 		if (*ptr && (isspace(*ptr) || iscntrl(*ptr))) {
@@ -880,15 +882,16 @@ static u16 mwl_fwcmd_parse_cal_cfg(const u8 *src, size_t len, u8 *dst)
 		}
 
 		if (isxdigit(*ptr)) {
-			kstrtol(ptr, 16, &res);
+			byte_str[0] = *ptr++;
+			byte_str[1] = *ptr++;
+			kstrtol(byte_str, 16, &res);
 			*dptr++ = res;
-			ptr += 2;
 		} else {
 			ptr++;
 		}
 	}
 
-	return (dptr - dst);
+	return cpu_to_le16(dptr - dst);
 }
 
 static u16 mwl_fwcmd_parse_txpwrlmt_cfg(const u8 *src, size_t len,
@@ -1486,12 +1489,16 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	pcmd->data_len = mwl_fwcmd_parse_cal_cfg(priv->cal_data->data,
-		priv->cal_data->size, pcmd->data);
+						 priv->cal_data->size,
+						 pcmd->data);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
 		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 	pcmd->type = cpu_to_le16(type);
+
+	utils_dump_data_debug("CalData:", pcmd->data,
+			      le16_to_cpu(pcmd->data_len));
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_CFG)) {
 		mutex_unlock(&priv->fwcmd_mutex);
