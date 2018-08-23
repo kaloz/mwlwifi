@@ -304,6 +304,7 @@ struct mwl_priv {
 	struct work_struct wds_check_handle;
 	u8 wds_check_sta[ETH_ALEN];
 
+	bool dfs_test;
 	bool csa_active;
 	struct work_struct chnl_switch_handle;
 	enum nl80211_dfs_regions dfs_region;

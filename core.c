@@ -757,6 +757,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		priv->pwr_level = SYSADPT_TX_GRP_PWR_LEVEL_TOTAL;
 	else
 		priv->pwr_level = SYSADPT_TX_POWER_LEVEL_TOTAL;
+	priv->dfs_test = false;
 	priv->csa_active = false;
 	priv->dfs_chirp_count_min = 5;
 	priv->dfs_chirp_time_interval = 1000;
