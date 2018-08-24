@@ -333,7 +333,7 @@ drop_packet:
 
 static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 					     struct sk_buff *skb,
-					     bool bad_mic)
+					     bool bad_mic, u8 signal)
 {
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
@@ -342,6 +342,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	pcie_rx_remove_dma_header(skb, 0);
 	status = IEEE80211_SKB_RXCB(skb);
 	memset(status, 0, sizeof(*status));
+	status->signal = -signal;
 	status->band = priv->hw->conf.chandef.chan->band;
 	status->freq = ieee80211_channel_to_frequency(
 		priv->hw->conf.chandef.chan->hw_value, status->band);
@@ -468,6 +469,7 @@ void pcie_rx_recv_ndp(unsigned long data)
 	u16 pktlen;
 	struct rx_info *rx_info;
 	struct pcie_dma_data *dma_data;
+	u8 signal;
 
 	rx_done_head = readl(pcie_priv->iobase1 + MACREG_REG_RXDONEHEAD);
 	rx_done_tail = readl(pcie_priv->iobase1 + MACREG_REG_RXDONETAIL);
@@ -570,8 +572,11 @@ recheck:
 			if (skb_tailroom(psk_buff) >= pktlen) {
 				skb_put(psk_buff, pktlen);
 				skb_pull(psk_buff, sizeof(*rx_info));
+				signal = ((le32_to_cpu(rx_info->rssi_x) >>
+					RXINFO_RSSI_X_SHIFT) &
+					RXINFO_RSSI_X_MASK);
 				pcie_rx_process_slow_data(priv, psk_buff,
-							  bad_mic);
+							  bad_mic, signal);
 			} else {
 				wiphy_err(hw->wiphy,
 					  "slow: space %d(%d) is not enough\n",
