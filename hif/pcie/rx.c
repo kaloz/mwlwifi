@@ -202,7 +202,11 @@ static inline void pcie_rx_status(struct mwl_priv *priv,
 	u16 rx_rate;
 
 	memset(status, 0, sizeof(*status));
-	status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
+
+	if (priv->chip_type == MWL8997)
+		status->signal = (s8)pdesc->rssi;
+	else
+		status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
 
 	rx_rate = le16_to_cpu(pdesc->rate);
 	pcie_rx_prepare_status(priv,
@@ -425,7 +429,12 @@ void pcie_rx_recv(unsigned long data)
 		status = IEEE80211_SKB_RXCB(prx_skb);
 		pcie_rx_status(priv, curr_hndl->pdesc, status);
 
-		priv->noise = -curr_hndl->pdesc->noise_floor;
+		if (priv->chip_type == MWL8997) {
+			priv->noise = (s8)curr_hndl->pdesc->noise_floor;
+			if (priv->noise > 0)
+				priv->noise = -priv->noise;
+		} else
+			priv->noise = -curr_hndl->pdesc->noise_floor;
 
 		wh = &((struct pcie_dma_data *)prx_skb->data)->wh;
 
