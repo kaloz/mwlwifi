@@ -701,6 +701,8 @@ struct start_cmd {
 	struct wmm_param_elem wmm_param;
 	struct country country;
 	__le32 ap_rf_type;           /* 0->B, 1->G, 2->Mixed, 3->A, 4->11J */
+	__le32 rsvd;
+	u8 bssid[ETH_ALEN];          /* only for 88W8997                   */
 } __packed;
 
 struct hostcmd_cmd_ap_beacon {

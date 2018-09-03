@@ -664,6 +664,8 @@ static int mwl_fwcmd_set_ap_beacon(struct mwl_priv *priv,
 
 	ether_addr_copy(pcmd->start_cmd.sta_mac_addr, mwl_vif->bssid);
 	memcpy(pcmd->start_cmd.ssid, bss_conf->ssid, bss_conf->ssid_len);
+	if (priv->chip_type == MWL8997)
+		ether_addr_copy(pcmd->start_cmd.bssid, mwl_vif->bssid);
 	pcmd->start_cmd.bss_type = 1;
 	pcmd->start_cmd.bcn_period  = cpu_to_le16(bss_conf->beacon_int);
 	pcmd->start_cmd.dtim_period = bss_conf->dtim_period; /* 8bit */
