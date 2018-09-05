@@ -664,6 +664,7 @@ struct wmm_param_elem {
 	u8 type;
 	u8 sub_type;
 	u8 version;
+	u8 qos_info;
 	u8 rsvd;
 	struct ac_param_rcd ac_be;
 	struct ac_param_rcd ac_bk;
@@ -701,7 +702,7 @@ struct start_cmd {
 	struct wmm_param_elem wmm_param;
 	struct country country;
 	__le32 ap_rf_type;           /* 0->B, 1->G, 2->Mixed, 3->A, 4->11J */
-	__le32 rsvd;
+	u8 rsvd[3];
 	u8 bssid[ETH_ALEN];          /* only for 88W8997                   */
 } __packed;
 
