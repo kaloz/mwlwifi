@@ -144,6 +144,12 @@ enum {
 	AMPDU_STREAM_ACTIVE,
 };
 
+enum {
+	LED_BLINK_RATE_LOW = 0x1,
+	LED_BLINK_RATE_MID,
+	LED_BLINK_RATE_HIGH,
+};
+
 struct mwl_chip_info {
 	const char *part_name;
 	const char *fw_image;
@@ -320,6 +326,9 @@ struct mwl_priv {
 	u32 throttle_state;
 	u32 quiet_period;
 	int temperature;
+
+	u8 led_blink_enable;
+	u8 led_blink_rate;
 
 	struct dentry *debugfs_phy;
 	u32 reg_type;

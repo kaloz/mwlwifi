@@ -858,6 +858,10 @@ static int mwl_wl_init(struct mwl_priv *priv)
 
 	mwl_set_caps(priv);
 
+	priv->led_blink_enable = 1;
+	priv->led_blink_rate = LED_BLINK_RATE_MID;
+	mwl_fwcmd_led_ctrl(hw, priv->led_blink_enable, priv->led_blink_rate);
+
 	vendor_cmd_register(hw->wiphy);
 
 	rc = ieee80211_register_hw(hw);

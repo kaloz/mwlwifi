@@ -68,6 +68,7 @@
 #define HOSTCMD_CMD_SET_BFTYPE                  0x1155
 #define HOSTCMD_CMD_CAU_REG_ACCESS              0x1157
 #define HOSTCMD_CMD_GET_TEMP                    0x1159
+#define HOSTCMD_CMD_LED_CTRL                    0x1169
 #define HOSTCMD_CMD_GET_FW_REGION_CODE          0x116A
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL          0x116B
 #define HOSTCMD_CMD_SET_RATE_DROP               0x1172
@@ -1055,6 +1056,16 @@ struct hostcmd_cmd_get_temp {
 	struct hostcmd_header cmd_hdr;
 	__le32 celcius;
 	__le32 raw_data;
+} __packed;
+
+/* HOSTCMD_CMD_LED_CTRL */
+struct hostcmd_cmd_led_ctrl {
+	struct hostcmd_header cmd_hdr;
+	__le16 action;     /* 0: GET, 1: SET (only SET is supported) */
+	u8 led_enable;     /* 0: Disable, 1: Enable                  */
+	u8 led_control;    /* 0: HW 1: SW (only SW is supported)     */
+	u8 led_blink_rate; /* 1: Slow, 2: Medium, 3: Fast blink      */
+	u8 reserved;
 } __packed;
 
 /* HOSTCMD_CMD_GET_FW_REGION_CODE */

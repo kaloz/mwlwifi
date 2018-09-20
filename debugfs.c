@@ -1085,6 +1085,81 @@ err:
 	return ret;
 }
 
+static ssize_t mwl_debugfs_led_ctrl_read(struct file *file,
+					 char __user *ubuf,
+					 size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len, "led blink %s\n",
+			 priv->led_blink_enable ? "enable" : "disable");
+	len += scnprintf(p + len, size - len, "led blink rate: %d\n",
+			 priv->led_blink_rate);
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_led_ctrl_write(struct file *file,
+					  const char __user *ubuf,
+					  size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int enable, rate;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	ret = sscanf(buf, "%x %x", &enable, &rate);
+
+	if ((ret != 1) && (ret != 2)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	if (enable && (ret != 2)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	ret = mwl_fwcmd_led_ctrl(priv->hw, enable, rate);
+
+	if (ret)
+		goto err;
+
+	priv->led_blink_enable = enable;
+	if (enable)
+		priv->led_blink_rate = rate;
+	else
+		priv->led_blink_rate = 0;
+
+	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
 static ssize_t mwl_debugfs_regrdwr_read(struct file *file, char __user *ubuf,
 					size_t count, loff_t *ppos)
 {
@@ -1896,6 +1971,7 @@ MWLWIFI_DEBUGFS_FILE_OPS(dfs_test);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
 MWLWIFI_DEBUGFS_FILE_OPS(thermal);
+MWLWIFI_DEBUGFS_FILE_OPS(led_ctrl);
 MWLWIFI_DEBUGFS_FILE_OPS(regrdwr);
 MWLWIFI_DEBUGFS_FILE_OPS(ratetable);
 MWLWIFI_DEBUGFS_FILE_OPS(tx_hist);
@@ -1930,6 +2006,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);
 	MWLWIFI_DEBUGFS_ADD_FILE(thermal);
+	MWLWIFI_DEBUGFS_ADD_FILE(led_ctrl);
 	MWLWIFI_DEBUGFS_ADD_FILE(regrdwr);
 	MWLWIFI_DEBUGFS_ADD_FILE(ratetable);
 	MWLWIFI_DEBUGFS_ADD_FILE(tx_hist);

@@ -89,6 +89,7 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_SET_BFTYPE, "SetBFType" },
 		{ HOSTCMD_CMD_CAU_REG_ACCESS, "CAURegAccess" },
 		{ HOSTCMD_CMD_GET_TEMP, "GetTemp" },
+		{ HOSTCMD_CMD_LED_CTRL, "LedCtrl" },
 		{ HOSTCMD_CMD_GET_FW_REGION_CODE, "GetFwRegionCode" },
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL, "GetDevicePwrTbl" },
 		{ HOSTCMD_CMD_SET_RATE_DROP, "SetRateDrop" },
@@ -3251,6 +3252,45 @@ int mwl_fwcmd_get_temp(struct ieee80211_hw *hw, u32 *temp)
 	}
 
 	*temp = le32_to_cpu(pcmd->celcius);
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_led_ctrl(struct ieee80211_hw *hw, u8 enable, u8 rate)
+{
+	struct hostcmd_cmd_led_ctrl  *pcmd;
+	struct mwl_priv *priv = hw->priv;
+
+	pcmd = (struct hostcmd_cmd_led_ctrl *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_LED_CTRL);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = 1; /* 1: set */
+	pcmd->led_enable = enable;
+	pcmd->led_control = 1; /* 1: SW */
+
+	switch (rate) {
+	case LED_BLINK_RATE_LOW:
+	case LED_BLINK_RATE_MID:
+	case LED_BLINK_RATE_HIGH:
+		pcmd->led_blink_rate = rate;
+		break;
+	default:
+		if (enable) {
+			mutex_unlock(&priv->fwcmd_mutex);
+			return -EINVAL;
+		}
+		break;
+	}
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_LED_CTRL)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
