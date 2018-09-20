@@ -502,6 +502,9 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 	struct mwl_ampdu_stream *stream;
 	struct mwl_sta *sta_info;
 	struct mwl_tx_info *tx_stats;
+	struct mwl_ampdu_stream *rm_stream = NULL;
+	u32 rm_pkts = 0;
+	bool ba_full = true;
 	int i;
 
 	if ((++cnt * SYSADPT_TIMER_WAKEUP_TIME) < CHECK_BA_TRAFFIC_TIME)
@@ -517,16 +520,27 @@ static void pcie_timer_routine(struct ieee80211_hw *hw)
 
 			if ((jiffies - tx_stats->start_time > HZ) &&
 			    (tx_stats->pkts < SYSADPT_AMPDU_PACKET_THRESHOLD)) {
-				ieee80211_stop_tx_ba_session(stream->sta,
-							     stream->tid);
+				if (rm_pkts) {
+					if (tx_stats->pkts < rm_pkts) {
+						rm_stream = stream;
+						rm_pkts = tx_stats->pkts;
+					}
+				} else {
+					rm_stream = stream;
+					rm_pkts = tx_stats->pkts;
+				}
 			}
 
 			if (jiffies - tx_stats->start_time > HZ) {
 				tx_stats->pkts = 0;
 				tx_stats->start_time = jiffies;
 			}
-		}
+		} else
+			ba_full = false;
 	}
+	if (ba_full && rm_stream)
+		ieee80211_stop_tx_ba_session(rm_stream->sta,
+					     rm_stream->tid);
 	spin_unlock_bh(&priv->stream_lock);
 }
 
