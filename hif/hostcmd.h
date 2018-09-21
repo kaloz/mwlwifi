@@ -401,6 +401,7 @@ struct hostcmd_cmd_802_11_rf_antenna {
 struct hostcmd_cmd_broadcast_ssid_enable {
 	struct hostcmd_header cmd_hdr;
 	__le32 enable;
+	__le32 hidden_ssid_info;
 } __packed;
 
 /* HOSTCMD_CMD_SET_CFG */

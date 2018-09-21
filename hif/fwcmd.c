@@ -1467,6 +1467,8 @@ int mwl_fwcmd_broadcast_ssid_enable(struct ieee80211_hw *hw,
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 	pcmd->enable = cpu_to_le32(enable);
+	if (priv->chip_type == MWL8997)
+		pcmd->hidden_ssid_info = enable ? 0 : 2;
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_BROADCAST_SSID_ENABLE)) {
 		mutex_unlock(&priv->fwcmd_mutex);
@@ -2942,6 +2944,8 @@ int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 	/* if the stream has already been started, don't start it again */
 	if (stream->state != AMPDU_STREAM_NEW)
 		return 0;
+
+	wiphy_debug(hw->wiphy, "Start BA %pM\n", stream->sta->addr);
 
 	return ieee80211_start_tx_ba_session(stream->sta, stream->tid, 0);
 }
