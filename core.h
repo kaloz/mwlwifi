@@ -220,6 +220,8 @@ struct mwl_priv {
 	struct mwl_device_pwr_tbl device_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
 	int chip_type;
 
+	bool use_short_slot;
+
 	struct {
 		enum mwl_bus bus;
 		const struct mwl_hif_ops *ops;
