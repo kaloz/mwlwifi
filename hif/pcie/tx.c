@@ -954,6 +954,11 @@ void pcie_tx_skbs(unsigned long data)
 				break;
 
 			tx_skb = skb_dequeue(&pcie_priv->txq[num]);
+			if (!tx_skb) {
+				wiphy_warn(hw->wiphy,
+					   "Socket buffer is NULL\n");
+				continue;
+			}
 			tx_info = IEEE80211_SKB_CB(tx_skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
 
@@ -1231,9 +1236,10 @@ void pcie_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *tx_info;
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
+	unsigned long flags;
 
 	for (num = 1; num < PCIE_NUM_OF_DESC_DATA; num++) {
-		spin_lock_bh(&pcie_priv->txq[num].lock);
+		spin_lock_irqsave(&pcie_priv->txq[num].lock, flags);
 		skb_queue_walk_safe(&pcie_priv->txq[num], skb, tmp) {
 			tx_info = IEEE80211_SKB_CB(skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
@@ -1248,7 +1254,7 @@ void pcie_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
 				dev_kfree_skb_any(skb);
 			}
 		}
-		spin_unlock_bh(&pcie_priv->txq[num].lock);
+		spin_unlock_irqrestore(&pcie_priv->txq[num].lock, flags);
 	}
 }
 
@@ -1262,9 +1268,10 @@ void pcie_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *tx_info;
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
+	unsigned long flags;
 
 	for (num = 1; num < PCIE_NUM_OF_DESC_DATA; num++) {
-		spin_lock_bh(&pcie_priv->txq[num].lock);
+		spin_lock_irqsave(&pcie_priv->txq[num].lock, flags);
 		skb_queue_walk_safe(&pcie_priv->txq[num], skb, tmp) {
 			tx_info = IEEE80211_SKB_CB(skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
@@ -1279,7 +1286,7 @@ void pcie_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 				dev_kfree_skb_any(skb);
 			}
 		}
-		spin_unlock_bh(&pcie_priv->txq[num].lock);
+		spin_unlock_irqrestore(&pcie_priv->txq[num].lock, flags);
 	}
 }
 
@@ -1295,10 +1302,11 @@ void pcie_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 	struct ieee80211_tx_info *tx_info;
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct sk_buff_head *amsdu_pkts;
+	unsigned long flags;
 
 	ac = utils_tid_to_ac(tid);
 	desc_num = SYSADPT_TX_WMM_QUEUES - ac - 1;
-	spin_lock_bh(&pcie_priv->txq[desc_num].lock);
+	spin_lock_irqsave(&pcie_priv->txq[desc_num].lock, flags);
 	skb_queue_walk_safe(&pcie_priv->txq[desc_num], skb, tmp) {
 		tx_info = IEEE80211_SKB_CB(skb);
 		tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
@@ -1313,7 +1321,7 @@ void pcie_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
 			dev_kfree_skb_any(skb);
 		}
 	}
-	spin_unlock_bh(&pcie_priv->txq[desc_num].lock);
+	spin_unlock_irqrestore(&pcie_priv->txq[desc_num].lock, flags);
 
 	spin_lock_bh(&sta_info->amsdu_lock);
 	amsdu_frag = &sta_info->amsdu_ctrl.frag[desc_num];
