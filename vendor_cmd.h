@@ -20,6 +20,7 @@
 
 #ifdef __KERNEL__
 void vendor_cmd_register(struct wiphy *wiphy);
+void vendor_cmd_basic_event(struct wiphy *wiphy, int event_idx);
 #endif
 
 #define MRVL_OUI        0x005043
@@ -47,7 +48,9 @@ enum mwl_vendor_attributes {
 };
 
 enum mwl_vendor_events {
-	MWL_VENDOR_EVENT_NONE,
+	MWL_VENDOR_EVENT_DRIVER_READY,
+	MWL_VENDOR_EVENT_DRIVER_START_REMOVE,
+	MWL_VENDOR_EVENT_CMD_TIMEOUT,
 
 	__MWL_VENDOR_EVENT_AFTER_LAST,
 	NUM_MWL_VENDOR_EVENT = __MWL_VENDOR_EVENT_AFTER_LAST,
