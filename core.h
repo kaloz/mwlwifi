@@ -221,6 +221,9 @@ struct mwl_priv {
 	int chip_type;
 
 	bool use_short_slot;
+	bool use_short_preamble;
+	int basic_rate_idx;
+	u8 broadcast_ssid;
 
 	struct {
 		enum mwl_bus bus;

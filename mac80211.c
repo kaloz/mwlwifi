@@ -358,9 +358,15 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 		}
 	}
 
-	if (changed & BSS_CHANGED_ERP_PREAMBLE)
-		mwl_fwcmd_set_radio_preamble(hw,
-					     vif->bss_conf.use_short_preamble);
+	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
+		if (priv->use_short_preamble !=
+		    vif->bss_conf.use_short_preamble) {
+			mwl_fwcmd_set_radio_preamble(
+				hw, vif->bss_conf.use_short_preamble);
+			priv->use_short_preamble =
+				vif->bss_conf.use_short_preamble;
+		}
+	}
 
 	if ((changed & BSS_CHANGED_ASSOC) && vif->bss_conf.assoc)
 		mwl_fwcmd_set_aid(hw, vif, (u8 *)vif->bss_conf.bssid,
@@ -382,9 +388,15 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		}
 	}
 
-	if (changed & BSS_CHANGED_ERP_PREAMBLE)
-		mwl_fwcmd_set_radio_preamble(hw,
-					     vif->bss_conf.use_short_preamble);
+	if (changed & BSS_CHANGED_ERP_PREAMBLE) {
+		if (priv->use_short_preamble !=
+		    vif->bss_conf.use_short_preamble) {
+			mwl_fwcmd_set_radio_preamble(
+				hw, vif->bss_conf.use_short_preamble);
+			priv->use_short_preamble =
+				vif->bss_conf.use_short_preamble;
+		}
+	}
 
 	if (changed & BSS_CHANGED_BASIC_RATES) {
 		int idx;
@@ -397,13 +409,15 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		idx = ffs(vif->bss_conf.basic_rates);
 		if (idx)
 			idx--;
+		if (priv->basic_rate_idx != idx) {
+			if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
+				rate = mwl_rates_24[idx].hw_value;
+			else
+				rate = mwl_rates_50[idx].hw_value;
 
-		if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
-			rate = mwl_rates_24[idx].hw_value;
-		else
-			rate = mwl_rates_50[idx].hw_value;
-
-		mwl_fwcmd_use_fixed_rate(hw, rate, rate);
+			mwl_fwcmd_use_fixed_rate(hw, rate, rate);
+			priv->basic_rate_idx = idx;
+		}
 	}
 
 	if (changed & (BSS_CHANGED_BEACON_INT | BSS_CHANGED_BEACON)) {
@@ -411,10 +425,17 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 
 		if ((info->ssid[0] != '\0') &&
 		    (info->ssid_len != 0) &&
-		    (!info->hidden_ssid))
-			mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);
-		else
-			mwl_fwcmd_broadcast_ssid_enable(hw, vif, false);
+		    (!info->hidden_ssid)) {
+			if (priv->broadcast_ssid != true) {
+				mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);
+				priv->broadcast_ssid = true;
+			}
+		} else {
+			if (priv->broadcast_ssid != false) {
+				mwl_fwcmd_broadcast_ssid_enable(hw, vif, false);
+				priv->broadcast_ssid = false;
+			}
+		}
 
 		skb = ieee80211_beacon_get(hw, vif);
 
