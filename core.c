@@ -1042,9 +1042,9 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 
 void mwl_deinit_hw(struct ieee80211_hw *hw)
 {
-	mwl_wl_deinit(hw->priv);
-
 #ifdef CONFIG_DEBUG_FS
 	mwl_debugfs_remove(hw);
 #endif
+
+	mwl_wl_deinit(hw->priv);
 }

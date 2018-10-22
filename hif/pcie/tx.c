@@ -241,12 +241,12 @@ static void pcie_tx_ring_cleanup(struct mwl_priv *priv)
 				if (!desc->tx_hndl[i].psk_buff)
 					continue;
 
-				wiphy_info(priv->hw->wiphy,
-					   "unmapped and free'd %i 0x%p 0x%x\n",
-					   i,
-					   desc->tx_hndl[i].psk_buff->data,
-					   le32_to_cpu(
-					   desc->ptx_ring[i].pkt_ptr));
+				wiphy_debug(priv->hw->wiphy,
+					    "unmapped and free'd %i %p %x\n",
+					    i,
+					    desc->tx_hndl[i].psk_buff->data,
+					    le32_to_cpu(
+					    desc->ptx_ring[i].pkt_ptr));
 				pci_unmap_single(pcie_priv->pdev,
 						 le32_to_cpu(
 						 desc->ptx_ring[i].pkt_ptr),

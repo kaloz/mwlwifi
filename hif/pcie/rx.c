@@ -161,11 +161,12 @@ static void pcie_rx_ring_cleanup(struct mwl_priv *priv)
 
 			dev_kfree_skb_any(rx_hndl->psk_buff);
 
-			wiphy_info(priv->hw->wiphy,
-				   "unmapped+free'd %i 0x%p 0x%x %i\n",
-				   i, rx_hndl->psk_buff->data,
-				   le32_to_cpu(rx_hndl->pdesc->pphys_buff_data),
-				   desc->rx_buf_size);
+			wiphy_debug(priv->hw->wiphy,
+				    "unmapped+free'd %i 0x%p 0x%x %i\n",
+				    i, rx_hndl->psk_buff->data,
+				    le32_to_cpu(
+				    rx_hndl->pdesc->pphys_buff_data),
+				    desc->rx_buf_size);
 
 			rx_hndl->psk_buff = NULL;
 		}
