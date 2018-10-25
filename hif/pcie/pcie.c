@@ -170,7 +170,7 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 	do {
 		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
 		usleep_range(1000, 2000);
-	} while ((int_code != cmd) && (--curr_iteration));
+	} while ((int_code != cmd) && (--curr_iteration) && !priv->rmmod);
 
 	if (curr_iteration == 0) {
 		wiphy_err(priv->hw->wiphy, "cmd 0x%04x=%s timed out\n",
@@ -380,7 +380,7 @@ static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
 		return -EIO;
 	}
 
-	if (!priv->in_send_cmd) {
+	if (!priv->in_send_cmd && !priv->rmmod) {
 		priv->in_send_cmd = true;
 		pcie_send_cmd(pcie_priv);
 		if (pcie_wait_complete(priv, 0x8000 | cmd)) {
@@ -392,7 +392,7 @@ static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
 		}
 	} else {
 		wiphy_warn(priv->hw->wiphy,
-			   "previous command is still running\n");
+			   "previous command is running or module removed\n");
 		busy = true;
 	}
 
@@ -1606,7 +1606,11 @@ err_pci_disable_device:
 static void pcie_remove(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
+	struct mwl_priv *priv = hw->priv;
 
+	priv->rmmod = true;
+	while (priv->in_send_cmd)
+		usleep_range(1000, 2000);
 	vendor_cmd_basic_event(hw->wiphy, MWL_VENDOR_EVENT_DRIVER_START_REMOVE);
 	mwl_deinit_hw(hw);
 	pci_set_drvdata(pdev, NULL);
