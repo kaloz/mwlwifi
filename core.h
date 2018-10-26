@@ -222,9 +222,6 @@ struct mwl_priv {
 
 	bool use_short_slot;
 	bool use_short_preamble;
-	bool set_beacon;
-	int basic_rate_idx;
-	u8 broadcast_ssid;
 
 	struct {
 		enum mwl_bus bus;
@@ -397,6 +394,9 @@ struct mwl_vif {
 	bool is_hw_crypto_enabled;
 	/* Indicate if this is station mode */
 	struct beacon_info beacon_info;
+	bool set_beacon;
+	int basic_rate_idx;
+	u8 broadcast_ssid;
 	u16 iv16;
 	u32 iv32;
 	s8 keyidx;
