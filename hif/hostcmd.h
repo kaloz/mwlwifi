@@ -77,8 +77,8 @@
 #define HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4      0x118B
 #define HOSTCMD_CMD_QUIET_MODE                  0x1201
 #define HOSTCMD_CMD_CORE_DUMP_DIAG_MODE         0x1202
-#define HOSTCMD_CMD_GET_FW_CORE_DUMP            0x1203
 #define HOSTCMD_CMD_802_11_SLOT_TIME            0x1203
+#define HOSTCMD_CMD_GET_FW_CORE_DUMP            0x1203
 #define HOSTCMD_CMD_EDMAC_CTRL                  0x1204
 #define HOSTCMD_CMD_TXPWRLMT_CFG                0x1211
 #define HOSTCMD_CMD_MCAST_CTS                   0x4001

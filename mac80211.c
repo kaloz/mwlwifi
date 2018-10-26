@@ -437,11 +437,14 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 			}
 		}
 
-		skb = ieee80211_beacon_get(hw, vif);
+		if (!priv->set_beacon) {
+			skb = ieee80211_beacon_get(hw, vif);
 
-		if (skb) {
-			mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
-			dev_kfree_skb_any(skb);
+			if (skb) {
+				mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
+				dev_kfree_skb_any(skb);
+			}
+			priv->set_beacon = true;
 		}
 	}
 

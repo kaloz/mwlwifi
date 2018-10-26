@@ -222,6 +222,7 @@ struct mwl_priv {
 
 	bool use_short_slot;
 	bool use_short_preamble;
+	bool set_beacon;
 	int basic_rate_idx;
 	u8 broadcast_ssid;
 
