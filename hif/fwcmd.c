@@ -2945,8 +2945,6 @@ int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 	if (stream->state != AMPDU_STREAM_NEW)
 		return 0;
 
-	wiphy_debug(hw->wiphy, "Start BA %pM\n", stream->sta->addr);
-
 	return ieee80211_start_tx_ba_session(stream->sta, stream->tid, 0);
 }
 
