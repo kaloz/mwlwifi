@@ -151,6 +151,10 @@ static bool pcie_chk_adapter(struct pcie_priv *pcie_priv)
 		return false;
 	}
 
+	if (priv->cmd_timeout)
+		wiphy_debug(priv->hw->wiphy, "MACREG_REG_INT_CODE: 0x%04x\n",
+			    regval);
+
 	return true;
 }
 
@@ -382,10 +386,13 @@ static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
 
 	if (!priv->in_send_cmd && !priv->rmmod) {
 		priv->in_send_cmd = true;
+		wiphy_debug(priv->hw->wiphy, "send cmd 0x%04x=%s\n",
+			    cmd, mwl_fwcmd_get_cmd_string(cmd));
 		pcie_send_cmd(pcie_priv);
 		if (pcie_wait_complete(priv, 0x8000 | cmd)) {
 			wiphy_err(priv->hw->wiphy, "timeout: 0x%04x\n", cmd);
 			priv->in_send_cmd = false;
+			priv->cmd_timeout = true;
 			vendor_cmd_basic_event(hw->wiphy,
 					       MWL_VENDOR_EVENT_CMD_TIMEOUT);
 			return -EIO;

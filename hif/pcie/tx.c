@@ -954,11 +954,8 @@ void pcie_tx_skbs(unsigned long data)
 				break;
 
 			tx_skb = skb_dequeue(&pcie_priv->txq[num]);
-			if (!tx_skb) {
-				wiphy_warn(hw->wiphy,
-					   "Socket buffer is NULL\n");
+			if (!tx_skb)
 				continue;
-			}
 			tx_info = IEEE80211_SKB_CB(tx_skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
 
