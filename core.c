@@ -946,8 +946,6 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->regulatory_set = false;
 	priv->use_short_slot = false;
 	priv->use_short_preamble = false;
-	priv->basic_rate_idx = 0;
-	priv->broadcast_ssid = 0xFF;
 	priv->disable_2g = false;
 	priv->disable_5g = false;
 	priv->tx_amsdu = true;

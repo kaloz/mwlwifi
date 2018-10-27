@@ -98,8 +98,8 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 		{ HOSTCMD_CMD_CORE_DUMP_DIAG_MODE, "CoreDumpDiagMode" },
-		{ HOSTCMD_CMD_GET_FW_CORE_DUMP, "GetFwCoreDump" },
 		{ HOSTCMD_CMD_802_11_SLOT_TIME, "80211SlotTime" },
+		{ HOSTCMD_CMD_GET_FW_CORE_DUMP, "GetFwCoreDump" },
 		{ HOSTCMD_CMD_EDMAC_CTRL, "EDMACCtrl" },
 		{ HOSTCMD_CMD_TXPWRLMT_CFG, "TxpwrlmtCfg" },
 		{ HOSTCMD_CMD_MCAST_CTS, "McastCts" },
@@ -2945,8 +2945,6 @@ int mwl_fwcmd_start_stream(struct ieee80211_hw *hw,
 	if (stream->state != AMPDU_STREAM_NEW)
 		return 0;
 
-	wiphy_debug(hw->wiphy, "Start BA %pM\n", stream->sta->addr);
-
 	return ieee80211_start_tx_ba_session(stream->sta, stream->tid, 0);
 }
 
@@ -3571,6 +3569,9 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_get_fw_core_dump *pcmd;
+
+	if (priv->chip_type != MWL8964)
+		return -EPERM;
 
 	pcmd = (struct hostcmd_cmd_get_fw_core_dump *)&priv->pcmd_buf[0];
 

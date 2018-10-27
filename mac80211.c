@@ -214,6 +214,9 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	mwl_vif->seqno = 0;
 	mwl_vif->is_hw_crypto_enabled = false;
 	mwl_vif->beacon_info.valid = false;
+	mwl_vif->set_beacon = false;
+	mwl_vif->basic_rate_idx = 0;
+	mwl_vif->broadcast_ssid = 0xFF;
 	mwl_vif->iv16 = 1;
 	mwl_vif->iv32 = 0;
 	mwl_vif->keyidx = 0;
@@ -379,6 +382,9 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 					     u32 changed)
 {
 	struct mwl_priv *priv = hw->priv;
+	struct mwl_vif *mwl_vif;
+
+	mwl_vif = mwl_dev_get_vif(vif);
 
 	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997)) {
 		if (priv->use_short_slot != vif->bss_conf.use_short_slot) {
@@ -409,14 +415,14 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		idx = ffs(vif->bss_conf.basic_rates);
 		if (idx)
 			idx--;
-		if (priv->basic_rate_idx != idx) {
+		if (mwl_vif->basic_rate_idx != idx) {
 			if (hw->conf.chandef.chan->band == NL80211_BAND_2GHZ)
 				rate = mwl_rates_24[idx].hw_value;
 			else
 				rate = mwl_rates_50[idx].hw_value;
 
 			mwl_fwcmd_use_fixed_rate(hw, rate, rate);
-			priv->basic_rate_idx = idx;
+			mwl_vif->basic_rate_idx = idx;
 		}
 	}
 
@@ -426,22 +432,25 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 		if ((info->ssid[0] != '\0') &&
 		    (info->ssid_len != 0) &&
 		    (!info->hidden_ssid)) {
-			if (priv->broadcast_ssid != true) {
+			if (mwl_vif->broadcast_ssid != true) {
 				mwl_fwcmd_broadcast_ssid_enable(hw, vif, true);
-				priv->broadcast_ssid = true;
+				mwl_vif->broadcast_ssid = true;
 			}
 		} else {
-			if (priv->broadcast_ssid != false) {
+			if (mwl_vif->broadcast_ssid != false) {
 				mwl_fwcmd_broadcast_ssid_enable(hw, vif, false);
-				priv->broadcast_ssid = false;
+				mwl_vif->broadcast_ssid = false;
 			}
 		}
 
-		skb = ieee80211_beacon_get(hw, vif);
+		if (!mwl_vif->set_beacon) {
+			skb = ieee80211_beacon_get(hw, vif);
 
-		if (skb) {
-			mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
-			dev_kfree_skb_any(skb);
+			if (skb) {
+				mwl_fwcmd_set_beacon(hw, vif, skb->data, skb->len);
+				dev_kfree_skb_any(skb);
+			}
+			mwl_vif->set_beacon = true;
 		}
 	}
 

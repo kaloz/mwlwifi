@@ -814,6 +814,63 @@ err:
 	return ret;
 }
 
+static ssize_t mwl_debugfs_dump_hostcmd_read(struct file *file,
+					     char __user *ubuf,
+					     size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long page = get_zeroed_page(GFP_KERNEL);
+	char *p = (char *)page;
+	int len = 0, size = PAGE_SIZE;
+	ssize_t ret;
+
+	if (!p)
+		return -ENOMEM;
+
+	len += scnprintf(p + len, size - len, "\n");
+	len += scnprintf(p + len, size - len, "tx amsdu: %s\n",
+			 priv->dump_hostcmd ? "enable" : "disable");
+	len += scnprintf(p + len, size - len, "\n");
+
+	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
+	free_page(page);
+
+	return ret;
+}
+
+static ssize_t mwl_debugfs_dump_hostcmd_write(struct file *file,
+					      const char __user *ubuf,
+					      size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int value;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &value)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	priv->dump_hostcmd = value ? true : false;
+
+	ret = count;
+
+err:
+	free_page(addr);
+	return ret;
+}
+
 static ssize_t mwl_debugfs_dfs_test_read(struct file *file,
 					 char __user *ubuf,
 					 size_t count, loff_t *ppos)
@@ -1967,6 +2024,7 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(stnid);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(txpwrlmt);
 MWLWIFI_DEBUGFS_FILE_OPS(tx_amsdu);
+MWLWIFI_DEBUGFS_FILE_OPS(dump_hostcmd);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_test);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_channel);
 MWLWIFI_DEBUGFS_FILE_OPS(dfs_radar);
@@ -2002,6 +2060,7 @@ void mwl_debugfs_init(struct ieee80211_hw *hw)
 	MWLWIFI_DEBUGFS_ADD_FILE(device_pwrtbl);
 	MWLWIFI_DEBUGFS_ADD_FILE(txpwrlmt);
 	MWLWIFI_DEBUGFS_ADD_FILE(tx_amsdu);
+	MWLWIFI_DEBUGFS_ADD_FILE(dump_hostcmd);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_test);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_channel);
 	MWLWIFI_DEBUGFS_ADD_FILE(dfs_radar);

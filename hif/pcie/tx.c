@@ -954,11 +954,8 @@ void pcie_tx_skbs(unsigned long data)
 				break;
 
 			tx_skb = skb_dequeue(&pcie_priv->txq[num]);
-			if (!tx_skb) {
-				wiphy_warn(hw->wiphy,
-					   "Socket buffer is NULL\n");
+			if (!tx_skb)
 				continue;
-			}
 			tx_info = IEEE80211_SKB_CB(tx_skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
 
@@ -1058,6 +1055,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	bool eapol_frame = false;
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct ieee80211_key_conf *k_conf = NULL;
+	int rc;
 
 	index = skb_get_queue_mapping(skb);
 	sta = control->sta;
@@ -1220,8 +1218,11 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
 		spin_lock_bh(&priv->stream_lock);
-		if (mwl_fwcmd_start_stream(hw, stream))
+		rc = mwl_fwcmd_start_stream(hw, stream);
+		if (rc)
 			mwl_fwcmd_remove_stream(hw, stream);
+		else
+			wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n", stream->sta->addr);
 		spin_unlock_bh(&priv->stream_lock);
 	}
 }

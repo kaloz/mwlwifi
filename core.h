@@ -222,8 +222,6 @@ struct mwl_priv {
 
 	bool use_short_slot;
 	bool use_short_preamble;
-	int basic_rate_idx;
-	u8 broadcast_ssid;
 
 	struct {
 		enum mwl_bus bus;
@@ -238,6 +236,7 @@ struct mwl_priv {
 	int antenna_tx;
 	int antenna_rx;
 	bool tx_amsdu;
+	bool dump_hostcmd;
 
 	struct mwl_tx_pwr_tbl tx_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
 	bool cdd;
@@ -251,6 +250,8 @@ struct mwl_priv {
 	unsigned short *pcmd_buf;    /* pointer to CmdBuf (virtual)  */
 	dma_addr_t pphys_cmd_buf;    /* pointer to CmdBuf (physical) */
 	bool in_send_cmd;
+	bool cmd_timeout;
+	bool rmmod;
 
 	int irq;
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
@@ -393,6 +394,9 @@ struct mwl_vif {
 	bool is_hw_crypto_enabled;
 	/* Indicate if this is station mode */
 	struct beacon_info beacon_info;
+	bool set_beacon;
+	int basic_rate_idx;
+	u8 broadcast_ssid;
 	u16 iv16;
 	u32 iv32;
 	s8 keyidx;
