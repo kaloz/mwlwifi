@@ -828,7 +828,7 @@ static ssize_t mwl_debugfs_dump_hostcmd_read(struct file *file,
 		return -ENOMEM;
 
 	len += scnprintf(p + len, size - len, "\n");
-	len += scnprintf(p + len, size - len, "tx amsdu: %s\n",
+	len += scnprintf(p + len, size - len, "dump_hostcmd: %s\n",
 			 priv->dump_hostcmd ? "enable" : "disable");
 	len += scnprintf(p + len, size - len, "\n");
 
