@@ -465,6 +465,7 @@ struct mwl_sta {
 	u32 check_ba_failed[MWL_MAX_TID];
 	struct mwl_tx_ba_hist ba_hist;
 	bool is_amsdu_allowed;
+	bool is_key_set;
 	/* for amsdu aggregation */
 	struct {
 		spinlock_t amsdu_lock;   /* for amsdu */

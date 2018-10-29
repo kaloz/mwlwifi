@@ -1061,24 +1061,37 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	sta = control->sta;
 
 	wh = (struct ieee80211_hdr *)skb->data;
+	tx_info = IEEE80211_SKB_CB(skb);
+	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
 
 	if (ieee80211_is_data_qos(wh->frame_control))
 		qos = le16_to_cpu(*((__le16 *)ieee80211_get_qos_ctl(wh)));
 	else
 		qos = 0;
 
-	if (skb->protocol == cpu_to_be16(ETH_P_PAE)) {
-		index = IEEE80211_AC_VO;
-		eapol_frame = true;
-	}
-
 	if (ieee80211_is_mgmt(wh->frame_control)) {
 		mgmtframe = true;
 		mgmt = (struct ieee80211_mgmt *)skb->data;
-	}
+	} else {
+		u16 pkt_type;
+		struct mwl_sta *sta_info;
 
-	tx_info = IEEE80211_SKB_CB(skb);
-	mwl_vif = mwl_dev_get_vif(tx_info->control.vif);
+		pkt_type = be16_to_cpu(*((__be16 *)
+			&skb->data[ieee80211_hdrlen(wh->frame_control) + 6]));
+		if (pkt_type == ETH_P_PAE) {
+			index = IEEE80211_AC_VO;
+			eapol_frame = true;
+		}
+		if (sta) {
+			if (mwl_vif->is_hw_crypto_enabled) {
+				sta_info = mwl_dev_get_sta(sta);
+				if (!sta_info->is_key_set && !eapol_frame) {
+					dev_kfree_skb_any(skb);
+					return;
+				}
+			}
+		}
+	}
 
 	if (tx_info->flags & IEEE80211_TX_CTL_ASSIGN_SEQ) {
 		wh->seq_ctrl &= cpu_to_le16(IEEE80211_SCTL_FRAG);

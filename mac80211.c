@@ -494,6 +494,7 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 				struct ieee80211_key_conf *key)
 {
 	struct mwl_vif *mwl_vif;
+	struct mwl_sta *sta_info;
 	int rc = 0;
 	u8 encr_type;
 	u8 *addr;
@@ -526,6 +527,10 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 			goto out;
 
 		mwl_vif->is_hw_crypto_enabled = true;
+		if (sta) {
+			sta_info = mwl_dev_get_sta(sta);
+			sta_info->is_key_set = true;
+		}
 	} else {
 		rc = mwl_fwcmd_encryption_remove_key(hw, vif, addr, key);
 		if (rc)
