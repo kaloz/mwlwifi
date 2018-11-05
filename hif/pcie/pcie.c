@@ -394,8 +394,10 @@ static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
 			wiphy_err(priv->hw->wiphy, "timeout: 0x%04x\n", cmd);
 			priv->in_send_cmd = false;
 			priv->cmd_timeout = true;
-			vendor_cmd_basic_event(hw->wiphy,
-					       MWL_VENDOR_EVENT_CMD_TIMEOUT);
+			if (priv->heartbeat)
+				vendor_cmd_basic_event(
+					hw->wiphy,
+					MWL_VENDOR_EVENT_CMD_TIMEOUT);
 			return -EIO;
 		}
 	} else {

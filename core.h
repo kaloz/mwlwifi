@@ -252,6 +252,10 @@ struct mwl_priv {
 	bool in_send_cmd;
 	bool cmd_timeout;
 	bool rmmod;
+	int heartbeat;
+	u32 pre_jiffies;
+	bool heartbeating;
+	struct work_struct heartbeat_handle;
 
 	int irq;
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */

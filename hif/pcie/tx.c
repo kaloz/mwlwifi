@@ -1235,7 +1235,8 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 		if (rc)
 			mwl_fwcmd_remove_stream(hw, stream);
 		else
-			wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n", stream->sta->addr);
+			wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n",
+				    stream->sta->addr);
 		spin_unlock_bh(&priv->stream_lock);
 	}
 }
