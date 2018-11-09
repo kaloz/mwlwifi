@@ -405,6 +405,11 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	}
 	wh = &dma_data->wh;
 
+	if (ieee80211_is_probe_resp(wh->frame_control) &&
+	    priv->dump_probe)
+		wiphy_info(priv->hw->wiphy,
+			  "Probe Resp: %pM\n", wh->addr1);
+
 	if (ieee80211_is_data(wh->frame_control) ||
 	    (ieee80211_is_mgmt(wh->frame_control) &&
 	    ieee80211_has_protected(wh->frame_control) &&
