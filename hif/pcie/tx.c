@@ -545,7 +545,8 @@ struct sk_buff *pcie_tx_do_amsdu(struct mwl_priv *priv,
 	spin_lock_bh(&sta_info->amsdu_lock);
 	amsdu = &sta_info->amsdu_ctrl.frag[desc_num];
 
-	if (tx_skb->len > SYSADPT_AMSDU_ALLOW_SIZE) {
+	if ((tx_skb->len > SYSADPT_AMSDU_ALLOW_SIZE) ||
+	    utils_is_non_amsdu_packet(tx_skb->data, true)) {
 		if (amsdu->num) {
 			pcie_tx_skb(priv, desc_num, amsdu->skb);
 			amsdu->num = 0;
@@ -959,11 +960,9 @@ void pcie_tx_skbs(unsigned long data)
 			tx_info = IEEE80211_SKB_CB(tx_skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)&tx_info->status;
 
-			if ((tx_skb->protocol != cpu_to_be16(ETH_P_PAE)) &&
-			    (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)) {
+			if (tx_ctrl->tx_priority >= SYSADPT_TX_WMM_QUEUES)
 				tx_skb = pcie_tx_do_amsdu(priv, num,
 							  tx_skb, tx_info);
-			}
 
 			if (tx_skb) {
 				if (pcie_tx_available(priv, num))

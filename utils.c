@@ -320,6 +320,50 @@ void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len)
 		       16, 1, buf, len, true);
 }
 
+bool utils_is_non_amsdu_packet(const void *packet, bool mac80211)
+{
+	const u8 *data = packet;
+	struct ieee80211_hdr *wh;
+	__be16 *protocol;
+	struct iphdr *iph;
+	struct udphdr *udph;
+
+	if (mac80211) {
+		/* mac80211 packet */
+		wh = (struct ieee80211_hdr *)data;
+		data += ieee80211_hdrlen(wh->frame_control) + 6;
+		protocol = (__be16 *)data;
+	} else {
+		/* mac802.3 packet */
+		data += (2 * ETH_ALEN);
+		protocol = (__be16 *)data;
+	}
+
+	if (*protocol == cpu_to_be16(ETH_P_PAE))
+		return true;
+
+	if (*protocol == htons(ETH_P_ARP))
+		return true;
+
+	if (*protocol == htons(ETH_P_IP)) {
+		data += sizeof(__be16);
+		iph = (struct iphdr *)data;
+		if (iph->protocol == IPPROTO_ICMP)
+			return true;
+		if (iph->protocol == IPPROTO_UDP) {
+			data += (iph->ihl * 4);
+			udph = (struct udphdr *)data;
+			if (((udph->source == htons(68)) &&
+			    (udph->dest == htons(67))) ||
+			    ((udph->source == htons(67)) &&
+			    (udph->dest == htons(68))))
+				return true;
+		}
+	}
+
+	return false;
+}
+
 bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op)
 {
 	const u8 *data = packet;
