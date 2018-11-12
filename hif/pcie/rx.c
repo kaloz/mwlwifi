@@ -521,6 +521,10 @@ void pcie_rx_recv(unsigned long data)
 					goto out;
 		}
 
+		if (ieee80211_is_probe_req(wh->frame_control) &&
+		    priv->dump_probe)
+			wiphy_info(hw->wiphy, "Probe Req: %pM\n", wh->addr2);
+
 		ieee80211_rx(hw, prx_skb);
 out:
 		pcie_rx_refill(priv, curr_hndl);

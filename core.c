@@ -578,6 +578,16 @@ static void mwl_set_caps(struct mwl_priv *priv)
 	}
 }
 
+static void mwl_heartbeat_handle(struct work_struct *work)
+{
+	struct mwl_priv *priv =
+		container_of(work, struct mwl_priv, heartbeat_handle);
+	u32 val;
+
+	mwl_fwcmd_get_addr_value(priv->hw, 0, 1, &val, 0);
+	priv->heartbeating = false;
+}
+
 static void mwl_watchdog_ba_events(struct work_struct *work)
 {
 	int rc;
@@ -704,6 +714,18 @@ static void timer_routine(unsigned long data)
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
 
+	if (priv->heartbeat) {
+		if ((jiffies - priv->pre_jiffies) >=
+		    msecs_to_jiffies(priv->heartbeat * 1000)) {
+			if (!priv->heartbeating) {
+				priv->heartbeating = true;
+				ieee80211_queue_work(hw,
+						     &priv->heartbeat_handle);
+			}
+			priv->pre_jiffies = jiffies;
+		}
+	}
+
 	mwl_hif_timer_routine(hw);
 
 	mod_timer(&priv->period_timer, jiffies +
@@ -736,6 +758,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->wiphy->flags |= WIPHY_FLAG_IBSS_RSN;
 	hw->wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
+	hw->wiphy->flags |= WIPHY_FLAG_AP_UAPSD;
 
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
@@ -767,6 +790,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	priv->bf_type = TXBF_MODE_AUTO;
 
 	/* Handle watchdog ba events */
+	INIT_WORK(&priv->heartbeat_handle, mwl_heartbeat_handle);
 	INIT_WORK(&priv->watchdog_ba_handle, mwl_watchdog_ba_events);
 	INIT_WORK(&priv->account_handle, mwl_account_handle);
 	INIT_WORK(&priv->wds_check_handle, mwl_wds_check_handle);
@@ -916,6 +940,7 @@ static void mwl_wl_deinit(struct mwl_priv *priv)
 	cancel_work_sync(&priv->account_handle);
 	cancel_work_sync(&priv->wds_check_handle);
 	cancel_work_sync(&priv->watchdog_ba_handle);
+	cancel_work_sync(&priv->heartbeat_handle);
 	mwl_hif_deinit(hw);
 }
 

@@ -141,6 +141,8 @@ void utils_dump_data_info(const char *prefix_str, const void *buf, size_t len);
 
 void utils_dump_data_debug(const char *prefix_str, const void *buf, size_t len);
 
+bool utils_is_non_amsdu_packet(const void *packet, bool mac80211);
+
 bool utils_is_arp(const void *packet, bool mac80211, u16 *arp_op);
 
 bool utils_is_icmp_echo(const void *packet, bool mac80211, u8 *type);

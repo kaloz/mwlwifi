@@ -237,6 +237,7 @@ struct mwl_priv {
 	int antenna_rx;
 	bool tx_amsdu;
 	bool dump_hostcmd;
+	bool dump_probe;
 
 	struct mwl_tx_pwr_tbl tx_pwr_tbl[SYSADPT_MAX_NUM_CHANNELS];
 	bool cdd;
@@ -252,6 +253,10 @@ struct mwl_priv {
 	bool in_send_cmd;
 	bool cmd_timeout;
 	bool rmmod;
+	int heartbeat;
+	u32 pre_jiffies;
+	bool heartbeating;
+	struct work_struct heartbeat_handle;
 
 	int irq;
 	struct mwl_hw_data hw_data;  /* Adapter HW specific info     */
