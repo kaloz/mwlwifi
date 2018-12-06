@@ -264,7 +264,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 	int i, j, k;
 #endif
 
-	hw = (struct ieee80211_hw *)wiphy_priv(wiphy);
+	hw = wiphy_to_ieee80211_hw(wiphy);
 	priv = hw->priv;
 
 	if (priv->forbidden_setting) {
