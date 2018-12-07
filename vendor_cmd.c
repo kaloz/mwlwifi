@@ -17,6 +17,7 @@
 
 #include <net/mac80211.h>
 #include <net/netlink.h>
+#include <linux/version.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -42,7 +43,11 @@ static int mwl_vendor_cmd_set_bf_type(struct wiphy *wiphy,
 		return -EPERM;
 
 	rc = nla_parse(tb, MWL_VENDOR_ATTR_MAX, data, data_len,
-		       mwl_vendor_attr_policy, NULL);
+		       mwl_vendor_attr_policy
+#if (defined(LINUX_BACKPORT) || (LINUX_VERSION_CODE >=KERNEL_VERSION(4,12,0)))
+               , NULL
+#endif
+               );
 	if (rc)
 		return rc;
 
