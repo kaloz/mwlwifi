@@ -709,11 +709,17 @@ static irqreturn_t mwl_isr(int irq, void *dev_id)
 	return mwl_hif_irq_handler(hw);
 }
 
+#ifdef timer_setup
+static void timer_routine(struct timer_list *t)
+{
+	struct mwl_priv *priv = from_timer(priv, t, period_timer);
+	struct ieee80211_hw *hw = priv->hw;
+#else
 static void timer_routine(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
-
+#endif
 	if (priv->heartbeat) {
 		if ((jiffies - priv->pre_jiffies) >=
 		    msecs_to_jiffies(priv->heartbeat * 1000)) {
@@ -902,8 +908,11 @@ static int mwl_wl_init(struct mwl_priv *priv)
 		wiphy_err(hw->wiphy, "fail to register IRQ handler\n");
 		goto err_register_irq;
 	}
-
+#ifdef timer_setup
+	timer_setup(&priv->period_timer, timer_routine, 0);
+#else
 	setup_timer(&priv->period_timer, timer_routine, (unsigned long)hw);
+#endif
 	mod_timer(&priv->period_timer, jiffies +
 		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
 
