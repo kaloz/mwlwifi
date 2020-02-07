@@ -92,12 +92,18 @@ static const struct wiphy_vendor_command mwl_vendor_commands[] = {
 			  .subcmd = MWL_VENDOR_CMD_SET_BF_TYPE},
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mwl_vendor_cmd_set_bf_type,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
+		.policy = mwl_vendor_attr_policy,
+#endif
 	},
 	{
 		.info = { .vendor_id = MRVL_OUI,
 			  .subcmd = MWL_VENDOR_CMD_GET_BF_TYPE},
 		.flags = WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = mwl_vendor_cmd_get_bf_type,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
+		.policy = mwl_vendor_attr_policy,
+#endif
 	}
 };
 
