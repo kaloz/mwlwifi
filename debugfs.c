@@ -363,10 +363,14 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 "2g: %s\n", priv->disable_2g ? "disable" : "enable");
 	len += scnprintf(p + len, size - len,
 			 "5g: %s\n", priv->disable_5g ? "disable" : "enable");
-	if (priv->antenna_tx == ANTENNA_TX_2)
+	if (priv->antenna_tx == ANTENNA_TX_1)
+		tx_num = 1;
+	else if (priv->antenna_tx == ANTENNA_TX_2)
 		tx_num = 2;
 	else if (priv->antenna_tx == ANTENNA_TX_3)
 		tx_num = 3;
+	if (priv->antenna_rx == ANTENNA_RX_1)
+		rx_num = 1;
 	if (priv->antenna_rx == ANTENNA_RX_2)
 		rx_num = 2;
 	else if (priv->antenna_rx == ANTENNA_RX_3)

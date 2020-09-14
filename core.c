@@ -231,14 +231,18 @@ static void mwl_process_of_dts(struct mwl_priv *priv)
 			priv->disable_5g = true;
 		if (strcmp(prop->name, "marvell,chainmask") == 0) {
 			prop_value = be32_to_cpu(*((__be32 *)prop->value));
-			if (prop_value == 2)
+			if (prop_value == 1)
+				priv->antenna_tx = ANTENNA_TX_1;
+			else if (prop_value == 2)
 				priv->antenna_tx = ANTENNA_TX_2;
 			else if (prop_value == 3)
 				priv->antenna_tx = ANTENNA_TX_3;
 
 			prop_value = be32_to_cpu(*((__be32 *)
 						 (prop->value + 4)));
-			if (prop_value == 2)
+			if (prop_value == 1)
+				priv->antenna_rx = ANTENNA_RX_1;
+			else if (prop_value == 2)
 				priv->antenna_rx = ANTENNA_RX_2;
 			else if (prop_value == 3)
 				priv->antenna_rx = ANTENNA_RX_3;
@@ -1058,11 +1062,15 @@ int mwl_init_hw(struct ieee80211_hw *hw, const char *fw_name,
 		   priv->disable_2g ? "disabled" : "enabled",
 		   priv->disable_5g ? "disabled" : "enabled");
 
-	if (priv->antenna_tx == ANTENNA_TX_2)
+	if (priv->antenna_tx == ANTENNA_TX_1)
+		tx_num = 1;
+	else if (priv->antenna_tx == ANTENNA_TX_2)
 		tx_num = 2;
 	else if (priv->antenna_tx == ANTENNA_TX_3)
 		tx_num = 3;
-	if (priv->antenna_rx == ANTENNA_RX_2)
+	if (priv->antenna_rx == ANTENNA_RX_1)
+		rx_num = 1;
+	else if (priv->antenna_rx == ANTENNA_RX_2)
 		rx_num = 2;
 	else if (priv->antenna_rx == ANTENNA_RX_3)
 		rx_num = 3;
