@@ -667,7 +667,8 @@ static struct device_node *pcie_get_device_node(struct ieee80211_hw *hw)
 	struct device_node *dev_node;
 
 	dev_node = pci_bus_to_OF_node(pcie_priv->pdev->bus);
-	wiphy_info(priv->hw->wiphy, "device node: %s\n", dev_node->full_name);
+	if (dev_node)
+		wiphy_info(priv->hw->wiphy, "device node: %s\n", dev_node->full_name);
 
 	return dev_node;
 }
