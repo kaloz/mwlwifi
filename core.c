@@ -148,10 +148,10 @@ static int mwl_prepare_cmd_buf(struct mwl_priv *priv)
 			  "cannot alloc memory for command buffer\n");
 		goto err;
 	}
-	wiphy_debug(priv->hw->wiphy,
-		    "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
-		    priv->pcmd_buf,
-		    (void *)priv->pphys_cmd_buf);
+	wiphy_dbg(priv->hw->wiphy,
+		  "priv->pcmd_buf = %p  priv->pphys_cmd_buf = %p\n",
+		  priv->pcmd_buf,
+		  (void *)priv->pphys_cmd_buf);
 	memset(priv->pcmd_buf, 0x00, CMD_BUF_SIZE);
 
 	return 0;
@@ -186,16 +186,16 @@ static int mwl_init_firmware(struct mwl_priv *priv, const char *fw_name,
 	if (cal_name) {
 		if ((request_firmware((const struct firmware **)&priv->cal_data,
 		     cal_name, priv->dev)) < 0)
-			wiphy_debug(priv->hw->wiphy,
-				    "cannot find calibtration data\n");
+			wiphy_dbg(priv->hw->wiphy,
+				  "cannot find calibtration data\n");
 	}
 
 	if (txpwrlmt_name) {
 		if ((request_firmware(
 		     (const struct firmware **)&priv->txpwrlmt_file,
 		     txpwrlmt_name, priv->dev)) < 0)
-			wiphy_debug(priv->hw->wiphy,
-				    "cannot find tx power limit data\n");
+			wiphy_dbg(priv->hw->wiphy,
+				  "cannot find tx power limit data\n");
 	}
 
 	return rc;
@@ -347,7 +347,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 			}
 
 			/* Dump loaded power tabel */
-			wiphy_debug(hw->wiphy, "regdomain: %s\n", prop->name);
+			wiphy_dbg(hw->wiphy, "regdomain: %s\n", prop->name);
 			for (i = 0; i < SYSADPT_MAX_NUM_CHANNELS; i++) {
 				struct mwl_tx_pwr_tbl *pwr_tbl;
 				char disp_buf[64];
@@ -356,12 +356,12 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 				pwr_tbl = &priv->tx_pwr_tbl[i];
 				if (pwr_tbl->channel == 0)
 					break;
-				wiphy_debug(hw->wiphy,
-					    "Channel: %d: 0x%x 0x%x 0x%x\n",
-					    pwr_tbl->channel,
-					    pwr_tbl->setcap,
-					    pwr_tbl->cdd,
-					    pwr_tbl->txantenna2);
+				wiphy_dbg(hw->wiphy,
+					  "Channel: %d: 0x%x 0x%x 0x%x\n",
+					  pwr_tbl->channel,
+					  pwr_tbl->setcap,
+					  pwr_tbl->cdd,
+					  pwr_tbl->txantenna2);
 				disp_ptr = disp_buf;
 				for (j = 0; j < SYSADPT_TX_POWER_LEVEL_TOTAL;
 				     j++) {
@@ -369,7 +369,7 @@ static void mwl_reg_notifier(struct wiphy *wiphy,
 						sprintf(disp_ptr, "%x ",
 							pwr_tbl->tx_power[j]);
 				}
-				wiphy_debug(hw->wiphy, "%s\n", disp_buf);
+				wiphy_dbg(hw->wiphy, "%s\n", disp_buf);
 			}
 		}
 	}

@@ -546,9 +546,9 @@ recheck:
 		case RXRING_CASE_DROP:
 		case RXRING_CASE_SLOW_BAD_PN:
 			if (ctrl_case == RXRING_CASE_SLOW_DEL_DONE) {
-				wiphy_debug(hw->wiphy,
-					    "staid %d deleted\n",
-					    stnid);
+				wiphy_dbg(hw->wiphy,
+					  "staid %d deleted\n",
+					  stnid);
 				utils_free_stnid(priv, stnid);
 			}
 			dev_kfree_skb_any(psk_buff);

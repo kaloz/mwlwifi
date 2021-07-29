@@ -757,8 +757,8 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 	if (hdrlen != reqd_hdrlen) {
 		needed_room = reqd_hdrlen - hdrlen;
 		if (skb_headroom(skb) < needed_room) {
-			wiphy_debug(priv->hw->wiphy, "headroom is short: %d %d",
-				    skb_headroom(skb), needed_room);
+			wiphy_dbg(priv->hw->wiphy, "headroom is short: %d %d",
+				  skb_headroom(skb), needed_room);
 			skb_cow(skb, needed_room);
 		}
 		skb_push(skb, needed_room);

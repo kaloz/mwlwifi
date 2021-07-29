@@ -939,7 +939,7 @@ const struct hostcmd_get_hw_spec
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	wiphy_debug(hw->wiphy, "pcmd = %p\n", pcmd);
+	wiphy_dbg(hw->wiphy, "pcmd = %p\n", pcmd);
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	eth_broadcast_addr(pcmd->hw_spec.permanent_addr);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_HW_SPEC);
@@ -955,8 +955,8 @@ const struct hostcmd_get_hw_spec
 		}
 
 		msleep(1000);
-		wiphy_debug(hw->wiphy,
-			    "repeat command = %p\n", pcmd);
+		wiphy_dbg(hw->wiphy,
+			  "repeat command = %p\n", pcmd);
 	}
 
 	mutex_unlock(&priv->fwcmd_mutex);
@@ -3613,8 +3613,8 @@ int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
 	struct mwl_priv *priv = hw->priv;
 	struct hostcmd_cmd_802_11_slot_time *pcmd;
 
-	wiphy_debug(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
-		    __func__, short_slot);
+	wiphy_dbg(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
+		  __func__, short_slot);
 
 	pcmd = (struct hostcmd_cmd_802_11_slot_time *)&priv->pcmd_buf[0];
 
@@ -3794,8 +3794,8 @@ int mwl_fwcmd_get_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		subband_len = le16_to_cpu(pcmd->cmd_hdr.len) -
 			sizeof(struct hostcmd_header) - 2;
 		if (total_len <= SYSADPT_TXPWRLMT_CFG_BUF_SIZE) {
-			wiphy_debug(hw->wiphy, "Subband len = %d\n",
-				    subband_len);
+			wiphy_dbg(hw->wiphy, "Subband len = %d\n",
+				  subband_len);
 			memcpy(priv->txpwrlmt_data.buf + total_len,
 			       &pcmd->subband_id, subband_len);
 			total_len += subband_len;
