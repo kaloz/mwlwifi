@@ -170,11 +170,13 @@ static int pcie_wait_complete(struct mwl_priv *priv, unsigned short cmd)
 {
 	unsigned int curr_iteration = MAX_WAIT_FW_COMPLETE_ITERATIONS;
 	unsigned short int_code = 0;
+	struct hostcmd_header *cmd_hdr;
 
 	do {
-		int_code = le16_to_cpu(*((__le16 *)&priv->pcmd_buf[0]));
+		cmd_hdr = (struct hostcmd_header *) &priv->pcmd_buf[0];
+		int_code = le16_to_cpu(cmd_hdr->result);
 		usleep_range(1000, 2000);
-	} while ((int_code != cmd) && (--curr_iteration) && !priv->rmmod);
+	} while ((int_code != HOSTCMD_RESULT_OK) && (--curr_iteration) && !priv->rmmod);
 
 	if (curr_iteration == 0) {
 		wiphy_err(priv->hw->wiphy, "cmd 0x%04x=%s timed out\n",
