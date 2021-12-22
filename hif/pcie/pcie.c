@@ -19,6 +19,15 @@
 #include <linux/etherdevice.h>
 #include <linux/kthread.h>
 #include <linux/signal.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/string.h>
+#include <linux/mm.h>
+#include <linux/syscalls.h>
+#include <asm/unistd.h>
+#include <asm/uaccess.h>
 
 #include "sysadpt.h"
 #include "core.h"

@@ -24,6 +24,15 @@
 #include <linux/firmware.h>
 #include <linux/delay.h>
 #include <linux/bitops.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/string.h>
+#include <linux/mm.h>
+#include <linux/syscalls.h>
+#include <asm/unistd.h>
+#include <asm/uaccess.h>
 #include <net/mac80211.h>
 
 #define PCIE_DRV_NAME    KBUILD_MODNAME
