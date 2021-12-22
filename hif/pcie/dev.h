@@ -37,9 +37,6 @@
 
 #define PCIE_DRV_NAME    KBUILD_MODNAME
 #define PCIE_DRV_VERSION "10.3.8.0-20181210"
-#define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
-#define PCIE_DEV_NAME "Marvell 802.11ac PCIE Adapter"
-
 
 #define PCIE_MIN_BYTES_HEADROOM   64
 #define PCIE_MIN_TX_HEADROOM_KF2  96

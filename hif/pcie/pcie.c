@@ -41,6 +41,8 @@
 #include "hif/pcie/tx_ndp.h"
 #include "hif/pcie/rx_ndp.h"
 
+#define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
+#define PCIE_DEV_NAME "Marvell 802.11ac PCIE Adapter"
 
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS 10000
 #define CHECK_BA_TRAFFIC_TIME           300 /* msec */
