@@ -1294,10 +1294,11 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 	const char filename[] = "/tmp/BF_MIMO_Ctrl_Field_Output.txt";
 	char str_buf[256];
 	char *buf = &str_buf[0];
-	mm_segment_t oldfs;
-
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
+        #ifdef set_fs
+	    mm_segment_t oldfs;
+	    oldfs = get_fs();
+	    set_fs(KERNEL_DS);
+        #endif
 
 	buf += sprintf(buf, "\nMAC: %pM\n", bf_mimo_ctrl->rec_mac);
 	buf += sprintf(buf, "SU_0_MU_1: %d\n", bf_mimo_ctrl->type);
@@ -1316,8 +1317,9 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 		wiphy_err(priv->hw->wiphy, "Error opening %s! %x\n",
 			  filename, (unsigned int)fp_data);
 	}
-
-	set_fs(oldfs);
+        #ifdef set_fs
+	    set_fs(oldfs);
+        #endif
 }
 
 static void pcie_process_account(struct ieee80211_hw *hw)
