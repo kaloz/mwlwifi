@@ -17,6 +17,9 @@
 
 #include <linux/module.h>
 #include <linux/etherdevice.h>
+#include <linux/kthread.h>
+#include <linux/signal.h>
+#include <linux/smp_lock.h>
 
 #include "sysadpt.h"
 #include "core.h"
