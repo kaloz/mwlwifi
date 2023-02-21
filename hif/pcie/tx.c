@@ -36,10 +36,6 @@
 
 #define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* Use multicast data rate */
 
-#define MWL_QOS_ACK_POLICY_MASK	           0x0060
-#define MWL_QOS_ACK_POLICY_NORMAL          0x0000
-#define MWL_QOS_ACK_POLICY_BLOCKACK        0x0060
-
 #define EXT_IV                             0x20
 #define INCREASE_IV(iv16, iv32) \
 { \
@@ -1109,14 +1105,14 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	if (mgmtframe || ieee80211_is_ctl(wh->frame_control)) {
 		qos = 0;
 	} else if (ieee80211_is_data(wh->frame_control)) {
-		qos &= ~MWL_QOS_ACK_POLICY_MASK;
+		qos &= ~IEEE80211_QOS_CTL_ACK_POLICY_MASK;
 
 		if (tx_info->flags & IEEE80211_TX_CTL_AMPDU) {
 			xmitcontrol &= 0xfb;
-			qos |= MWL_QOS_ACK_POLICY_BLOCKACK;
+			qos |= IEEE80211_QOS_CTL_ACK_POLICY_BLOCKACK;
 		} else {
 			xmitcontrol |= 0x4;
-			qos |= MWL_QOS_ACK_POLICY_NORMAL;
+			qos |= IEEE80211_QOS_CTL_ACK_POLICY_NORMAL;
 		}
 
 		if (is_multicast_ether_addr(wh->addr1) || eapol_frame)
@@ -1164,7 +1160,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 		if (stream) {
 			if (stream->state == AMPDU_STREAM_ACTIVE) {
 				if (WARN_ON(!(qos &
-					    MWL_QOS_ACK_POLICY_BLOCKACK))) {
+					    IEEE80211_QOS_CTL_ACK_POLICY_BLOCKACK))) {
 					spin_unlock_bh(&priv->stream_lock);
 					dev_kfree_skb_any(skb);
 					return;
@@ -1211,8 +1207,8 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 
 		spin_unlock_bh(&priv->stream_lock);
 	} else {
-		qos &= ~MWL_QOS_ACK_POLICY_MASK;
-		qos |= MWL_QOS_ACK_POLICY_NORMAL;
+		qos &= ~IEEE80211_QOS_CTL_ACK_POLICY_MASK;
+		qos |= IEEE80211_QOS_CTL_ACK_POLICY_NORMAL;
 	}
 
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
