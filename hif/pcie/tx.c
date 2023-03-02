@@ -34,7 +34,10 @@
 #define TOTAL_HW_QUEUES        (SYSADPT_TX_WMM_QUEUES + \
 				PCIE_AMPDU_QUEUES)
 
-#define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* Use multicast data rate */
+#define EAGLE_TXD_XMITCTRL_USE_RATEINFO    0x1     /* bit 0 use rateinfo            */
+#define EAGLE_TXD_XMITCTRL_DISABLE_AMPDU   0x2     /* bit 1 disable ampdu           */
+#define EAGLE_TXD_XMITCTRL_ENABLE_AMPDU    0x4     /* bit 2 enable  ampdu           */
+#define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* bit 3 use multicast data rate */
 
 #define EXT_IV                             0x20
 #define INCREASE_IV(iv16, iv32) \
@@ -1108,10 +1111,10 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 		qos &= ~IEEE80211_QOS_CTL_ACK_POLICY_MASK;
 
 		if (tx_info->flags & IEEE80211_TX_CTL_AMPDU) {
-			xmitcontrol &= 0xfb;
+			xmitcontrol &= ~EAGLE_TXD_XMITCTRL_ENABLE_AMPDU;
 			qos |= IEEE80211_QOS_CTL_ACK_POLICY_BLOCKACK;
 		} else {
-			xmitcontrol |= 0x4;
+			xmitcontrol |= EAGLE_TXD_XMITCTRL_ENABLE_AMPDU;
 			qos |= IEEE80211_QOS_CTL_ACK_POLICY_NORMAL;
 		}
 
