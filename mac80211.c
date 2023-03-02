@@ -766,8 +766,8 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 					    buf_size, params->ssn,
 					    params->amsdu);
 			spin_lock_bh(&priv->stream_lock);
-			break;
 		}
+		break;
 	case IEEE80211_AMPDU_RX_STOP:
 		if (priv->chip_type == MWL8964) {
 			struct mwl_ampdu_stream tmp;
