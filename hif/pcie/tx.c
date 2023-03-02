@@ -49,9 +49,7 @@
 
 /* Transmission information to transmit a socket buffer. */
 struct pcie_tx_ctrl {
-	void *vif;
 	void *sta;
-	void *k_conf;
 	u8 tx_priority;
 	u8 type;
 	u16 qos_ctrl;
@@ -372,7 +370,6 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	struct ieee80211_sta *sta;
 	struct ieee80211_vif *vif;
 	struct mwl_vif *mwl_vif;
-	struct ieee80211_key_conf *k_conf;
 	bool ccmp = false;
 	struct pcie_pfu_dma_data *pfu_dma_data;
 	struct pcie_dma_data *dma_data;
@@ -385,11 +382,10 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
 	sta = (struct ieee80211_sta *)tx_ctrl->sta;
-	vif = (struct ieee80211_vif *)tx_ctrl->vif;
+	vif = (struct ieee80211_vif *)tx_info->control.vif;
 	mwl_vif = mwl_dev_get_vif(vif);
-	k_conf = (struct ieee80211_key_conf *)tx_ctrl->k_conf;
 
-	pcie_tx_encapsulate_frame(priv, tx_skb, k_conf, &ccmp);
+	pcie_tx_encapsulate_frame(priv, tx_skb, (struct ieee80211_key_conf *)tx_info->control.hw_key, &ccmp);
 
 	if (priv->chip_type == MWL8997) {
 		pfu_dma_data = (struct pcie_pfu_dma_data *)tx_skb->data;
@@ -1003,7 +999,6 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	struct ieee80211_mgmt *mgmt;
 	bool eapol_frame = false;
 	struct pcie_tx_ctrl *tx_ctrl;
-	struct ieee80211_key_conf *k_conf = NULL;
 	int rc;
 
 	index = skb_get_queue_mapping(skb);
@@ -1067,8 +1062,6 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 		if (is_multicast_ether_addr(wh->addr1) || eapol_frame)
 			xmitcontrol |= EAGLE_TXD_XMITCTRL_USE_MC_RATE;
 	}
-
-	k_conf = tx_info->control.hw_key;
 
 	/* Queue ADDBA request in the respective data queue.  While setting up
 	 * the ampdu stream, mac80211 queues further packets for that
@@ -1161,9 +1154,7 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	}
 
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
-	tx_ctrl->vif = (void *)tx_info->control.vif;
 	tx_ctrl->sta = (void *)sta;
-	tx_ctrl->k_conf = (void *)k_conf;
 	tx_ctrl->tx_priority = txpriority;
 	tx_ctrl->type = (mgmtframe ? IEEE_TYPE_MANAGEMENT : IEEE_TYPE_DATA);
 	tx_ctrl->qos_ctrl = qos;
@@ -1205,7 +1196,7 @@ void pcie_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
 		skb_queue_walk_safe(&pcie_priv->txq[num], skb, tmp) {
 			tx_info = IEEE80211_SKB_CB(skb);
 			tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
-			if (tx_ctrl->vif == vif) {
+			if (tx_info->control.vif == vif) {
 				__skb_unlink(skb, &pcie_priv->txq[num]);
 				dev_kfree_skb_any(skb);
 			}
