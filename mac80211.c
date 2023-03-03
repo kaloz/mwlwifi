@@ -533,6 +533,7 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 		}
 	} else {
 		rc = mwl_fwcmd_encryption_remove_key(hw, vif, addr, key);
+		mwl_vif->is_hw_crypto_enabled = false;
 		if (rc)
 			goto out;
 	}
