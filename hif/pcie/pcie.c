@@ -31,7 +31,9 @@
 #include "hif/pcie/rx_ndp.h"
 
 #define PCIE_DRV_DESC "Marvell Mac80211 Wireless PCIE Network Driver"
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,30)
 #define PCIE_DEV_NAME "Marvell 802.11ac PCIE Adapter"
+#endif
 
 #define MAX_WAIT_FW_COMPLETE_ITERATIONS 10000
 #define CHECK_BA_TRAFFIC_TIME           300 /* msec */
@@ -1294,8 +1296,15 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 	char *buf = &str_buf[0];
 	mm_segment_t oldfs;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+	oldfs = get_fs();
+	set_fs( get_ds() );
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
+#else
+	oldfs = force_uaccess_begin();
+#endif
 
 	buf += sprintf(buf, "\nMAC: %pM\n", bf_mimo_ctrl->rec_mac);
 	buf += sprintf(buf, "SU_0_MU_1: %d\n", bf_mimo_ctrl->type);
@@ -1315,7 +1324,11 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 			  filename, (unsigned int)fp_data);
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	set_fs(oldfs);
+#else
+	force_uaccess_end(oldfs);
+#endif
 }
 
 static void pcie_process_account(struct ieee80211_hw *hw)
@@ -1641,5 +1654,7 @@ MODULE_DESCRIPTION(PCIE_DRV_DESC);
 MODULE_VERSION(PCIE_DRV_VERSION);
 MODULE_AUTHOR("Marvell Semiconductor, Inc.");
 MODULE_LICENSE("GPL v2");
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,15,30)
 MODULE_SUPPORTED_DEVICE(PCIE_DEV_NAME);
+#endif
 MODULE_DEVICE_TABLE(pci, pcie_id_tbl);
