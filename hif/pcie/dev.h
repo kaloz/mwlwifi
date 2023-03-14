@@ -36,7 +36,6 @@
 #define PCIE_MAX_NUM_TX_DESC      256
 #define PCIE_TX_QUEUE_LIMIT       (3 * PCIE_MAX_NUM_TX_DESC)
 #define PCIE_TX_WAKE_Q_THRESHOLD  (2 * PCIE_MAX_NUM_TX_DESC)
-#define PCIE_DELAY_FREE_Q_LIMIT   PCIE_MAX_NUM_TX_DESC
 #define PCIE_MAX_NUM_RX_DESC      256
 #define PCIE_RECEIVE_LIMIT        256
 
@@ -601,8 +600,6 @@ struct pcie_priv {
 	/* for tx descriptor data  */
 	spinlock_t tx_desc_lock ____cacheline_aligned_in_smp;
 	struct pcie_desc_data desc_data[PCIE_NUM_OF_DESC_DATA];
-	int delay_q_idx;
-	struct sk_buff *delay_q[PCIE_DELAY_FREE_Q_LIMIT];
 	/* number of descriptors owned by fw at any one time */
 	int fw_desc_cnt[PCIE_NUM_OF_DESC_DATA];
 

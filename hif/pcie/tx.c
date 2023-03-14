@@ -740,12 +740,11 @@ next:
 static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	int num;
+	int num = SYSADPT_TX_WMM_QUEUES;
 	struct pcie_desc_data *desc;
 	struct pcie_tx_hndl *tx_hndl;
 	struct pcie_tx_desc *tx_desc;
 	struct sk_buff *done_skb;
-	int idx;
 	u32 rate;
 	struct pcie_dma_data *dma_data;
 	struct ieee80211_hdr *wh;
@@ -753,7 +752,7 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 	int hdrlen;
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
-	for (num = 0; num < SYSADPT_TX_WMM_QUEUES; num++) {
+	while (num--) {
 		desc = &pcie_priv->desc_data[num];
 		tx_hndl = desc->pstale_tx_hndl;
 		tx_desc = tx_hndl->pdesc;
@@ -782,14 +781,6 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 			wmb(); /*Data Memory Barrier*/
 
 			skb_get(done_skb);
-			idx = pcie_priv->delay_q_idx;
-			if (pcie_priv->delay_q[idx])
-				dev_kfree_skb_any(pcie_priv->delay_q[idx]);
-			pcie_priv->delay_q[idx] = done_skb;
-			idx++;
-			if (idx >= PCIE_DELAY_FREE_Q_LIMIT)
-				idx = 0;
-			pcie_priv->delay_q_idx = idx;
 
 			dma_data = (struct pcie_dma_data *)done_skb->data;
 			wh = &dma_data->wh;
@@ -816,6 +807,8 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 					&dma_data->wh, hdrlen);
 				skb_pull(done_skb, sizeof(*dma_data) - hdrlen);
 				ieee80211_tx_status(priv->hw, done_skb);
+				dev_kfree_skb_any(done_skb);
+				done_skb = NULL;
 			}
 next:
 			tx_hndl = tx_hndl->pnext;
@@ -837,9 +830,7 @@ next:
 int pcie_tx_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
 	int rc;
-	int i;
 
 	if (priv->chip_type == MWL8997)
 		rc = pcie_txbd_ring_create(priv);
@@ -858,22 +849,12 @@ int pcie_tx_init(struct ieee80211_hw *hw)
 		return rc;
 	}
 
-	pcie_priv->delay_q_idx = 0;
-	for (i = 0; i < PCIE_DELAY_FREE_Q_LIMIT; i++)
-		pcie_priv->delay_q[i] = NULL;
-
 	return 0;
 }
 
 void pcie_tx_deinit(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
-	struct pcie_priv *pcie_priv = priv->hif.priv;
-	int i;
-
-	for (i = 0; i < PCIE_DELAY_FREE_Q_LIMIT; i++)
-		if (pcie_priv->delay_q[i])
-			dev_kfree_skb_any(pcie_priv->delay_q[i]);
 
 	pcie_tx_ring_cleanup(priv);
 
