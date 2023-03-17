@@ -1176,7 +1176,7 @@ void pcie_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
 	struct pcie_tx_ctrl *tx_ctrl;
 	unsigned long flags;
 
-	for (num = 1; num < PCIE_NUM_OF_DESC_DATA; num++) {
+	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++) {
 		spin_lock_irqsave(&pcie_priv->txq[num].lock, flags);
 		skb_queue_walk_safe(&pcie_priv->txq[num], skb, tmp) {
 			tx_info = IEEE80211_SKB_CB(skb);
@@ -1201,7 +1201,7 @@ void pcie_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 	struct pcie_tx_ctrl *tx_ctrl;
 	unsigned long flags;
 
-	for (num = 1; num < PCIE_NUM_OF_DESC_DATA; num++) {
+	for (num = 0; num < PCIE_NUM_OF_DESC_DATA; num++) {
 		spin_lock_irqsave(&pcie_priv->txq[num].lock, flags);
 		skb_queue_walk_safe(&pcie_priv->txq[num], skb, tmp) {
 			tx_info = IEEE80211_SKB_CB(skb);
