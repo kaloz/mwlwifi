@@ -688,6 +688,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		spin_lock_bh(&priv->stream_lock);
 		if (mwl_fwcmd_start_stream(hw, stream))
 			mwl_fwcmd_remove_stream(hw, stream);
+		stream->jiffies = jiffies;
+		stream->start_time = stream->jiffies;
+		stream->desc_num = index;
 		spin_unlock_bh(&priv->stream_lock);
 	}
 }

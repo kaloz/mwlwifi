@@ -31,7 +31,7 @@ void pcie_tx_del_pkts_via_vif(struct ieee80211_hw *hw,
 void pcie_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 			      struct ieee80211_sta *sta);
 void pcie_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
-			    struct ieee80211_sta *sta, u8 tid);
+			    struct ieee80211_sta *sta, u8 desc_num);
 void pcie_tx_del_sta_amsdu_pkts(struct ieee80211_hw *hw,
 				struct ieee80211_sta *sta);
 

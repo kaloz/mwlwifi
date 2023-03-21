@@ -614,25 +614,37 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	struct mwl_sta *sta_info;
 	struct ieee80211_sta *sta;
 	ssize_t ret;
+	struct mwl_tx_info *tx_stats;
 
 	if (!p)
 		return -ENOMEM;
 
+	if (priv->chip_type == MWL8964)
+		return -EPERM;
+
+	len += scnprintf(p + len, size - len, "debug_ampdu: %d\n", priv->debug_ampdu);
+	len += scnprintf(p + len, size - len, "=================\n");
+
 	spin_lock_bh(&priv->stream_lock);
+	len += scnprintf(p + len, size - len, "stream|idx|state|       macaddress|tid|pkts|remain|start time\n");
 	for (i = 0; i < priv->ampdu_num; i++) {
 		stream = &priv->ampdu[i];
 		if (!stream->state)
 			continue;
-		len += scnprintf(p + len, size - len, "stream: %d\n", i);
-		len += scnprintf(p + len, size - len, "idx: %u\n", stream->idx);
-		len += scnprintf(p + len, size - len,
-				 "state: %u\n", stream->state);
+
 		if (stream->sta) {
-			len += scnprintf(p + len, size - len,
-					 "mac address: %pM\n",
-					 stream->sta->addr);
-			len += scnprintf(p + len, size - len,
-					 "tid: %u\n", stream->tid);
+			sta_info = mwl_dev_get_sta(stream->sta);
+			tx_stats = &sta_info->tx_stats[stream->tid];
+			len += scnprintf(p + len, size - len, "%6d|%3u|%5u|%pM|%3u|%4u|%6lu|%lu\n", i,
+			stream->idx,
+			stream->state,
+			stream->sta->addr,
+			stream->tid,
+			tx_stats->pkts,
+			(SYSADPT_TIMER_AMPDU_KEEPALIVE - (jiffies - stream->jiffies))/ HZ,
+			abs(jiffies - stream->start_time) / HZ
+			);
+
 		}
 	}
 	spin_unlock_bh(&priv->stream_lock);
@@ -655,6 +667,39 @@ static ssize_t mwl_debugfs_ampdu_read(struct file *file, char __user *ubuf,
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
+	return ret;
+}
+
+static ssize_t mwl_debugfs_ampdu_write(struct file *file,
+					  const char __user *ubuf,
+					  size_t count, loff_t *ppos)
+{
+	struct mwl_priv *priv = (struct mwl_priv *)file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	size_t buf_size = min_t(size_t, count, PAGE_SIZE - 1);
+	int value;
+	ssize_t ret;
+
+	if (!buf)
+		return -ENOMEM;
+
+	if (copy_from_user(buf, ubuf, buf_size)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (kstrtoint(buf, 0, &value)) {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	priv->debug_ampdu = value ? true : false;
+
+	ret = count;
+
+err:
+	free_page(addr);
 	return ret;
 }
 
@@ -2090,10 +2135,10 @@ MWLWIFI_DEBUGFS_FILE_READ_OPS(tx_status);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(rx_status);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(vif);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(sta);
-MWLWIFI_DEBUGFS_FILE_READ_OPS(ampdu);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(stnid);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(device_pwrtbl);
 MWLWIFI_DEBUGFS_FILE_READ_OPS(txpwrlmt);
+MWLWIFI_DEBUGFS_FILE_OPS(ampdu);
 MWLWIFI_DEBUGFS_FILE_OPS(tx_amsdu);
 MWLWIFI_DEBUGFS_FILE_OPS(dump_hostcmd);
 MWLWIFI_DEBUGFS_FILE_OPS(dump_probe);

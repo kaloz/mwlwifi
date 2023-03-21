@@ -941,6 +941,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	mod_timer(&priv->period_timer, jiffies +
 		  msecs_to_jiffies(SYSADPT_TIMER_WAKEUP_TIME));
 
+	priv->jiffies_ampdu = jiffies;
 	return rc;
 
 err_register_hw:
@@ -1011,6 +1012,7 @@ struct ieee80211_hw *mwl_alloc_hw(int bus_type,
 	priv->hif.bus = bus_type;
 	priv->hif.ops = ops;
 	priv->hif.priv = (char *)priv + ALIGN(sizeof(*priv), NETDEV_ALIGN);
+	priv->debug_ampdu = false;
 	priv->ampdu_num = mwl_hif_get_ampdu_num(hw);
 	priv->ampdu =
 		kzalloc(priv->ampdu_num * sizeof(*priv->ampdu), GFP_KERNEL);

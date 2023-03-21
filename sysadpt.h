@@ -79,7 +79,9 @@
 
 #define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
 
-#define SYSADPT_OTP_BUF_SIZE           (256*8) /* 258 lines * 8 bytes */
+#define SYSADPT_TIMER_AMPDU_KEEPALIVE  (60 * HZ)/* 60 s */
+
+#define SYSADPT_OTP_BUF_SIZE           (256*8) /* 256 lines * 8 bytes */
 
 #define SYSADPT_TXPWRLMT_CFG_BUF_SIZE  (3650)
 

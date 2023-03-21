@@ -1151,12 +1151,16 @@ void pcie_tx_xmit(struct ieee80211_hw *hw,
 	/* Initiate the ampdu session here */
 	if (start_ba_session) {
 		spin_lock_bh(&priv->stream_lock);
+
 		rc = mwl_fwcmd_start_stream(hw, stream);
 		if (rc)
 			mwl_fwcmd_remove_stream(hw, stream);
-		else
+		else if (priv->debug_ampdu)
 			wiphy_debug(hw->wiphy, "Mac80211 start BA %pM\n",
 				    stream->sta->addr);
+		stream->jiffies = jiffies;
+		stream->start_time = stream->jiffies;
+		stream->desc_num = index;
 		spin_unlock_bh(&priv->stream_lock);
 	}
 }
@@ -1212,18 +1216,15 @@ void pcie_tx_del_pkts_via_sta(struct ieee80211_hw *hw,
 }
 
 void pcie_tx_del_ampdu_pkts(struct ieee80211_hw *hw,
-			    struct ieee80211_sta *sta, u8 tid)
+			    struct ieee80211_sta *sta, u8 desc_num)
 {
 	struct mwl_priv *priv = hw->priv;
 	struct pcie_priv *pcie_priv = priv->hif.priv;
-	int ac, desc_num;
 	struct sk_buff *skb, *tmp;
 	struct ieee80211_tx_info *tx_info;
 	struct pcie_tx_ctrl *tx_ctrl;
 	unsigned long flags;
 
-	ac = utils_tid_to_ac(tid);
-	desc_num = SYSADPT_TX_WMM_QUEUES - ac - 1;
 	spin_lock_irqsave(&pcie_priv->txq[desc_num].lock, flags);
 	skb_queue_walk_safe(&pcie_priv->txq[desc_num], skb, tmp) {
 		tx_info = IEEE80211_SKB_CB(skb);

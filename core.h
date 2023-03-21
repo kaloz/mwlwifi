@@ -186,6 +186,9 @@ struct mwl_ampdu_stream {
 	u8 tid;
 	u8 state;
 	int idx;
+	int desc_num;
+	unsigned long jiffies;
+	unsigned long start_time;
 };
 
 struct mwl_stnid {
@@ -254,6 +257,7 @@ struct mwl_priv {
 	bool cmd_timeout;
 	bool rmmod;
 	int heartbeat;
+	unsigned long jiffies_ampdu;
 	u32 pre_jiffies;
 	bool heartbeating;
 	struct work_struct heartbeat_handle;
@@ -350,6 +354,8 @@ struct mwl_priv {
 	int fixed_rate;
 	bool coredump_text;
 	u32 ra_tx_attempt[2][6];
+
+	bool debug_ampdu;
 };
 
 struct beacon_info {
