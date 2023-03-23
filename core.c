@@ -459,11 +459,11 @@ static void mwl_set_ht_caps(struct mwl_priv *priv,
 	band->ht_cap.mcs.rx_mask[4] = 0x01;
 
 	band->ht_cap.mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
-	if  (priv->antenna_tx == ANTENNA_TX_1)
+	if (priv->antenna_tx == ANTENNA_TX_1)
 		band->ht_cap.mcs.rx_highest = cpu_to_le16(150);
-	if  (priv->antenna_tx == ANTENNA_TX_2)
+	if (priv->antenna_tx == ANTENNA_TX_2)
 		band->ht_cap.mcs.rx_highest = cpu_to_le16(300);
-	if  (priv->antenna_tx == ANTENNA_TX_4_AUTO)
+	if (priv->antenna_tx == ANTENNA_TX_4_AUTO)
 		band->ht_cap.mcs.rx_highest = cpu_to_le16(450);
 }
 
@@ -516,13 +516,13 @@ static void mwl_set_vht_caps(struct mwl_priv *priv,
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xfffa);
 		antenna_num = 2;
 		highest = cpu_to_le16(780);
-	} else{
+	} else {
 		band->vht_cap.vht_mcs.tx_mcs_map = cpu_to_le16(0xffea);
 		highest = cpu_to_le16(1170);
 	}
 
-	band->vht_cap.vht_mcs.rx_highest=highest;
-	band->vht_cap.vht_mcs.tx_highest=highest;
+	band->vht_cap.vht_mcs.rx_highest = highest;
+	band->vht_cap.vht_mcs.tx_highest = highest;
 
 	if (band->vht_cap.cap & (IEEE80211_VHT_CAP_SU_BEAMFORMEE_CAPABLE |
 	    IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE)) {
@@ -906,7 +906,7 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	} else if (priv->antenna_tx == ANTENNA_TX_2) {
 		hw->wiphy->available_antennas_rx = 0x2;
 		hw->wiphy->available_antennas_tx = 0x2;
-	} else{
+	} else {
 		hw->wiphy->available_antennas_rx = 0x4;
 		hw->wiphy->available_antennas_tx = 0x4;
 	}
