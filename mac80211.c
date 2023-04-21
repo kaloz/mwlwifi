@@ -848,22 +848,25 @@ static int mwl_mac80211_ampdu_action(struct ieee80211_hw *hw,
 						 BA_FLAG_DIRECTION_UP,
 						 buf_size, params->ssn,
 						 params->amsdu);
+			spin_lock_bh(&priv->stream_lock);
 
-			if (rc) {
-				mwl_fwcmd_destroy_ba(hw, stream, BA_FLAG_DIRECTION_UP);
+			if (!rc) {
+				stream->state = AMPDU_STREAM_ACTIVE;
+				sta_info->check_ba_failed[tid] = 0;
+				if (priv->tx_amsdu)
+					sta_info->is_amsdu_allowed =
+						params->amsdu;
+				else
+					sta_info->is_amsdu_allowed = false;
+			} else {
+				spin_unlock_bh(&priv->stream_lock);
+				mwl_fwcmd_destroy_ba(hw, stream,
+						     BA_FLAG_DIRECTION_UP);
 				spin_lock_bh(&priv->stream_lock);
 				mwl_fwcmd_remove_stream(hw, stream);
 				wiphy_err(hw->wiphy,
 					  "ampdu operation error code: %d\n",
 					  rc);
-			} else {
-				spin_lock_bh(&priv->stream_lock);
-				stream->state = AMPDU_STREAM_ACTIVE;
-				sta_info->check_ba_failed[tid] = 0;
-				if (priv->tx_amsdu)
-					sta_info->is_amsdu_allowed = params->amsdu;
-				else
-					sta_info->is_amsdu_allowed = false;
 			}
 		} else {
 			rc = -EPERM;
