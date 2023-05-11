@@ -392,7 +392,6 @@ void pcie_rx_recv(unsigned long data)
 	struct sk_buff *prx_skb = NULL;
 	int pkt_len;
 	struct ieee80211_rx_status *status;
-	struct mwl_vif *mwl_vif = NULL;
 	struct ieee80211_hdr *wh;
 	u8 *_data;
 	u8 *qc;
@@ -442,59 +441,37 @@ void pcie_rx_recv(unsigned long data)
 
 		wh = &((struct pcie_dma_data *)prx_skb->data)->wh;
 
-		if (ieee80211_has_protected(wh->frame_control)) {
-			/* Check if hw crypto has been enabled for
-			 * this bss. If yes, set the status flags
-			 * accordingly
-			 */
-			if (ieee80211_has_tods(wh->frame_control)) {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr1);
-				if (!mwl_vif &&
-				    ieee80211_has_a4(wh->frame_control))
-					mwl_vif =
-						utils_find_vif_bss(priv,
-								   wh->addr2);
-			} else {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr2);
+		if (utils_is_crypted(wh)) {
+			/* When MMIC ERROR is encountered
+			* by the firmware, payload is
+			* dropped and only 32 bytes of
+			* mwlwifi Firmware header is sent
+			* to the host.
+			*
+			* We need to add four bytes of
+			* key information.  In it
+			* MAC80211 expects keyidx set to
+			* 0 for triggering Counter
+			* Measure of MMIC failure.
+			*/
+			if (status->flag & RX_FLAG_MMIC_ERROR) {
+				struct pcie_dma_data *dma_data;
+
+				dma_data = (struct pcie_dma_data *)
+				     prx_skb->data;
+				memset((void *)&dma_data->data, 0, 4);
+				pkt_len += 4;
 			}
 
-			if  ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
-			     is_multicast_ether_addr(wh->addr1) ||
-			     (ieee80211_is_mgmt(wh->frame_control) &&
-			     !is_multicast_ether_addr(wh->addr1))) {
-				/* When MMIC ERROR is encountered
-				 * by the firmware, payload is
-				 * dropped and only 32 bytes of
-				 * mwlwifi Firmware header is sent
-				 * to the host.
-				 *
-				 * We need to add four bytes of
-				 * key information.  In it
-				 * MAC80211 expects keyidx set to
-				 * 0 for triggering Counter
-				 * Measure of MMIC failure.
-				 */
-				if (status->flag & RX_FLAG_MMIC_ERROR) {
-					struct pcie_dma_data *dma_data;
-
-					dma_data = (struct pcie_dma_data *)
-					     prx_skb->data;
-					memset((void *)&dma_data->data, 0, 4);
-					pkt_len += 4;
-				}
-
-				if (!ieee80211_is_auth(wh->frame_control)) {
-					if (priv->chip_type != MWL8997)
-						status->flag |=
-							RX_FLAG_IV_STRIPPED |
-							RX_FLAG_DECRYPTED |
-							RX_FLAG_MMIC_STRIPPED;
-					else
-						status->flag |=
-							RX_FLAG_DECRYPTED |
-							RX_FLAG_MMIC_STRIPPED;
-				}
-			}
+			if (priv->chip_type != MWL8997)
+				status->flag |=
+					RX_FLAG_IV_STRIPPED |
+					RX_FLAG_DECRYPTED |
+					RX_FLAG_MMIC_STRIPPED;
+			else
+				status->flag |=
+					RX_FLAG_DECRYPTED |
+					RX_FLAG_MMIC_STRIPPED;
 		}
 
 		skb_put(prx_skb, pkt_len);
