@@ -335,7 +335,7 @@ int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 
 	if (sizeof(struct pcie_tx_ctrl_ndp) >
 	    sizeof(tx_info->status.status_driver_data)) {
-		wiphy_err(hw->wiphy, "driver data is not enough: %d (%d)\n",
+		wiphy_err(hw->wiphy, "driver data is not enough: %zu (%zu)\n",
 			  sizeof(struct pcie_tx_ctrl_ndp),
 			  sizeof(tx_info->status.status_driver_data));
 		return -ENOMEM;
