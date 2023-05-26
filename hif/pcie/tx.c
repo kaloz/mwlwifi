@@ -39,14 +39,6 @@
 #define EAGLE_TXD_XMITCTRL_ENABLE_AMPDU    0x4     /* bit 2 enable  ampdu           */
 #define EAGLE_TXD_XMITCTRL_USE_MC_RATE     0x8     /* bit 3 use multicast data rate */
 
-#define EXT_IV                             0x20
-#define INCREASE_IV(iv16, iv32) \
-{ \
-	(iv16)++; \
-	if ((iv16) == 0) \
-		(iv32)++; \
-}
-
 /* Transmission information to transmit a socket buffer. */
 struct pcie_tx_ctrl {
 	void *sta;
@@ -55,13 +47,6 @@ struct pcie_tx_ctrl {
 	u16 qos_ctrl;
 	u8 xmit_control;
 };
-
-struct ccmp_hdr {
-	__le16 iv16;
-	u8 rsvd;
-	u8 key_id;
-	__le32 iv32;
-} __packed;
 
 static int pcie_tx_ring_alloc(struct mwl_priv *priv)
 {
@@ -321,17 +306,6 @@ static void pcie_txbd_ring_delete(struct mwl_priv *priv)
 	pcie_priv->txbd_ring_pbase = 0;
 }
 
-static inline void pcie_tx_add_ccmp_hdr(u8 *pccmp_hdr,
-					u8 key_id, u16 iv16, u32 iv32)
-{
-	struct ccmp_hdr *ccmp_h = (struct ccmp_hdr *)pccmp_hdr;
-
-	ccmp_h->iv16 = cpu_to_le16(iv16);
-	ccmp_h->rsvd = 0;
-	ccmp_h->key_id = EXT_IV | (key_id << 6);
-	ccmp_h->iv32 = cpu_to_le32(iv32);
-}
-
 static inline bool pcie_tx_available(struct mwl_priv *priv, int desc_num)
 {
 	struct pcie_priv *pcie_priv = priv->hif.priv;
@@ -370,11 +344,12 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	struct ieee80211_sta *sta;
 	struct ieee80211_vif *vif;
 	struct mwl_vif *mwl_vif;
-	bool ccmp = false;
 	struct pcie_pfu_dma_data *pfu_dma_data;
 	struct pcie_dma_data *dma_data;
 	struct ieee80211_hdr *wh;
 	dma_addr_t dma;
+	int tailpad = 0;
+	struct ieee80211_key_conf * k_conf;
 
 	if (WARN_ON(!tx_skb))
 		return;
@@ -384,8 +359,17 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	sta = (struct ieee80211_sta *)tx_ctrl->sta;
 	vif = (struct ieee80211_vif *)tx_info->control.vif;
 	mwl_vif = mwl_dev_get_vif(vif);
+	k_conf = (struct ieee80211_key_conf *)tx_info->control.hw_key;
 
-	pcie_tx_encapsulate_frame(priv, tx_skb, (struct ieee80211_key_conf *)tx_info->control.hw_key, &ccmp);
+	if (k_conf) {
+		switch (k_conf->cipher) {
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104: tailpad = 4; break;
+		case WLAN_CIPHER_SUITE_TKIP:   tailpad = 12;break;
+		case WLAN_CIPHER_SUITE_CCMP:   tailpad = 8; break;
+		}
+	}
+	pcie_tx_add_dma_header(priv, tx_skb, 0, tailpad);
 
 	if (priv->chip_type == MWL8997) {
 		pfu_dma_data = (struct pcie_pfu_dma_data *)tx_skb->data;
@@ -403,43 +387,6 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	    priv->dump_probe)
 		wiphy_info(priv->hw->wiphy,
 			  "Probe Resp: %pM\n", wh->addr1);
-
-	if (ieee80211_is_data(wh->frame_control) ||
-	    (ieee80211_is_mgmt(wh->frame_control) &&
-	    ieee80211_has_protected(wh->frame_control) &&
-	    !is_multicast_ether_addr(wh->addr1))) {
-		if (is_multicast_ether_addr(wh->addr1)) {
-			if (ccmp) {
-				pcie_tx_add_ccmp_hdr(dma_data->data,
-						     mwl_vif->keyidx,
-						     mwl_vif->iv16,
-						     mwl_vif->iv32);
-				INCREASE_IV(mwl_vif->iv16, mwl_vif->iv32);
-			}
-		} else {
-			if (ccmp) {
-				if (vif->type == NL80211_IFTYPE_STATION) {
-					pcie_tx_add_ccmp_hdr(dma_data->data,
-							     mwl_vif->keyidx,
-							     mwl_vif->iv16,
-							     mwl_vif->iv32);
-					INCREASE_IV(mwl_vif->iv16,
-						    mwl_vif->iv32);
-				} else {
-					struct mwl_sta *sta_info;
-
-					sta_info = mwl_dev_get_sta(sta);
-
-					pcie_tx_add_ccmp_hdr(dma_data->data,
-							     0,
-							     sta_info->iv16,
-							     sta_info->iv32);
-					INCREASE_IV(sta_info->iv16,
-						    sta_info->iv32);
-				}
-			}
-		}
-	}
 
 	if (tx_info->flags & IEEE80211_TX_INTFL_DONT_ENCRYPT)
 		tx_desc->flags |= PCIE_TX_WCB_FLAGS_DONT_ENCRYPT;

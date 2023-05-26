@@ -786,8 +786,7 @@ static inline void pcie_tx_add_dma_header(struct mwl_priv *priv,
 
 static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 					     struct sk_buff *skb,
-					     struct ieee80211_key_conf *k_conf,
-					     bool *ccmp)
+					     struct ieee80211_key_conf *k_conf)
 {
 	int head_pad = 0;
 	int data_pad = 0;
@@ -814,8 +813,6 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 			break;
 		case WLAN_CIPHER_SUITE_CCMP:
 			data_pad = 8;
-			if (ccmp)
-				*ccmp = true;
 			break;
 		}
 	}

@@ -408,9 +408,6 @@ struct mwl_vif {
 	bool set_beacon;
 	int basic_rate_idx;
 	u8 broadcast_ssid;
-	u16 iv16;
-	u32 iv32;
-	s8 keyidx;
 };
 
 struct mwl_tx_info {
@@ -490,8 +487,6 @@ struct mwl_sta {
 	u16 rx_gi;
 	u16 rx_rate_mcs;
 	u8 rx_signal;
-	u16 iv16;
-	u32 iv32;
 };
 
 static inline struct mwl_vif *mwl_dev_get_vif(const struct ieee80211_vif *vif)

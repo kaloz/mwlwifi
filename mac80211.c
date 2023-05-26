@@ -217,9 +217,6 @@ static int mwl_mac80211_add_interface(struct ieee80211_hw *hw,
 	mwl_vif->set_beacon = false;
 	mwl_vif->basic_rate_idx = 0;
 	mwl_vif->broadcast_ssid = 0xFF;
-	mwl_vif->iv16 = 1;
-	mwl_vif->iv32 = 0;
-	mwl_vif->keyidx = 0;
 
 	switch (vif->type) {
 	case NL80211_IFTYPE_AP:
@@ -495,6 +492,7 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 {
 	struct mwl_vif *mwl_vif;
 	struct mwl_sta *sta_info;
+	struct mwl_priv *priv=hw->priv;
 	int rc = 0;
 	u8 encr_type;
 	u8 *addr;
@@ -508,11 +506,11 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 			encr_type = ENCR_TYPE_WEP;
 		} else if (key->cipher == WLAN_CIPHER_SUITE_CCMP) {
 			encr_type = ENCR_TYPE_AES;
-			if ((key->flags & IEEE80211_KEY_FLAG_PAIRWISE) == 0) {
-				if (vif->type != NL80211_IFTYPE_STATION)
-					mwl_vif->keyidx = key->keyidx;
-			}
+			if (priv->chip_type != MWL8964)
+				key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
 		} else if (key->cipher == WLAN_CIPHER_SUITE_TKIP) {
+			if (priv->chip_type != MWL8964)
+				key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC | IEEE80211_KEY_FLAG_GENERATE_IV;
 			encr_type = ENCR_TYPE_TKIP;
 		} else {
 			encr_type = ENCR_TYPE_DISABLE;
@@ -600,8 +598,6 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	if (vif->type == NL80211_IFTYPE_STATION)
 		sta_info->sta_stnid = sta_stnid;
 	sta_info->tx_rate_info = utils_get_init_tx_rate(priv, &hw->conf, sta);
-	sta_info->iv16 = 1;
-	sta_info->iv32 = 0;
 	spin_lock_init(&sta_info->amsdu_lock);
 	spin_lock_bh(&priv->sta_lock);
 	list_add_tail(&sta_info->list, &priv->sta_list);

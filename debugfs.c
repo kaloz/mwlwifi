@@ -494,11 +494,6 @@ static ssize_t mwl_debugfs_vif_read(struct file *file, char __user *ubuf,
 		len += scnprintf(p + len, size - len, "hw_crypto_enabled: %s\n",
 				 mwl_vif->is_hw_crypto_enabled ?
 				 "true" : "false");
-		len += scnprintf(p + len, size - len,
-				 "key idx: %d\n", mwl_vif->keyidx);
-		len += scnprintf(p + len, size - len,
-				 "IV: %08x%04x\n", mwl_vif->iv32,
-				 mwl_vif->iv16);
 		beacon_info = &mwl_vif->beacon_info;
 		dump_data(p, size, &len, beacon_info->ie_wmm_ptr,
 			  beacon_info->ie_wmm_len, "WMM:");
@@ -591,8 +586,6 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 				 sta->tdls, sta->tdls_initiator);
 		len += scnprintf(p + len, size - len, "wme: %d, mfp: %d\n",
 				 sta->wme, sta->mfp);
-		len += scnprintf(p + len, size - len, "IV: %08x%04x\n",
-				 sta_info->iv32, sta_info->iv16);
 	}
 	spin_unlock_bh(&priv->sta_lock);
 

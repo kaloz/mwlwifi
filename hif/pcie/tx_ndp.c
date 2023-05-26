@@ -599,7 +599,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			ieee80211_tx_status(hw, ack_skb);
 		}
 
-		pcie_tx_encapsulate_frame(priv, skb, k_conf, NULL);
+		pcie_tx_encapsulate_frame(priv, skb, k_conf);
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->ht_cap.ht_supported && !eapol_frame &&
