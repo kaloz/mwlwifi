@@ -1700,7 +1700,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return rc;
 	}
 
-	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+	rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
 	if (rc) {
 		pr_err("%s: 32-bit PCI DMA not supported\n",
 		       PCIE_DRV_NAME);

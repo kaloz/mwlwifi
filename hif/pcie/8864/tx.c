@@ -171,11 +171,11 @@ static void pcie_tx_ring_cleanup(struct mwl_priv *priv)
 					    desc->tx_hndl[i].psk_buff->data,
 					    le32_to_cpu(
 					    desc->ptx_ring[i].pkt_ptr));
-				pci_unmap_single(pcie_priv->pdev,
+				dma_unmap_single(&(pcie_priv->pdev)->dev,
 						 le32_to_cpu(
 						 desc->ptx_ring[i].pkt_ptr),
 						 desc->tx_hndl[i].psk_buff->len,
-						 PCI_DMA_TODEVICE);
+						 DMA_TO_DEVICE);
 				dev_kfree_skb_any(desc->tx_hndl[i].psk_buff);
 				desc->ptx_ring[i].status =
 					cpu_to_le32(EAGLE_TXD_STATUS_IDLE);
@@ -291,9 +291,9 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	tx_desc->type = tx_ctrl->type;
 	tx_desc->xmit_control = tx_ctrl->xmit_control;
 	tx_desc->sap_pkt_info = 0;
-	dma = pci_map_single(pcie_priv->pdev, tx_skb->data,
-			     tx_skb->len, PCI_DMA_TODEVICE);
-	if (pci_dma_mapping_error(pcie_priv->pdev, dma)) {
+	dma = dma_map_single(&(pcie_priv->pdev)->dev, tx_skb->data,
+			     tx_skb->len, DMA_TO_DEVICE);
+	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
 		dev_kfree_skb_any(tx_skb);
 		wiphy_err(priv->hw->wiphy,
 			  "failed to map pci memory!\n");
@@ -447,10 +447,10 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 		       (tx_desc->status & cpu_to_le32(EAGLE_TXD_STATUS_OK)) &&
 		       (!(tx_desc->status &
 		       cpu_to_le32(EAGLE_TXD_STATUS_FW_OWNED)))) {
-			pci_unmap_single(pcie_priv->pdev,
+			dma_unmap_single(&(pcie_priv->pdev)->dev,
 					 le32_to_cpu(tx_desc->pkt_ptr),
 					 le16_to_cpu(tx_desc->pkt_len),
-					 PCI_DMA_TODEVICE);
+					 DMA_TO_DEVICE);
 			done_skb = tx_hndl->psk_buff;
 			rate = le32_to_cpu(tx_desc->rate_info);
 			tx_desc->pkt_ptr = 0;
