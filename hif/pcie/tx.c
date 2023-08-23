@@ -383,11 +383,6 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	}
 	wh = &dma_data->wh;
 
-	if (ieee80211_is_probe_resp(wh->frame_control) &&
-	    priv->dump_probe)
-		wiphy_info(priv->hw->wiphy,
-			  "Probe Resp: %pM\n", wh->addr1);
-
 	if (tx_info->flags & IEEE80211_TX_INTFL_DONT_ENCRYPT)
 		tx_desc->flags |= PCIE_TX_WCB_FLAGS_DONT_ENCRYPT;
 	if (tx_info->flags & IEEE80211_TX_CTL_NO_CCK_RATE)
