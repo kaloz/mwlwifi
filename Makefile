@@ -26,3 +26,4 @@ clean:
 	rm -rf .tmp_versions
 	find . -name ".*.o.cmd" -exec rm -f {} \;
 	find . -name "*.o" -exec rm -f {} \;
+	find . -name "*.o.d" -exec rm -f {} \;
