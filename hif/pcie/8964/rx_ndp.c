@@ -24,7 +24,7 @@
 #include "core.h"
 #include "utils.h"
 #include "hif/pcie/dev.h"
-#include "hif/pcie/rx_ndp.h"
+#include "hif/pcie/8964/rx_ndp.h"
 
 #define MAX_NUM_RX_RING_BYTES   (MAX_NUM_RX_DESC * \
 				sizeof(struct pcie_rx_desc_ndp))

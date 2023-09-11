@@ -25,7 +25,7 @@
 #include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
-#include "hif/pcie/tx_ndp.h"
+#include "hif/pcie/8964/tx_ndp.h"
 
 #define MAX_NUM_TX_RING_BYTES   (MAX_NUM_TX_DESC * \
 				sizeof(struct pcie_tx_desc_ndp))
