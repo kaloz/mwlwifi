@@ -988,6 +988,7 @@ static inline void pcie_rx_remove_dma_header(struct sk_buff *skb, __le16 qos)
 	hdrlen = ieee80211_hdrlen(dma_data->wh.frame_control);
 
 	if (hdrlen != sizeof(dma_data->wh)) {
+		/* Adding qos to a nullfunc frame causes problems. */
 		if (ieee80211_is_data_qos(dma_data->wh.frame_control)) {
 			memmove(dma_data->data - hdrlen,
 				&dma_data->wh, hdrlen - 2);
