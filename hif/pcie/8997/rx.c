@@ -387,6 +387,7 @@ void pcie_8997_rx_recv(unsigned long data)
 	struct pcie_rx_hndl *curr_hndl;
 	int work_done = 0;
 	struct sk_buff *prx_skb = NULL;
+	struct sk_buff *monitor_skb;
 	int pkt_len;
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
@@ -479,6 +480,17 @@ void pcie_8997_rx_recv(unsigned long data)
 				if (pcie_rx_process_mesh_amsdu(priv, prx_skb, status))
 					goto out;
 			}
+		}
+
+		if (status->flag & RX_FLAG_DECRYPTED) {
+			monitor_skb = skb_copy(prx_skb, GFP_ATOMIC);
+			if (monitor_skb) {
+				IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
+				((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+
+				ieee80211_rx(hw, monitor_skb);
+			}
+			status->flag |= RX_FLAG_SKIP_MONITOR;
 		}
 
 		ieee80211_rx(hw, prx_skb);

@@ -51,6 +51,7 @@ struct pcie_tx_ctrl_ndp {
 	u32 rate;
 	u32 tcp_dst_src;
 	u32 tcp_sn;
+	u16 qos;
 } __packed;
 
 static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
@@ -477,8 +478,12 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 			}
 			hdrlen = ieee80211_hdrlen(
 				dma_data->wh.frame_control);
-			memmove(dma_data->data - hdrlen,
-				&dma_data->wh, hdrlen);
+			if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
+			   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - 2);
+				*((__le16 *)(dma_data->data - 2)) = tx_ctrl->qos;
+			} else
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
 			skb_pull(skb, sizeof(*dma_data) - hdrlen);
 		}
 
@@ -663,6 +668,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
 	tx_ctrl->flags = 0;
+	tx_ctrl->qos = qos;
 	if (!mgmtframe)
 		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
 	if (eapol_frame)

@@ -338,6 +338,7 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 	struct ieee80211_rx_status *status;
 	struct ieee80211_hdr *wh;
 	struct mwl_vif *mwl_vif = NULL;
+	struct sk_buff* monitor_skb;
 
 	pcie_rx_remove_dma_header(skb, 0);
 	status = IEEE80211_SKB_RXCB(skb);
@@ -379,6 +380,16 @@ static inline void pcie_rx_process_slow_data(struct mwl_priv *priv,
 			ether_addr_copy(priv->wds_check_sta, wh->addr2);
 			ieee80211_queue_work(priv->hw, &priv->wds_check_handle);
 			priv->wds_check = true;
+		}
+
+		if (status->flag & RX_FLAG_DECRYPTED) {
+			monitor_skb = skb_copy(skb, GFP_ATOMIC);
+			if (monitor_skb) {
+				IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
+				((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+				ieee80211_rx(priv->hw, monitor_skb);
+			}
+			status->flag |= RX_FLAG_SKIP_MONITOR;
 		}
 	}
 

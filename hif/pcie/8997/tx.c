@@ -437,8 +437,12 @@ static void pcie_pfu_tx_done(struct mwl_priv *priv)
 				/* Remove H/W dma header */
 				hdrlen = ieee80211_hdrlen(
 					dma_data->wh.frame_control);
-				memmove(dma_data->data - hdrlen,
-					&dma_data->wh, hdrlen);
+				if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
+				   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
+					memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - 2);
+					*((__le16 *)(dma_data->data - 2)) = tx_desc->qos_ctrl;
+				} else
+					memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
 				skb_pull(done_skb, sizeof(*pfu_dma) - hdrlen);
 				ieee80211_tx_status(priv->hw, done_skb);
 			}
