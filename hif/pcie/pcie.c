@@ -885,6 +885,9 @@ static int pcie_init_ndp(struct ieee80211_hw *hw)
 		cpu_to_le32(pcie_priv->desc_data_ndp.pphys_acnt_ring);
 	set_hw_spec.acnt_buf_size =
 		cpu_to_le32(pcie_priv->desc_data_ndp.acnt_ring_size);
+	set_hw_spec.features |=
+		cpu_to_le32(priv->feature);
+
 	rc = mwl_fwcmd_set_hw_specs(hw, &set_hw_spec);
 	if (rc) {
 		wiphy_err(hw->wiphy, "%s: fail to set HW specifications\n",
