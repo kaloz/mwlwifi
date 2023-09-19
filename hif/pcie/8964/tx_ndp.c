@@ -230,7 +230,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	}
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
 	pnext_tx_desc = &desc->ptx_ring[tx_send_head_new];
 
 	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
@@ -335,10 +335,10 @@ int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 	int rc;
 
 	if (sizeof(struct pcie_tx_ctrl_ndp) >
-	    sizeof(tx_info->status.status_driver_data)) {
+	    sizeof(tx_info->driver_data)) {
 		wiphy_err(hw->wiphy, "driver data is not enough: %d (%d)\n",
 			  sizeof(struct pcie_tx_ctrl_ndp),
-			  sizeof(tx_info->status.status_driver_data));
+			  sizeof(tx_info->driver_data));
 		return -ENOMEM;
 	}
 
@@ -460,7 +460,7 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 
 		tx_info = IEEE80211_SKB_CB(skb);
 		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
-			tx_info->status.status_driver_data;
+			tx_info->driver_data;
 
 		if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
 			dev_kfree_skb_any(skb);
@@ -664,7 +664,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
 
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
 	tx_ctrl->flags = 0;

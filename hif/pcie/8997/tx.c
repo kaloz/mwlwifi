@@ -469,7 +469,18 @@ next:
 int pcie_8997_tx_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
+	struct sk_buff skb;
+	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(&skb);
 	int rc;
+
+	if (sizeof(struct pcie_tx_ctrl) >
+	    sizeof(tx_info->driver_data)) {
+		wiphy_err(hw->wiphy, "driver data is not enough: %zu (%zu)\n",
+			  sizeof(struct pcie_tx_ctrl),
+			  sizeof(tx_info->driver_data));
+		return -ENOMEM;
+	}
+
 
 	rc = pcie_txbd_ring_create(priv);
 
