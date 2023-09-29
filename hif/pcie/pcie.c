@@ -362,6 +362,7 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	for (i = 1; i < SYSADPT_TOTAL_TX_QUEUES; i++)
 		set_hw_spec.wcb_base[i] = cpu_to_le32(
 			pcie_priv->desc_data[i].pphys_tx_ring);
+	set_hw_spec.features |= HW_SET_PARMS_FEATURES_HOST_PROBE_RESP;
 	set_hw_spec.features |= cpu_to_le32(priv->feature);
 	set_hw_spec.tx_wcb_num_per_queue =
 			cpu_to_le32(PCIE_MAX_NUM_TX_DESC);
