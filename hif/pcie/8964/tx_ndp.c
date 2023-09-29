@@ -480,8 +480,8 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 				dma_data->wh.frame_control);
 			if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
 			   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
-				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - 2);
-				*((__le16 *)(dma_data->data - 2)) = tx_ctrl->qos;
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
+				*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_ctrl->qos;
 			} else
 				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
 			skb_pull(skb, sizeof(*dma_data) - hdrlen);
