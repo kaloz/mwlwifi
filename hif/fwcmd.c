@@ -942,7 +942,6 @@ const struct hostcmd_get_hw_spec
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	wiphy_debug(hw->wiphy, "pcmd = %p\n", pcmd);
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	eth_broadcast_addr(pcmd->hw_spec.permanent_addr);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_HW_SPEC);
