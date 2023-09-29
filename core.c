@@ -99,6 +99,18 @@ static const struct ieee80211_rate mwl_rates_50[] = {
 	{ .bitrate = 540, .hw_value = 108, },
 };
 
+static const u32 cipher_suites[] = {
+	WLAN_CIPHER_SUITE_WEP40,
+	WLAN_CIPHER_SUITE_WEP104,
+	WLAN_CIPHER_SUITE_TKIP,
+	WLAN_CIPHER_SUITE_CCMP,
+	/* Do not add hardware supported ciphers before this line.
+	 * Allow software encryption for all chips. Don't forget to
+	 * update n_cipher_suites below.
+	 */
+	WLAN_CIPHER_SUITE_AES_CMAC,
+};
+
 static const struct ieee80211_iface_limit ap_if_limits[] = {
 	{ .max = SYSADPT_NUM_OF_AP, .types = BIT(NL80211_IFTYPE_AP) },
 #if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
@@ -779,6 +791,9 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
 	hw->wiphy->flags |= WIPHY_FLAG_AP_UAPSD;
+
+	hw->wiphy->cipher_suites = cipher_suites;
+	hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
 
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
