@@ -210,17 +210,11 @@ static int pcie_init(struct ieee80211_hw *hw)
 	tasklet_init(&pcie_priv->rx_task,
 		     (void *)pcie_rx_recv, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->rx_task);
-	tasklet_init(&pcie_priv->qe_task,
-		     (void *)pcie_tx_flush_amsdu, (unsigned long)hw);
-	tasklet_disable(&pcie_priv->qe_task);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
 	pcie_priv->is_tx_done_schedule = false;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
 	pcie_priv->is_rx_schedule = false;
-	pcie_priv->is_qe_schedule = false;
-	pcie_priv->qe_trig_num = 0;
-	pcie_priv->qe_trig_time = jiffies;
 
 	rc = pcie_tx_init(hw);
 	if (rc) {
@@ -323,7 +317,6 @@ static void pcie_deinit(struct ieee80211_hw *hw)
 
 	pcie_rx_deinit(hw);
 	pcie_tx_deinit(hw);
-	tasklet_kill(&pcie_priv->qe_task);
 	tasklet_kill(&pcie_priv->rx_task);
 	tasklet_kill(&pcie_priv->tx_done_task);
 	tasklet_kill(&pcie_priv->tx_task);
@@ -345,8 +338,6 @@ static int pcie_get_info(struct ieee80211_hw *hw, char *buf, size_t size)
 			 "tx limit: %d\n", pcie_priv->txq_limit);
 	len += scnprintf(p + len, size - len,
 			 "rx limit: %d\n", pcie_priv->recv_limit);
-	len += scnprintf(p + len, size - len,
-			 "qe trigger number: %d\n", pcie_priv->qe_trig_num);
 	return len;
 }
 
@@ -358,7 +349,6 @@ static void pcie_enable_data_tasks(struct ieee80211_hw *hw)
 	tasklet_enable(&pcie_priv->tx_task);
 	tasklet_enable(&pcie_priv->tx_done_task);
 	tasklet_enable(&pcie_priv->rx_task);
-	tasklet_enable(&pcie_priv->qe_task);
 }
 
 static void pcie_disable_data_tasks(struct ieee80211_hw *hw)
@@ -369,7 +359,6 @@ static void pcie_disable_data_tasks(struct ieee80211_hw *hw)
 	tasklet_disable(&pcie_priv->tx_task);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	tasklet_disable(&pcie_priv->rx_task);
-	tasklet_disable(&pcie_priv->qe_task);
 }
 
 static int pcie_exec_cmd(struct ieee80211_hw *hw, unsigned short cmd)
@@ -460,21 +449,6 @@ static irqreturn_t pcie_isr(struct ieee80211_hw *hw)
 		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
 			ieee80211_radar_detected(hw);
-		}
-
-		if (int_status & MACREG_A2HRIC_BIT_QUE_EMPTY) {
-			if (!pcie_priv->is_qe_schedule) {
-				if (time_after(jiffies,
-					       (pcie_priv->qe_trig_time + 1))) {
-					pcie_mask_int(pcie_priv,
-					      MACREG_A2HRIC_BIT_QUE_EMPTY,
-					      false);
-					tasklet_schedule(&pcie_priv->qe_task);
-					pcie_priv->qe_trig_num++;
-					pcie_priv->is_qe_schedule = true;
-					pcie_priv->qe_trig_time = jiffies;
-				}
-			}
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)

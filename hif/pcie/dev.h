@@ -584,7 +584,6 @@ struct pcie_priv {
 	struct tasklet_struct tx_task;
 	struct tasklet_struct tx_done_task;
 	struct tasklet_struct rx_task;
-	struct tasklet_struct qe_task;
 	unsigned int tx_head_room;
 	int txq_limit;
 	int txq_wake_threshold;
@@ -592,9 +591,6 @@ struct pcie_priv {
 	bool is_tx_done_schedule;
 	int recv_limit;
 	bool is_rx_schedule;
-	bool is_qe_schedule;
-	u32 qe_trig_num;
-	unsigned long qe_trig_time;
 
 	/* various descriptor data */
 	/* for tx descriptor data  */

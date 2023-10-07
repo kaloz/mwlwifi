@@ -586,10 +586,14 @@ static int mwl_mac80211_sta_add(struct ieee80211_hw *hw,
 	if (sta->ht_cap.ht_supported) {
 		sta_info->is_ampdu_allowed = true;
 		sta_info->is_amsdu_allowed = false;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_MAX_AMSDU)
+		if (sta->ht_cap.cap & IEEE80211_HT_CAP_MAX_AMSDU) {
 			sta_info->amsdu_ctrl.cap = MWL_AMSDU_SIZE_8K;
-		else
+			sta_info->amsdu_ctrl.amsdu_allow_size = SYSADPT_AMSDU_8K_MAX_SIZE;
+		}
+		else {
 			sta_info->amsdu_ctrl.cap = MWL_AMSDU_SIZE_4K;
+			sta_info->amsdu_ctrl.amsdu_allow_size = SYSADPT_AMSDU_4K_MAX_SIZE;
+		}
 		if ((sta->tdls) && (!sta->wme))
 			sta->wme = true;
 	}

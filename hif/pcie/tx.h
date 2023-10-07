@@ -22,7 +22,6 @@ int pcie_tx_init(struct ieee80211_hw *hw);
 void pcie_tx_deinit(struct ieee80211_hw *hw);
 void pcie_tx_skbs(unsigned long data);
 void pcie_tx_done(unsigned long data);
-void pcie_tx_flush_amsdu(unsigned long data);
 void pcie_tx_xmit(struct ieee80211_hw *hw,
 		  struct ieee80211_tx_control *control,
 		  struct sk_buff *skb);

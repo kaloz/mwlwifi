@@ -417,7 +417,6 @@ struct mwl_tx_info {
 
 struct mwl_amsdu_frag {
 	struct sk_buff *skb;
-	unsigned long jiffies;
 	u8 pad;
 	u8 num;
 };
@@ -425,6 +424,7 @@ struct mwl_amsdu_frag {
 struct mwl_amsdu_ctrl {
 	struct mwl_amsdu_frag frag[SYSADPT_TX_WMM_QUEUES];
 	u8 cap;
+	int amsdu_allow_size;
 };
 
 struct mwl_tx_ba_stats {
