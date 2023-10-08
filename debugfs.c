@@ -538,54 +538,38 @@ static ssize_t mwl_debugfs_sta_read(struct file *file, char __user *ubuf,
 	if (!p)
 		return -ENOMEM;
 
+	len += scnprintf(p + len, size - len, "       macaddress|aid|ampdu|amsdu|  wds|ba_hist|amsdu_cap|  ht cap, ampdu,         rx_mask|   vht_cap|           mcs|rx bw,nss|tdls|init|wme|mfp\n");
+
 	spin_lock_bh(&priv->sta_lock);
 	list_for_each_entry(sta_info, &priv->sta_list, list) {
 		sta = container_of((void *)sta_info, struct ieee80211_sta,
 				   drv_priv);
-		len += scnprintf(p + len, size - len,
-				 "mac address: %pM\n", sta->addr);
-		len += scnprintf(p + len, size - len, "aid: %u\n", sta->aid);
-		len += scnprintf(p + len, size - len, "ampdu: %s\n",
-				 sta_info->is_ampdu_allowed ? "true" : "false");
-		len += scnprintf(p + len, size - len, "amsdu: %s\n",
-				 sta_info->is_amsdu_allowed ? "true" : "false");
-		len += scnprintf(p + len, size - len, "wds: %s\n",
-				 sta_info->wds ? "true" : "false");
-		len += scnprintf(p + len, size - len, "ba_hist: %s\n",
-				 sta_info->ba_hist.enable ?
-				 "enable" : "disable");
-		if (sta_info->is_amsdu_allowed) {
-			len += scnprintf(p + len, size - len,
-					 "amsdu cap: 0x%02x\n",
-					 sta_info->amsdu_ctrl.cap);
-		}
-		if (sta->ht_cap.ht_supported) {
-			len += scnprintf(p + len, size - len,
-					 "ht_cap: 0x%04x, ampdu: %02x, %02x\n",
-					 sta->ht_cap.cap,
-					 sta->ht_cap.ampdu_factor,
-					 sta->ht_cap.ampdu_density);
-			len += scnprintf(p + len, size - len,
-					 "rx_mask: 0x%02x, %02x, %02x, %02x\n",
-					 sta->ht_cap.mcs.rx_mask[0],
-					 sta->ht_cap.mcs.rx_mask[1],
-					 sta->ht_cap.mcs.rx_mask[2],
-					 sta->ht_cap.mcs.rx_mask[3]);
-		}
-		if (sta->vht_cap.vht_supported) {
-			len += scnprintf(p + len, size - len,
-					 "vht_cap: 0x%08x, mcs: %02x, %02x\n",
-					 sta->vht_cap.cap,
-					 sta->vht_cap.vht_mcs.rx_mcs_map,
-					 sta->vht_cap.vht_mcs.tx_mcs_map);
-		}
-		len += scnprintf(p + len, size - len, "rx_bw: %d, rx_nss: %d\n",
-				 sta->bandwidth, sta->rx_nss);
-		len += scnprintf(p + len, size - len,
-				 "tdls: %d, tdls_init: %d\n",
-				 sta->tdls, sta->tdls_initiator);
-		len += scnprintf(p + len, size - len, "wme: %d, mfp: %d\n",
-				 sta->wme, sta->mfp);
+
+		len += scnprintf(p + len, size - len, "%pM|%3d|%5s|%5s|%5s|%7s|     0x%02x|0x%06x, %02x-%02x,0x%02x, %02x, %02x, %02x|0x%08x|0x%04x, 0x%04x|rx %2d, %2d|%4d|%4d|%3d|%3d\n",
+			sta->addr,
+			sta->aid,
+			sta_info->is_ampdu_allowed ? "true" : "false",
+			sta_info->is_amsdu_allowed ? "true" : "false",
+			sta_info->wds ? "true" : "false",
+			sta_info->ba_hist.enable ? "enable" : "disable",
+			sta_info->is_amsdu_allowed ? sta_info->amsdu_ctrl.cap : 0 ,
+			sta->ht_cap.ht_supported ? sta->ht_cap.cap : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.ampdu_factor : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.ampdu_density : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.mcs.rx_mask[0] : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.mcs.rx_mask[1] : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.mcs.rx_mask[2] : 0,
+			sta->ht_cap.ht_supported ? sta->ht_cap.mcs.rx_mask[3] : 0,
+			sta->vht_cap.vht_supported ? sta->vht_cap.cap : 0,
+			sta->vht_cap.vht_supported ? sta->vht_cap.vht_mcs.rx_mcs_map : 0,
+			sta->vht_cap.vht_supported ? sta->vht_cap.vht_mcs.tx_mcs_map : 0,
+			sta->bandwidth,
+			sta->rx_nss,
+			sta->tdls,
+			sta->tdls_initiator,
+			sta->wme,
+			sta->mfp
+			);
 	}
 	spin_unlock_bh(&priv->sta_lock);
 
