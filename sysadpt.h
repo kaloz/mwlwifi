@@ -53,7 +53,7 @@
 
 #define SYSADPT_MAX_AGGR_SIZE          4096
 
-#define SYSADPT_AMPDU_PACKET_THRESHOLD 64
+#define SYSADPT_AMPDU_PACKET_THRESHOLD 256
 
 #define SYSADPT_AMSDU_FW_MAX_SIZE      3300
 
@@ -79,7 +79,7 @@
 
 #define SYSADPT_TIMER_WAKEUP_TIME      10 /* ms */
 
-#define SYSADPT_TIMER_AMPDU_KEEPALIVE  (60 * HZ)/* 60 s */
+#define SYSADPT_TIMER_AMPDU_KEEPALIVE  (600 * HZ) /* 600 s */
 
 #define SYSADPT_OTP_BUF_SIZE           (256*8) /* 256 lines * 8 bytes */
 
