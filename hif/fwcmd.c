@@ -942,7 +942,6 @@ const struct hostcmd_get_hw_spec
 
 	mutex_lock(&priv->fwcmd_mutex);
 
-	wiphy_debug(hw->wiphy, "pcmd = %p\n", pcmd);
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	eth_broadcast_addr(pcmd->hw_spec.permanent_addr);
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_GET_HW_SPEC);
@@ -2877,6 +2876,7 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 	struct mwl_ampdu_stream *stream;
 	struct mwl_sta *sta_info = mwl_dev_get_sta(sta);
 	int idx;
+	int ac = utils_tid_to_ac(tid);
 
 	if (priv->chip_type == MWL8964) {
 		idx = ((sta_info->stnid - 1) * SYSADPT_MAX_TID) + tid;
@@ -2890,16 +2890,35 @@ struct mwl_ampdu_stream *mwl_fwcmd_add_stream(struct ieee80211_hw *hw,
 			return stream;
 		}
 	} else {
-		for (idx = 0; idx < priv->ampdu_num; idx++) {
-			stream = &priv->ampdu[idx];
+		switch(ac) {
+			case IEEE80211_AC_VI:
+			case IEEE80211_AC_VO:
+				idx = priv->ampdu_num;
+				while (idx--) {
+					stream = &priv->ampdu[idx];
 
-			if (stream->state == AMPDU_NO_STREAM) {
-				stream->sta = sta;
-				stream->state = AMPDU_STREAM_NEW;
-				stream->tid = tid;
-				stream->idx = idx;
-				return stream;
-			}
+					if (stream->state == AMPDU_NO_STREAM) {
+						stream->sta = sta;
+						stream->state = AMPDU_STREAM_NEW;
+						stream->tid = tid;
+						stream->idx = idx;
+						return stream;
+					}
+				};
+				break;
+			default:
+				for (idx = 0; idx < priv->ampdu_num; idx++) {
+					stream = &priv->ampdu[idx];
+
+					if (stream->state == AMPDU_NO_STREAM) {
+						stream->sta = sta;
+						stream->state = AMPDU_STREAM_NEW;
+						stream->tid = tid;
+						stream->idx = idx;
+						return stream;
+					}
+				};
+			break;
 		}
 	}
 

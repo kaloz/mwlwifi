@@ -22,7 +22,7 @@
 #include "core.h"
 #include "utils.h"
 #include "hif/pcie/dev.h"
-#include "hif/pcie/rx.h"
+#include "hif/pcie/8997/rx.h"
 
 #define MAX_NUM_RX_RING_BYTES  (PCIE_MAX_NUM_RX_DESC * \
 				sizeof(struct pcie_rx_desc))
@@ -204,10 +204,7 @@ static inline void pcie_rx_status(struct mwl_priv *priv,
 
 	memset(status, 0, sizeof(*status));
 
-	if (priv->chip_type == MWL8997)
-		status->signal = (s8)pdesc->rssi;
-	else
-		status->signal = -(pdesc->rssi + W836X_RSSI_OFFSET);
+	status->signal = (s8)pdesc->rssi;
 
 	rx_rate = le16_to_cpu(pdesc->rate);
 	pcie_rx_prepare_status(priv,
@@ -351,7 +348,7 @@ static inline int pcie_rx_refill(struct mwl_priv *priv,
 	return 0;
 }
 
-int pcie_rx_init(struct ieee80211_hw *hw)
+int pcie_8997_rx_init(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 	int rc;
@@ -373,7 +370,7 @@ int pcie_rx_init(struct ieee80211_hw *hw)
 	return 0;
 }
 
-void pcie_rx_deinit(struct ieee80211_hw *hw)
+void pcie_8997_rx_deinit(struct ieee80211_hw *hw)
 {
 	struct mwl_priv *priv = hw->priv;
 
@@ -381,7 +378,7 @@ void pcie_rx_deinit(struct ieee80211_hw *hw)
 	pcie_rx_ring_free(priv);
 }
 
-void pcie_rx_recv(unsigned long data)
+void pcie_8997_rx_recv(unsigned long data)
 {
 	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
 	struct mwl_priv *priv = hw->priv;
@@ -390,9 +387,9 @@ void pcie_rx_recv(unsigned long data)
 	struct pcie_rx_hndl *curr_hndl;
 	int work_done = 0;
 	struct sk_buff *prx_skb = NULL;
+	struct sk_buff *monitor_skb;
 	int pkt_len;
 	struct ieee80211_rx_status *status;
-	struct mwl_vif *mwl_vif = NULL;
 	struct ieee80211_hdr *wh;
 	u8 *_data;
 	u8 *qc;
@@ -433,68 +430,37 @@ void pcie_rx_recv(unsigned long data)
 		status = IEEE80211_SKB_RXCB(prx_skb);
 		pcie_rx_status(priv, curr_hndl->pdesc, status);
 
-		if (priv->chip_type == MWL8997) {
-			priv->noise = (s8)curr_hndl->pdesc->noise_floor;
-			if (priv->noise > 0)
-				priv->noise = -priv->noise;
-		} else
-			priv->noise = -curr_hndl->pdesc->noise_floor;
+		priv->noise = (s8)curr_hndl->pdesc->noise_floor;
+		if (priv->noise > 0)
+			priv->noise = -priv->noise;
 
 		wh = &((struct pcie_dma_data *)prx_skb->data)->wh;
 
-		if (ieee80211_has_protected(wh->frame_control)) {
-			/* Check if hw crypto has been enabled for
-			 * this bss. If yes, set the status flags
-			 * accordingly
-			 */
-			if (ieee80211_has_tods(wh->frame_control)) {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr1);
-				if (!mwl_vif &&
-				    ieee80211_has_a4(wh->frame_control))
-					mwl_vif =
-						utils_find_vif_bss(priv,
-								   wh->addr2);
-			} else {
-				mwl_vif = utils_find_vif_bss(priv, wh->addr2);
+		if (utils_is_crypted(wh)) {
+			/* When MMIC ERROR is encountered
+			* by the firmware, payload is
+			* dropped and only 32 bytes of
+			* mwlwifi Firmware header is sent
+			* to the host.
+			*
+			* We need to add four bytes of
+			* key information.  In it
+			* MAC80211 expects keyidx set to
+			* 0 for triggering Counter
+			* Measure of MMIC failure.
+			*/
+			if (status->flag & RX_FLAG_MMIC_ERROR) {
+				struct pcie_dma_data *dma_data;
+
+				dma_data = (struct pcie_dma_data *)
+				     prx_skb->data;
+				memset((void *)&dma_data->data, 0, 4);
+				pkt_len += 4;
 			}
 
-			if  ((mwl_vif && mwl_vif->is_hw_crypto_enabled) ||
-			     is_multicast_ether_addr(wh->addr1) ||
-			     (ieee80211_is_mgmt(wh->frame_control) &&
-			     !is_multicast_ether_addr(wh->addr1))) {
-				/* When MMIC ERROR is encountered
-				 * by the firmware, payload is
-				 * dropped and only 32 bytes of
-				 * mwlwifi Firmware header is sent
-				 * to the host.
-				 *
-				 * We need to add four bytes of
-				 * key information.  In it
-				 * MAC80211 expects keyidx set to
-				 * 0 for triggering Counter
-				 * Measure of MMIC failure.
-				 */
-				if (status->flag & RX_FLAG_MMIC_ERROR) {
-					struct pcie_dma_data *dma_data;
-
-					dma_data = (struct pcie_dma_data *)
-					     prx_skb->data;
-					memset((void *)&dma_data->data, 0, 4);
-					pkt_len += 4;
-				}
-
-				if (!ieee80211_is_auth(wh->frame_control)) {
-					if (priv->chip_type != MWL8997)
-						status->flag |=
-							RX_FLAG_IV_STRIPPED |
-							RX_FLAG_DECRYPTED |
-							RX_FLAG_MMIC_STRIPPED;
-					else
-						status->flag |=
-							RX_FLAG_DECRYPTED |
-							RX_FLAG_MMIC_STRIPPED;
-				}
-			}
+			status->flag |=
+				RX_FLAG_DECRYPTED |
+				RX_FLAG_MMIC_STRIPPED;
 		}
 
 		skb_put(prx_skb, pkt_len);
@@ -516,9 +482,16 @@ void pcie_rx_recv(unsigned long data)
 			}
 		}
 
-		if (ieee80211_is_probe_req(wh->frame_control) &&
-		    priv->dump_probe)
-			wiphy_info(hw->wiphy, "Probe Req: %pM\n", wh->addr2);
+		if (status->flag & RX_FLAG_DECRYPTED) {
+			monitor_skb = skb_copy(prx_skb, GFP_ATOMIC);
+			if (monitor_skb) {
+				IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
+				((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+
+				ieee80211_rx(hw, monitor_skb);
+			}
+			status->flag |= RX_FLAG_SKIP_MONITOR;
+		}
 
 		ieee80211_rx(hw, prx_skb);
 out:

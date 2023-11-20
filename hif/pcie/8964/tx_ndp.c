@@ -25,7 +25,7 @@
 #include "utils.h"
 #include "hif/fwcmd.h"
 #include "hif/pcie/dev.h"
-#include "hif/pcie/tx_ndp.h"
+#include "hif/pcie/8964/tx_ndp.h"
 
 #define MAX_NUM_TX_RING_BYTES   (MAX_NUM_TX_DESC * \
 				sizeof(struct pcie_tx_desc_ndp))
@@ -51,6 +51,7 @@ struct pcie_tx_ctrl_ndp {
 	u32 rate;
 	u32 tcp_dst_src;
 	u32 tcp_sn;
+	u16 qos;
 } __packed;
 
 static int pcie_tx_ring_alloc_ndp(struct mwl_priv *priv)
@@ -229,7 +230,7 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 	}
 
 	tx_info = IEEE80211_SKB_CB(tx_skb);
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
 	pnext_tx_desc = &desc->ptx_ring[tx_send_head_new];
 
 	if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
@@ -334,10 +335,10 @@ int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 	int rc;
 
 	if (sizeof(struct pcie_tx_ctrl_ndp) >
-	    sizeof(tx_info->status.status_driver_data)) {
+	    sizeof(tx_info->driver_data)) {
 		wiphy_err(hw->wiphy, "driver data is not enough: %d (%d)\n",
 			  sizeof(struct pcie_tx_ctrl_ndp),
-			  sizeof(tx_info->status.status_driver_data));
+			  sizeof(tx_info->driver_data));
 		return -ENOMEM;
 	}
 
@@ -459,7 +460,7 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 
 		tx_info = IEEE80211_SKB_CB(skb);
 		tx_ctrl = (struct pcie_tx_ctrl_ndp *)
-			tx_info->status.status_driver_data;
+			tx_info->driver_data;
 
 		if (tx_ctrl->flags & TX_CTRL_TYPE_DATA) {
 			dev_kfree_skb_any(skb);
@@ -477,8 +478,12 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 			}
 			hdrlen = ieee80211_hdrlen(
 				dma_data->wh.frame_control);
-			memmove(dma_data->data - hdrlen,
-				&dma_data->wh, hdrlen);
+			if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
+			   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
+				*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_ctrl->qos;
+			} else
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
 			skb_pull(skb, sizeof(*dma_data) - hdrlen);
 		}
 
@@ -599,7 +604,7 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 			ieee80211_tx_status(hw, ack_skb);
 		}
 
-		pcie_tx_encapsulate_frame(priv, skb, k_conf, NULL);
+		pcie_tx_encapsulate_frame(priv, skb, k_conf);
 	} else {
 		tid = qos & 0x7;
 		if (sta && sta->ht_cap.ht_supported && !eapol_frame &&
@@ -659,10 +664,11 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
 
-	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->status.status_driver_data;
+	tx_ctrl = (struct pcie_tx_ctrl_ndp *)tx_info->driver_data;
 	tx_ctrl->tx_que_priority = tx_que_priority;
 	tx_ctrl->hdrlen = ieee80211_hdrlen(wh->frame_control);
 	tx_ctrl->flags = 0;
+	tx_ctrl->qos = qos;
 	if (!mgmtframe)
 		tx_ctrl->flags |= TX_CTRL_TYPE_DATA;
 	if (eapol_frame)
@@ -688,6 +694,9 @@ void pcie_tx_xmit_ndp(struct ieee80211_hw *hw,
 		spin_lock_bh(&priv->stream_lock);
 		if (mwl_fwcmd_start_stream(hw, stream))
 			mwl_fwcmd_remove_stream(hw, stream);
+		stream->jiffies = jiffies;
+		stream->start_time = stream->jiffies;
+		stream->desc_num = index;
 		spin_unlock_bh(&priv->stream_lock);
 	}
 }

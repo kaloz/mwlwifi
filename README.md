@@ -2,18 +2,8 @@
 mac80211 driver for the Marvell 88W8x64 802.11ac chip
 
 ## Building mwlwifi With OpenWrt/LEDE
-1. Modify `package/kernel/mwlwifi/Makefile`:
-    ```
-    PKG_VERSION:=10.3.0.17-20160601
-    PKG_SOURCE_VERSION:=4bb95ba1aeccce506a95499b49b9b844ecfae8a1
-    ```
+[See building for OpenWrt](docs/OPENWRT.md)
 
-2. Rename `package/kernel/mwlwifi/patches` to `package/kernel/mwlwifi/patches.tmp`.
-3. Run the following commands:
-    ```sh
-    make package/kernel/mwlwifi/clean
-    make V=s (-jx)
-    ```
 
 ### Special Considerations
 * After driver 10.3.0.17-20160603, [MAX-MPDU-7991] should be removed from vht_capab command of hostapd.

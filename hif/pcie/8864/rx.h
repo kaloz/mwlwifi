@@ -15,11 +15,11 @@
 
 /* Description:  This file defines receive related functions. */
 
-#ifndef _RX_H_
-#define _RX_H_
+#ifndef _8864_RX_H_
+#define _8864_RX_H_
 
-int pcie_rx_init(struct ieee80211_hw *hw);
-void pcie_rx_deinit(struct ieee80211_hw *hw);
-void pcie_rx_recv(unsigned long data);
+int pcie_8864_rx_init(struct ieee80211_hw *hw);
+void pcie_8864_rx_deinit(struct ieee80211_hw *hw);
+void pcie_8864_rx_recv(unsigned long data);
 
-#endif /* _RX_H_ */
+#endif /* _8864_RX_H_ */
