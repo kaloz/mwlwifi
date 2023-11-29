@@ -132,10 +132,10 @@ static void pcie_tx_ring_cleanup_ndp(struct mwl_priv *priv)
 	for (i = 0; i < MAX_TX_RING_SEND_SIZE; i++) {
 		tx_skb = desc->tx_vbuflist[i];
 		if (tx_skb) {
-			pci_unmap_single(pcie_priv->pdev,
+			dma_unmap_single(&(pcie_priv->pdev)->dev,
 					 desc->pphys_tx_buflist[i],
 					 tx_skb->len,
-					 PCI_DMA_TODEVICE);
+					 DMA_TO_DEVICE);
 			dev_kfree_skb_any(tx_skb);
 			desc->pphys_tx_buflist[i] = 0;
 			desc->tx_vbuflist[i] = NULL;
@@ -267,9 +267,9 @@ static inline int pcie_tx_skb_ndp(struct mwl_priv *priv,
 			(TXRING_CTRL_TAG_MGMT << TXRING_CTRL_TAG_SHIFT));
 	}
 
-	dma = pci_map_single(pcie_priv->pdev, tx_skb->data,
-			     tx_skb->len, PCI_DMA_TODEVICE);
-	if (pci_dma_mapping_error(pcie_priv->pdev, dma)) {
+	dma = dma_map_single(&(pcie_priv->pdev)->dev, tx_skb->data,
+			     tx_skb->len, DMA_TO_DEVICE);
+	if (dma_mapping_error(&(pcie_priv->pdev)->dev, dma)) {
 		dev_kfree_skb_any(tx_skb);
 		wiphy_err(priv->hw->wiphy,
 			  "failed to map pci memory!\n");
@@ -451,10 +451,10 @@ void pcie_tx_done_ndp(struct ieee80211_hw *hw)
 				  "buffer is NULL for tx done ring\n");
 			break;
 		}
-		pci_unmap_single(pcie_priv->pdev,
+		dma_unmap_single(&(pcie_priv->pdev)->dev,
 				 desc->pphys_tx_buflist[index],
 				 skb->len,
-				 PCI_DMA_TODEVICE);
+				 DMA_TO_DEVICE);
 		desc->pphys_tx_buflist[index] = 0;
 		desc->tx_vbuflist[index] = NULL;
 

@@ -1438,7 +1438,9 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 	const char filename[] = "/tmp/BF_MIMO_Ctrl_Field_Output.txt";
 	char str_buf[256];
 	char *buf = &str_buf[0];
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 	mm_segment_t oldfs;
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 	oldfs = get_fs();
@@ -1446,7 +1448,7 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 	oldfs = force_uaccess_begin();
 #endif
 
@@ -1470,7 +1472,7 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
 	set_fs(oldfs);
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 	force_uaccess_end(oldfs);
 #endif
 }
@@ -1698,7 +1700,7 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return rc;
 	}
 
-	rc = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+	rc = dma_set_mask(&pdev->dev, DMA_BIT_MASK(32));
 	if (rc) {
 		pr_err("%s: 32-bit PCI DMA not supported\n",
 		       PCIE_DRV_NAME);
