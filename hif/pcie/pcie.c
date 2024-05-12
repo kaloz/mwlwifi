@@ -1466,8 +1466,8 @@ static void pcie_bf_mimo_ctrl_decode(struct mwl_priv *priv,
 			       &fp_data->f_pos);
 		filp_close(fp_data, current->files);
 	} else {
-		wiphy_err(priv->hw->wiphy, "Error opening %s! %x\n",
-			  filename, (unsigned int)fp_data);
+		wiphy_err(priv->hw->wiphy, "Error opening %s! %ld\n",
+			  filename, PTR_ERR(fp_data));
 	}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)
