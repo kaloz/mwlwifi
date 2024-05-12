@@ -3622,11 +3622,7 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	core_dump->context = pcmd->cmd_data.coredump.context;
 	core_dump->size_kb = pcmd->cmd_data.coredump.size_kb;
 	core_dump->flags = pcmd->cmd_data.coredump.flags;
-	memcpy(buff,
-	       (const void *)((u32)pcmd +
-	       sizeof(struct hostcmd_cmd_get_fw_core_dump) -
-	       sizeof(struct hostcmd_cmd_get_fw_core_dump_)),
-	       MAX_CORE_DUMP_BUFFER);
+	memcpy(buff, pcmd->buffer, MAX_CORE_DUMP_BUFFER);
 
 	mutex_unlock(&priv->fwcmd_mutex);
 
