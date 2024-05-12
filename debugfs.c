@@ -364,10 +364,10 @@ static ssize_t mwl_debugfs_info_read(struct file *file, char __user *ubuf,
 			 "-----------------------=>  address| address|qlen|fw_desc_cnt\n");
 		spin_lock_irqsave(&pcie_priv->tx_desc_lock, flags);
 		len += scnprintf(p + len, size - len,
-				"wcb_base0   : %x => %8x|%8p|%4d|%d\n", get_hw_spec->wcb_base0, *((unsigned int *)le32_to_cpu(get_hw_spec->wcb_base0)),(void *)*((unsigned int *)le32_to_cpu(get_hw_spec->wcb_base0)),skb_queue_len(&pcie_priv->txq[0]),pcie_priv->fw_desc_cnt[0]);
+				"wcb_base0   : %x => %8zx|%8p|%4d|%d\n", get_hw_spec->wcb_base0, *((uintptr_t *)(uintptr_t)le32_to_cpu(get_hw_spec->wcb_base0)),(void *)*((uintptr_t *)(uintptr_t)le32_to_cpu(get_hw_spec->wcb_base0)),skb_queue_len(&pcie_priv->txq[0]),pcie_priv->fw_desc_cnt[0]);
 		for(i = 0; i < SYSADPT_TOTAL_TX_QUEUES - 1; i++)
 			len += scnprintf(p + len, size - len,
-				"wcb_base[%2d]: %x => %8x|%8p|%4d|%d\n", i, get_hw_spec->wcb_base[i], *((unsigned int *)le32_to_cpu(get_hw_spec->wcb_base[i])),(void *)*((unsigned int *)le32_to_cpu(get_hw_spec->wcb_base[i])),skb_queue_len(&pcie_priv->txq[i + 1]),pcie_priv->fw_desc_cnt[i + 1]);
+				"wcb_base[%2d]: %x => %8zx|%8p|%4d|%d\n", i, get_hw_spec->wcb_base[i], *((uintptr_t *)(uintptr_t)le32_to_cpu(get_hw_spec->wcb_base[i])),(void *)*((uintptr_t *)(uintptr_t)le32_to_cpu(get_hw_spec->wcb_base[i])),skb_queue_len(&pcie_priv->txq[i + 1]),pcie_priv->fw_desc_cnt[i + 1]);
 		spin_unlock_irqrestore(&pcie_priv->tx_desc_lock, flags);
 	}
 
