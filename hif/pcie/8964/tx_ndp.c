@@ -334,13 +334,8 @@ int pcie_tx_init_ndp(struct ieee80211_hw *hw)
 	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(&skb);
 	int rc;
 
-	if (sizeof(struct pcie_tx_ctrl_ndp) >
-	    sizeof(tx_info->driver_data)) {
-		wiphy_err(hw->wiphy, "driver data is not enough: %zu (%zu)\n",
-			  sizeof(struct pcie_tx_ctrl_ndp),
-			  sizeof(tx_info->driver_data));
-		return -ENOMEM;
-	}
+	BUILD_BUG_ON(sizeof(struct pcie_tx_ctrl_ndp) >
+		     sizeof(tx_info->driver_data));
 
 	rc = pcie_tx_ring_alloc_ndp(priv);
 	if (rc) {
