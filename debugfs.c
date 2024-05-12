@@ -1342,7 +1342,7 @@ done:
 				 priv->reg_value);
 	else
 		len += scnprintf(p + len, size - len,
-				 "error: %d(%u 0x%08x 0x%08x)\n",
+				 "error: %zd(%u 0x%08x 0x%08x)\n",
 				 ret, priv->reg_type, priv->reg_offset,
 				 priv->reg_value);
 
