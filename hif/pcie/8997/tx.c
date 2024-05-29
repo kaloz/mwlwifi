@@ -405,7 +405,6 @@ static void pcie_pfu_tx_done(struct mwl_priv *priv)
 			if (ieee80211_is_nullfunc(wh->frame_control) ||
 			    ieee80211_is_qos_nullfunc(wh->frame_control)) {
 				dev_kfree_skb_any(done_skb);
-				done_skb = NULL;
 				goto next;
 			}
 
@@ -418,25 +417,21 @@ static void pcie_pfu_tx_done(struct mwl_priv *priv)
 			}
 
 			if (ieee80211_is_data(wh->frame_control) ||
-			    ieee80211_is_data_qos(wh->frame_control)) {
-					pcie_tx_prepare_info(priv, rate, info);
-			} else {
+			    ieee80211_is_data_qos(wh->frame_control))
+				pcie_tx_prepare_info(priv, rate, info);
+			else
 				pcie_tx_prepare_info(priv, 0, info);
-			}
 
-			if (done_skb) {
-				/* Remove H/W dma header */
-				hdrlen = ieee80211_hdrlen(
-					dma_data->wh.frame_control);
-				if (ieee80211_is_qos_nullfunc(dma_data->wh.frame_control) ||
-				   ieee80211_is_data_qos(dma_data->wh.frame_control)) {
-					memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
-					*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_desc->qos_ctrl;
-				} else
-					memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
-				skb_pull(done_skb, sizeof(*pfu_dma) - hdrlen);
-				ieee80211_tx_status(priv->hw, done_skb);
-			}
+			/* Remove H/W dma header */
+			hdrlen = ieee80211_hdrlen(
+				dma_data->wh.frame_control);
+			if (ieee80211_is_data_qos(dma_data->wh.frame_control)) {
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen - IEEE80211_QOS_CTL_LEN);
+				*((__le16 *)(dma_data->data - IEEE80211_QOS_CTL_LEN)) = tx_desc->qos_ctrl;
+			} else
+				memmove(dma_data->data - hdrlen, &dma_data->wh, hdrlen);
+			skb_pull(done_skb, sizeof(*pfu_dma) - hdrlen);
+			ieee80211_tx_status(priv->hw, done_skb);
 		}
 next:
 		memset(data_buf, 0, sizeof(*data_buf));
