@@ -481,15 +481,17 @@ void pcie_8864_rx_recv(unsigned long data)
 			}
 		}
 
-		if (status->flag & RX_FLAG_DECRYPTED) {
-			monitor_skb = skb_copy(prx_skb, GFP_ATOMIC);
-			if (monitor_skb) {
-				IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
-				((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
+		if(priv->rx_decrypt) {
+			if (status->flag & RX_FLAG_DECRYPTED) {
+				monitor_skb = skb_copy(prx_skb, GFP_ATOMIC);
+				if (monitor_skb) {
+					IEEE80211_SKB_RXCB(monitor_skb)->flag |= RX_FLAG_ONLY_MONITOR;
+					((struct ieee80211_hdr *)monitor_skb->data)->frame_control &= ~__cpu_to_le16(IEEE80211_FCTL_PROTECTED);
 
-				ieee80211_rx(hw, monitor_skb);
+					ieee80211_rx(hw, monitor_skb);
+				}
+				status->flag |= RX_FLAG_SKIP_MONITOR;
 			}
-			status->flag |= RX_FLAG_SKIP_MONITOR;
 		}
 
 		ieee80211_rx(hw, prx_skb);
