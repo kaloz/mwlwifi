@@ -725,9 +725,6 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 			tid = (capab & IEEE80211_ADDBA_PARAM_TID_MASK) >> 2;
 			index = utils_tid_to_ac(tid);
 		}
-
-		if (unlikely(ieee80211_is_assoc_req(wh->frame_control)))
-			utils_add_basic_rates(hw->conf.chandef.chan->band, skb);
 	}
 
 	index = SYSADPT_TX_WMM_QUEUES - index - 1;
