@@ -244,23 +244,14 @@ static inline void pcie_tx_skb(struct mwl_priv *priv, int desc_num,
 	struct pcie_tx_ctrl *tx_ctrl;
 	struct pcie_tx_hndl *tx_hndl = NULL;
 	struct pcie_tx_desc *tx_desc;
-	struct ieee80211_sta *sta;
-	struct ieee80211_vif *vif;
-	struct mwl_vif *mwl_vif;
 	struct pcie_dma_data *dma_data;
 	struct ieee80211_hdr *wh;
 	dma_addr_t dma;
 	int tailpad = 0;
 	struct ieee80211_key_conf *k_conf;
 
-	if (WARN_ON(!tx_skb))
-		return;
-
 	tx_info = IEEE80211_SKB_CB(tx_skb);
 	tx_ctrl = (struct pcie_tx_ctrl *)tx_info->driver_data;
-	sta = (struct ieee80211_sta *)tx_ctrl->sta;
-	vif = (struct ieee80211_vif *)tx_info->control.vif;
-	mwl_vif = mwl_dev_get_vif(vif);
 	k_conf = (struct ieee80211_key_conf *)tx_info->control.hw_key;
 
 	if (k_conf) {
