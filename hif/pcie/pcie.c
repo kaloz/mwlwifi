@@ -212,7 +212,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 		     (void *)pcie_8997_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
 	tasklet_init(&pcie_priv->tx_done_task,
-		     (void *)pcie_8997_tx_done, (unsigned long)hw);
+		     (void *)pcie_8997_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	init_dummy_netdev(&pcie_priv->napi_dev);
@@ -220,9 +220,7 @@ static int pcie_init_8997(struct ieee80211_hw *hw)
 		       pcie_8997_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
-	pcie_priv->is_tx_done_schedule = false;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
-	pcie_priv->is_rx_schedule = false;
 
 	rc = pcie_8997_tx_init(hw);
 	if (rc) {
@@ -309,16 +307,14 @@ static int pcie_init_8864(struct ieee80211_hw *hw)
 	spin_lock_init(&pcie_priv->int_mask_lock);
 	tasklet_init(&pcie_priv->tx_task, (void *)pcie_8864_tx_skbs, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_task);
-	tasklet_init(&pcie_priv->tx_done_task, (void *)pcie_8864_tx_done, (unsigned long)hw);
+	tasklet_init(&pcie_priv->tx_done_task, (void *)pcie_8864_tx_done_task, (unsigned long)hw);
 	tasklet_disable(&pcie_priv->tx_done_task);
 	spin_lock_init(&pcie_priv->tx_desc_lock);
 	init_dummy_netdev(&pcie_priv->napi_dev);
 	netif_napi_add(&pcie_priv->napi_dev, &pcie_priv->napi, pcie_8864_poll_napi);
 	pcie_priv->txq_limit = PCIE_TX_QUEUE_LIMIT;
 	pcie_priv->txq_wake_threshold = PCIE_TX_WAKE_Q_THRESHOLD;
-	pcie_priv->is_tx_done_schedule = false;
 	pcie_priv->recv_limit = PCIE_RECEIVE_LIMIT;
-	pcie_priv->is_rx_schedule = false;
 
 	rc = pcie_8864_tx_init(hw);
 	if (rc) {
@@ -526,27 +522,25 @@ static irqreturn_t pcie_isr_8864(struct ieee80211_hw *hw)
 		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
-			if (!pcie_priv->is_tx_done_schedule) {
-				pcie_mask_int(pcie_priv,
-					      MACREG_A2HRIC_BIT_TX_DONE, false);
-				tasklet_schedule(&pcie_priv->tx_done_task);
-				pcie_priv->is_tx_done_schedule = true;
-			}
+			priv->hif.ops->irq_disable(hw);
+			tasklet_schedule(&pcie_priv->tx_done_task);
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
-			pcie_mask_int(pcie_priv,
-				      MACREG_A2HRIC_BIT_RX_RDY, false);
 			priv->hif.ops->irq_disable(hw);
 			napi_schedule(&pcie_priv->napi);
 		}
+
 		if (int_status & MACREG_A2HRIC_BIT_RADAR_DETECT) {
 			wiphy_info(hw->wiphy, "radar detected by firmware\n");
 			ieee80211_radar_detected(hw);
 		}
 
-		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH) ieee80211_queue_work(hw, &priv->chnl_switch_handle);
-		if (int_status & MACREG_A2HRIC_BIT_TX_WATCHDOG) ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
+		if (int_status & MACREG_A2HRIC_BIT_CHAN_SWITCH)
+			ieee80211_queue_work(hw, &priv->chnl_switch_handle);
+
+		if (int_status & MACREG_A2HRIC_BIT_TX_WATCHDOG)
+			ieee80211_queue_work(hw, &priv->watchdog_ba_handle);
 	}
 
 	return IRQ_HANDLED;
@@ -570,17 +564,11 @@ static irqreturn_t pcie_isr_8997(struct ieee80211_hw *hw)
 		       pcie_priv->iobase1 + MACREG_REG_A2H_INTERRUPT_CAUSE);
 
 		if (int_status & MACREG_A2HRIC_BIT_TX_DONE) {
-			if (!pcie_priv->is_tx_done_schedule) {
-				pcie_mask_int(pcie_priv,
-					      MACREG_A2HRIC_BIT_TX_DONE, false);
-				tasklet_schedule(&pcie_priv->tx_done_task);
-				pcie_priv->is_tx_done_schedule = true;
-			}
+			priv->hif.ops->irq_disable(hw);
+			tasklet_schedule(&pcie_priv->tx_done_task);
 		}
 
 		if (int_status & MACREG_A2HRIC_BIT_RX_RDY) {
-			pcie_mask_int(pcie_priv,
-				      MACREG_A2HRIC_BIT_RX_RDY, false);
 			priv->hif.ops->irq_disable(hw);
 			napi_schedule(&pcie_priv->napi);
 		}

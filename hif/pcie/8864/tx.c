@@ -424,6 +424,9 @@ static void pcie_non_pfu_tx_done(struct mwl_priv *priv)
 
 	spin_lock_bh(&pcie_priv->tx_desc_lock);
 	while (num--) {
+		if (!pcie_priv->fw_desc_cnt[num])
+			continue;
+
 		desc = &pcie_priv->desc_data[num];
 		tx_hndl = desc->pstale_tx_hndl;
 		tx_desc = tx_hndl->pdesc;
@@ -495,11 +498,7 @@ next:
 	}
 	spin_unlock_bh(&pcie_priv->tx_desc_lock);
 
-	if (pcie_priv->is_tx_done_schedule) {
-		pcie_mask_int(pcie_priv, MACREG_A2HRIC_BIT_TX_DONE, true);
-		tasklet_schedule(&pcie_priv->tx_task);
-		pcie_priv->is_tx_done_schedule = false;
-	}
+	tasklet_schedule(&pcie_priv->tx_task);
 }
 
 int pcie_8864_tx_init(struct ieee80211_hw *hw)
@@ -608,6 +607,15 @@ void pcie_8864_tx_skbs(unsigned long data)
 		}
 	}
 	spin_unlock_bh(&pcie_priv->tx_desc_lock);
+}
+
+void pcie_8864_tx_done_task(unsigned long data)
+{
+	struct ieee80211_hw *hw = (struct ieee80211_hw *)data;
+	struct mwl_priv *priv = hw->priv;
+
+	pcie_non_pfu_tx_done(priv);
+	priv->hif.ops->irq_enable(hw);
 }
 
 void pcie_8864_tx_done(unsigned long data)

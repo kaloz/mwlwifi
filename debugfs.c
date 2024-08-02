@@ -425,7 +425,6 @@ err_get_hw_specs:
 	len += scnprintf(p + len, size - len,
 			 "use_short_preamble: %s\n", priv->use_short_preamble ? "enable" : "disable");
 	len += mwl_hif_get_info(priv->hw, p + len, size - len);
-
 	ret = simple_read_from_buffer(ubuf, count, ppos, p, len);
 	free_page(page);
 
