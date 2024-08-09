@@ -583,6 +583,9 @@ struct pcie_priv {
 	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
 	struct tasklet_struct tx_task;
 	struct tasklet_struct tx_done_task;
+	/* NAPI */
+	struct net_device napi_dev;
+	struct napi_struct napi;
 	struct tasklet_struct rx_task;
 	unsigned int tx_head_room;
 	int txq_limit;
