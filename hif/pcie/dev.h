@@ -27,7 +27,7 @@
 #include <net/mac80211.h>
 
 #define PCIE_DRV_NAME    KBUILD_MODNAME
-#define PCIE_DRV_VERSION "10.4.10.0"
+#define PCIE_DRV_VERSION "10.4.11.0"
 
 #define PCIE_MIN_BYTES_HEADROOM   64
 #define PCIE_MIN_TX_HEADROOM_KF2  96
@@ -99,7 +99,6 @@ enum {
 			     MACREG_A2HRIC_BIT_RADAR_DETECT | \
 			     MACREG_A2HRIC_BIT_CHAN_SWITCH | \
 			     MACREG_A2HRIC_BIT_TX_WATCHDOG | \
-			     MACREG_A2HRIC_BIT_QUE_EMPTY | \
 			     MACREG_A2HRIC_BA_WATCHDOG | \
 			     MACREG_A2HRIC_CONSEC_TXFAIL)
 
@@ -583,6 +582,9 @@ struct pcie_priv {
 	spinlock_t int_mask_lock ____cacheline_aligned_in_smp;
 	struct tasklet_struct tx_task;
 	struct tasklet_struct tx_done_task;
+	/* NAPI */
+	struct net_device napi_dev;
+	struct napi_struct napi;
 	struct tasklet_struct rx_task;
 	unsigned int tx_head_room;
 	int txq_limit;

@@ -355,7 +355,7 @@ struct mwl_priv {
 	u32 ra_tx_attempt[2][6];
 
 	bool debug_ampdu;
-	bool decrypt_rx;
+	bool rx_decrypt;
 	bool rate_adapt_mode;
 	bool dwds_stamode;
 	bool optimization_level;
