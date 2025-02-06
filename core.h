@@ -38,7 +38,7 @@
 
 /* band related constants */
 #define BAND_24_CHANNEL_NUM           14
-#define BAND_24_RATE_NUM              13
+#define BAND_24_RATE_NUM              12
 #define BAND_50_CHANNEL_NUM           24
 #define BAND_50_RATE_NUM              8
 
