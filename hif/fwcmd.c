@@ -98,11 +98,15 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 		{ HOSTCMD_CMD_CORE_DUMP_DIAG_MODE, "CoreDumpDiagMode" },
+		{ HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997, "80211SlotTime" },
 		{ HOSTCMD_CMD_802_11_SLOT_TIME, "80211SlotTime" },
 		{ HOSTCMD_CMD_GET_FW_CORE_DUMP, "GetFwCoreDump" },
 		{ HOSTCMD_CMD_EDMAC_CTRL, "EDMACCtrl" },
 		{ HOSTCMD_CMD_TXPWRLMT_CFG, "TxpwrlmtCfg" },
 		{ HOSTCMD_CMD_MCAST_CTS, "McastCts" },
+		{ HOSTCMD_CMD_SET_WDS_MODE, "SetWDSMode" },
+		{ HOSTCMD_CMD_SET_NO_ACK, "SetNoAck" },
+		{ HOSTCMD_CMD_SET_NO_STEER, "SetNoSteer" },
 	};
 
 	max_entries = ARRAY_SIZE(cmds);
@@ -3659,6 +3663,34 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int mwl_fwcmd_set_slot_time_mwl8997(struct ieee80211_hw *hw, bool short_slot)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_802_11_slot_time_mwl8997 *pcmd;
+
+	wiphy_dbg(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
+		    __func__, short_slot);
+
+	pcmd = (struct hostcmd_cmd_802_11_slot_time_mwl8997 *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->short_slot = cpu_to_le16(short_slot ? 1 : 0);
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -3894,6 +3926,78 @@ int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable)
 	pcmd->enable = enable;
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_MCAST_CTS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_wds_mode(struct ieee80211_hw *hw, u32 wds_mode)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_WDS_MODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = wds_mode;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_WDS_MODE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_no_ack(struct ieee80211_hw *hw, u32 noack)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NO_ACK);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = noack;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_NO_ACK)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_no_steer(struct ieee80211_hw *hw, u32 nosteer)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NO_STEER);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = nosteer;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_NO_STEER)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		return -EIO;
 	}

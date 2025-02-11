@@ -372,10 +372,14 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 
-	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997)) {
+	if (changed & BSS_CHANGED_ERP_SLOT) {
 		if (priv->use_short_slot != vif->bss_conf.use_short_slot) {
-			mwl_fwcmd_set_slot_time(hw,
-						vif->bss_conf.use_short_slot);
+			if (priv->chip_type == MWL8997)
+				mwl_fwcmd_set_slot_time_mwl8997(hw,
+							vif->bss_conf.use_short_slot);
+			else
+				mwl_fwcmd_set_slot_time(hw,
+							vif->bss_conf.use_short_slot);
 			priv->use_short_slot = vif->bss_conf.use_short_slot;
 		}
 	}
@@ -405,10 +409,14 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997)) {
+	if (changed & BSS_CHANGED_ERP_SLOT) {
 		if (priv->use_short_slot != vif->bss_conf.use_short_slot) {
-			mwl_fwcmd_set_slot_time(hw,
-						vif->bss_conf.use_short_slot);
+			if (priv->chip_type == MWL8997)
+				mwl_fwcmd_set_slot_time_mwl8997(hw,
+							vif->bss_conf.use_short_slot);
+			else
+				mwl_fwcmd_set_slot_time(hw,
+							vif->bss_conf.use_short_slot);
 			priv->use_short_slot = vif->bss_conf.use_short_slot;
 		}
 	}
