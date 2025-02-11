@@ -51,6 +51,7 @@ enum {
 #define MCU_CCA_CNT               MAC_REG_ADDR(0x06A0)
 #define MCU_TXPE_CNT              MAC_REG_ADDR(0x06A4)
 #define MCU_LAST_READ             MAC_REG_ADDR(0x06A8)
+#define BBU_RXRDY_CNT_REG	  MAC_REG_ADDR(0x0860)
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
