@@ -810,7 +810,12 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 			data_pad = 12;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP:
+		case WLAN_CIPHER_SUITE_GCMP:
 			data_pad = 8;
+			break;
+		case WLAN_CIPHER_SUITE_CCMP_256:
+		case WLAN_CIPHER_SUITE_GCMP_256:
+			data_pad = 16;
 			break;
 		}
 	}

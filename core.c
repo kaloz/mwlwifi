@@ -111,6 +111,20 @@ static const u32 cipher_suites[] = {
 	WLAN_CIPHER_SUITE_AES_CMAC,
 };
 
+static const u32 cipher_suites_8964[] = {
+		WLAN_CIPHER_SUITE_WEP40,
+		WLAN_CIPHER_SUITE_WEP104,
+		WLAN_CIPHER_SUITE_TKIP,
+		WLAN_CIPHER_SUITE_CCMP,
+		WLAN_CIPHER_SUITE_CCMP_256,
+		WLAN_CIPHER_SUITE_GCMP,
+		WLAN_CIPHER_SUITE_GCMP_256,
+		WLAN_CIPHER_SUITE_AES_CMAC,
+		WLAN_CIPHER_SUITE_BIP_CMAC_256,
+		WLAN_CIPHER_SUITE_BIP_GMAC_128,
+		WLAN_CIPHER_SUITE_BIP_GMAC_256,
+};
+
 static const struct ieee80211_iface_limit ap_if_limits[] = {
 	{ .max = SYSADPT_NUM_OF_AP, .types = BIT(NL80211_IFTYPE_AP) },
 #if defined(CPTCFG_MAC80211_MESH) || defined(CONFIG_MAC80211_MESH)
@@ -791,10 +805,13 @@ static int mwl_wl_init(struct mwl_priv *priv)
 	hw->wiphy->flags |= WIPHY_FLAG_HAS_CHANNEL_SWITCH;
 	hw->wiphy->flags |= WIPHY_FLAG_SUPPORTS_TDLS;
 	hw->wiphy->flags |= WIPHY_FLAG_AP_UAPSD;
-
-	hw->wiphy->cipher_suites = cipher_suites;
-	hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
-
+	if (priv->chip_type == MWL8964) {
+		hw->wiphy->cipher_suites = cipher_suites_8964;
+		hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites_8964);
+	} else {
+		hw->wiphy->cipher_suites = cipher_suites;
+		hw->wiphy->n_cipher_suites = ARRAY_SIZE(cipher_suites);
+	}
 	hw->vif_data_size = sizeof(struct mwl_vif);
 	hw->sta_data_size = sizeof(struct mwl_sta);
 

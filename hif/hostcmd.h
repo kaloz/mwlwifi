@@ -135,7 +135,11 @@
 
 #define KEY_TYPE_ID_WEP                         0x00
 #define KEY_TYPE_ID_TKIP                        0x01
-#define KEY_TYPE_ID_AES	                        0x02
+#define KEY_TYPE_ID_CCMP			0x02
+#define KEY_TYPE_ID_UNKNOWN			0x03
+#define KEY_TYPE_ID_CCMP_256			0x04
+#define KEY_TYPE_ID_GCMP			0x05
+#define KEY_TYPE_ID_GCMP_256			0x06
 
 /* Group key for RX only */
 #define ENCR_KEY_FLAG_RXGROUPKEY                0x00000002
@@ -846,10 +850,16 @@ struct aes_type_key {
 	u8 key_material[MAX_ENCR_KEY_LENGTH];
 } __packed;
 
+struct aes256_type_key {
+	/* AES Key material */
+	u8 key_material[MAX_ENCR_KEY_LENGTH * 2];
+} __packed;
+
 union mwl_key_type {
 	struct wep_type_key  wep_key;
 	struct tkip_type_key tkip_key;
 	struct aes_type_key  aes_key;
+	struct aes256_type_key  aes256_key;
 } __packed;
 
 struct key_param_set {

@@ -852,7 +852,28 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 				      ENCR_KEY_FLAG_TSC_VALID);
 		break;
 	case WLAN_CIPHER_SUITE_CCMP:
-		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_AES);
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_CCMP);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_CCMP_256:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_CCMP_256);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_GCMP:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_GCMP);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_GCMP_256);
 		cmd->key_param.key_info =
 			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
 			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
@@ -2618,6 +2639,9 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		keymlen = MAX_ENCR_KEY_LENGTH + 2 * MIC_KEY_LENGTH;
 		break;
 	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_CCMP_256:
+	case WLAN_CIPHER_SUITE_GCMP:
+	case WLAN_CIPHER_SUITE_GCMP_256:
 		keymlen = key->keylen;
 		break;
 	default:
