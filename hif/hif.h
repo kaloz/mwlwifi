@@ -30,9 +30,10 @@
 struct mwl_survey_info {
 	struct ieee80211_channel channel;
 	u32 filled;
-	u32 time_period;
-	u32 time_busy;
-	u32 time_tx;
+	u64 time_period;
+	u64 time_busy;
+	u64 time_tx;
+	u64 time_rx;
 	s8 noise;
 };
 

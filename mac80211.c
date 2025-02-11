@@ -772,9 +772,14 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 
 	survey->channel = &survey_info->channel;
 	survey->filled |= survey_info->filled;
-	survey->time = survey_info->time_period / 1000;
-	survey->time_busy = survey_info->time_busy / 1000;
-	survey->time_tx = survey_info->time_tx / 1000;
+	survey->time = survey_info->time_period;
+	survey->time_busy = survey_info->time_busy;
+	survey->time_tx = survey_info->time_tx;
+	survey->time_rx = survey_info->time_rx;
+	do_div(survey->time, 1000);
+	do_div(survey->time_busy, 1000);
+	do_div(survey->time_tx, 1000);
+	do_div(survey->time_rx, 1000);
 	survey->noise = survey_info->noise;
 
 	return 0;
