@@ -804,18 +804,20 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 		switch (k_conf->cipher) {
 		case WLAN_CIPHER_SUITE_WEP40:
 		case WLAN_CIPHER_SUITE_WEP104:
-			data_pad = 4;
+			data_pad = IEEE80211_WEP_IV_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_TKIP:
-			data_pad = 12;
+			data_pad = IEEE80211_TKIP_IV_LEN + IEEE80211_TKIP_ICV_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP:
-		case WLAN_CIPHER_SUITE_GCMP:
-			data_pad = 8;
+			data_pad = IEEE80211_CCMP_MIC_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP_256:
+			data_pad = IEEE80211_CCMP_MIC_LEN;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP:
 		case WLAN_CIPHER_SUITE_GCMP_256:
-			data_pad = 16;
+			data_pad = IEEE80211_GCMP_MIC_LEN;
 			break;
 		}
 	}
