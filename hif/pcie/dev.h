@@ -813,7 +813,7 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 			data_pad = IEEE80211_CCMP_MIC_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP_256:
-			data_pad = IEEE80211_CCMP_MIC_LEN;
+			data_pad = IEEE80211_CCMP_256_MIC_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_GCMP:
 		case WLAN_CIPHER_SUITE_GCMP_256:
