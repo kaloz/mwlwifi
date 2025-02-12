@@ -98,11 +98,15 @@ char *mwl_fwcmd_get_cmd_string(unsigned short cmd)
 		{ HOSTCMD_CMD_GET_DEVICE_PWR_TBL_SC4, "GetDevicePwrTblSC4" },
 		{ HOSTCMD_CMD_QUIET_MODE, "QuietMode" },
 		{ HOSTCMD_CMD_CORE_DUMP_DIAG_MODE, "CoreDumpDiagMode" },
+		{ HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997, "80211SlotTime" },
 		{ HOSTCMD_CMD_802_11_SLOT_TIME, "80211SlotTime" },
 		{ HOSTCMD_CMD_GET_FW_CORE_DUMP, "GetFwCoreDump" },
 		{ HOSTCMD_CMD_EDMAC_CTRL, "EDMACCtrl" },
 		{ HOSTCMD_CMD_TXPWRLMT_CFG, "TxpwrlmtCfg" },
 		{ HOSTCMD_CMD_MCAST_CTS, "McastCts" },
+		{ HOSTCMD_CMD_SET_WDS_MODE, "SetWDSMode" },
+		{ HOSTCMD_CMD_SET_NO_ACK, "SetNoAck" },
+		{ HOSTCMD_CMD_SET_NO_STEER, "SetNoSteer" },
 	};
 
 	max_entries = ARRAY_SIZE(cmds);
@@ -546,7 +550,34 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 					beacon_info->ie_wsc_len = (elen + 2);
 					beacon_info->ie_wsc_ptr = (pos - 2);
 				}
-			}
+			} else {
+				beacon_info->ie_vendor_len = (elen + 2);
+				beacon_info->ie_vendor_ptr = (pos - 2);
+ 			}
+			break;
+		case WLAN_EID_NEIGHBOR_REPORT:
+			beacon_info->ie_neighbor_report_len = (elen + 2);
+			beacon_info->ie_neighbor_report_ptr = (pos - 2);
+			break;
+		case WLAN_EID_FAST_BSS_TRANSITION:
+			beacon_info->ie_fast_bss_transition_len = (elen + 2);
+			beacon_info->ie_fast_bss_transition_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MEASURE_REQUEST:
+			beacon_info->ie_measure_request_len = (elen + 2);
+			beacon_info->ie_measure_request_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MEASURE_REPORT:
+			beacon_info->ie_measure_report_len = (elen + 2);
+			beacon_info->ie_measure_report_ptr = (pos - 2);
+			break;
+		case WLAN_EID_ERP_INFO:
+			beacon_info->ie_erp_info_len = (elen + 2);
+			beacon_info->ie_erp_info_ptr = (pos - 2);
+			break;
+		case WLAN_EID_MMIE:
+			beacon_info->ie_mmie_len = (elen + 2);
+			beacon_info->ie_mmie_ptr = (pos - 2);
 			break;
 		default:
 			break;
@@ -613,6 +644,35 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
 	       beacon->ie_mde_ptr, beacon->ie_mde_len);
 	ie_list_len_proprietary += mwl_vif->beacon_info.ie_mde_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_vendor_ptr, beacon->ie_vendor_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_vendor_len;
+
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_neighbor_report_ptr, beacon->ie_neighbor_report_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_neighbor_report_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_fast_bss_transition_ptr, beacon->ie_fast_bss_transition_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_fast_bss_transition_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_measure_request_ptr, beacon->ie_measure_request_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_measure_request_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_measure_report_ptr, beacon->ie_measure_report_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_measure_report_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_erp_info_ptr, beacon->ie_erp_info_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_erp_info_len;
+
+	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+	       beacon->ie_mmie_ptr, beacon->ie_mmie_len);
+	ie_list_len_proprietary += mwl_vif->beacon_info.ie_mmie_len;
 
 	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
 
@@ -852,7 +912,28 @@ static int mwl_fwcmd_encryption_set_cmd_info(struct hostcmd_cmd_set_key *cmd,
 				      ENCR_KEY_FLAG_TSC_VALID);
 		break;
 	case WLAN_CIPHER_SUITE_CCMP:
-		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_AES);
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_CCMP);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_CCMP_256:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_CCMP_256);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_GCMP:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_GCMP);
+		cmd->key_param.key_info =
+			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
+			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
+			cpu_to_le32(ENCR_KEY_FLAG_TXGROUPKEY);
+		break;
+	case WLAN_CIPHER_SUITE_GCMP_256:
+		cmd->key_param.key_type_id = cpu_to_le16(KEY_TYPE_ID_GCMP_256);
 		cmd->key_param.key_info =
 			(key->flags & IEEE80211_KEY_FLAG_PAIRWISE) ?
 			cpu_to_le32(ENCR_KEY_FLAG_PAIRWISE) :
@@ -2618,6 +2699,9 @@ int mwl_fwcmd_encryption_set_key(struct ieee80211_hw *hw,
 		keymlen = MAX_ENCR_KEY_LENGTH + 2 * MIC_KEY_LENGTH;
 		break;
 	case WLAN_CIPHER_SUITE_CCMP:
+	case WLAN_CIPHER_SUITE_CCMP_256:
+	case WLAN_CIPHER_SUITE_GCMP:
+	case WLAN_CIPHER_SUITE_GCMP_256:
 		keymlen = key->keylen;
 		break;
 	default:
@@ -3635,6 +3719,34 @@ int mwl_fwcmd_get_fw_core_dump(struct ieee80211_hw *hw,
 	return 0;
 }
 
+int mwl_fwcmd_set_slot_time_mwl8997(struct ieee80211_hw *hw, bool short_slot)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_802_11_slot_time_mwl8997 *pcmd;
+
+	wiphy_dbg(priv->hw->wiphy, "%s(): short_slot_time=%d\n",
+		    __func__, short_slot);
+
+	pcmd = (struct hostcmd_cmd_802_11_slot_time_mwl8997 *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->action = cpu_to_le16(WL_SET);
+	pcmd->short_slot = cpu_to_le16(short_slot ? 1 : 0);
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_802_11_SLOT_TIME_MWL8997)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
 int mwl_fwcmd_set_slot_time(struct ieee80211_hw *hw, bool short_slot)
 {
 	struct mwl_priv *priv = hw->priv;
@@ -3870,6 +3982,78 @@ int mwl_fwcmd_mcast_cts(struct ieee80211_hw *hw, u8 enable)
 	pcmd->enable = enable;
 
 	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_MCAST_CTS)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_wds_mode(struct ieee80211_hw *hw, u32 wds_mode)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_WDS_MODE);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = wds_mode;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_WDS_MODE)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_no_ack(struct ieee80211_hw *hw, u32 noack)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NO_ACK);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = noack;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_NO_ACK)) {
+		mutex_unlock(&priv->fwcmd_mutex);
+		return -EIO;
+	}
+
+	mutex_unlock(&priv->fwcmd_mutex);
+
+	return 0;
+}
+
+int mwl_fwcmd_set_no_steer(struct ieee80211_hw *hw, u32 nosteer)
+{
+	struct mwl_priv *priv = hw->priv;
+	struct hostcmd_cmd_basic_cmd *pcmd;
+
+	pcmd = (struct hostcmd_cmd_basic_cmd *)&priv->pcmd_buf[0];
+
+	mutex_lock(&priv->fwcmd_mutex);
+
+	memset(pcmd, 0x00, sizeof(*pcmd));
+	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_NO_STEER);
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->value = nosteer;
+
+	if (mwl_hif_exec_cmd(hw, HOSTCMD_CMD_SET_NO_STEER)) {
 		mutex_unlock(&priv->fwcmd_mutex);
 		return -EIO;
 	}

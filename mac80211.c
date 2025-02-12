@@ -372,10 +372,14 @@ static void mwl_mac80211_bss_info_changed_sta(struct ieee80211_hw *hw,
 {
 	struct mwl_priv *priv = hw->priv;
 
-	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997)) {
+	if (changed & BSS_CHANGED_ERP_SLOT) {
 		if (priv->use_short_slot != vif->bss_conf.use_short_slot) {
-			mwl_fwcmd_set_slot_time(hw,
-						vif->bss_conf.use_short_slot);
+			if (priv->chip_type == MWL8997)
+				mwl_fwcmd_set_slot_time_mwl8997(hw,
+							vif->bss_conf.use_short_slot);
+			else
+				mwl_fwcmd_set_slot_time(hw,
+							vif->bss_conf.use_short_slot);
 			priv->use_short_slot = vif->bss_conf.use_short_slot;
 		}
 	}
@@ -405,10 +409,14 @@ static void mwl_mac80211_bss_info_changed_ap(struct ieee80211_hw *hw,
 
 	mwl_vif = mwl_dev_get_vif(vif);
 
-	if ((changed & BSS_CHANGED_ERP_SLOT) && (priv->chip_type == MWL8997)) {
+	if (changed & BSS_CHANGED_ERP_SLOT) {
 		if (priv->use_short_slot != vif->bss_conf.use_short_slot) {
-			mwl_fwcmd_set_slot_time(hw,
-						vif->bss_conf.use_short_slot);
+			if (priv->chip_type == MWL8997)
+				mwl_fwcmd_set_slot_time_mwl8997(hw,
+							vif->bss_conf.use_short_slot);
+			else
+				mwl_fwcmd_set_slot_time(hw,
+							vif->bss_conf.use_short_slot);
 			priv->use_short_slot = vif->bss_conf.use_short_slot;
 		}
 	}
@@ -523,19 +531,34 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	addr = sta ? sta->addr : vif->addr;
 
 	if (cmd_param == SET_KEY) {
-		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
-		    (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
+		switch (key->cipher) {
+		case WLAN_CIPHER_SUITE_WEP40:
+		case WLAN_CIPHER_SUITE_WEP104:
 			encr_type = ENCR_TYPE_WEP;
-		} else if (key->cipher == WLAN_CIPHER_SUITE_CCMP) {
-			encr_type = ENCR_TYPE_AES;
+			break;
+		case WLAN_CIPHER_SUITE_CCMP:
+			encr_type = ENCR_TYPE_CCMP;
 			if (priv->chip_type != MWL8964)
 				key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
-		} else if (key->cipher == WLAN_CIPHER_SUITE_TKIP) {
-			if (priv->chip_type != MWL8964)
-				key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC | IEEE80211_KEY_FLAG_GENERATE_IV;
+			break;
+		case WLAN_CIPHER_SUITE_CCMP_256:
+			encr_type = ENCR_TYPE_CCMP_256;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP:
+			encr_type = ENCR_TYPE_GCMP;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP_256:
+			encr_type = ENCR_TYPE_GCMP_256;
+			break;
+		case WLAN_CIPHER_SUITE_TKIP:
 			encr_type = ENCR_TYPE_TKIP;
-		} else {
+			if (priv->chip_type != MWL8964)
+				key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC |
+					      IEEE80211_KEY_FLAG_GENERATE_IV;
+			break;
+		default:
 			encr_type = ENCR_TYPE_DISABLE;
+			break;
 		}
 
 		rc = mwl_fwcmd_update_encryption_enable(hw, vif, addr,
@@ -749,9 +772,14 @@ static int mwl_mac80211_get_survey(struct ieee80211_hw *hw,
 
 	survey->channel = &survey_info->channel;
 	survey->filled |= survey_info->filled;
-	survey->time = survey_info->time_period / 1000;
-	survey->time_busy = survey_info->time_busy / 1000;
-	survey->time_tx = survey_info->time_tx / 1000;
+	survey->time = survey_info->time_period;
+	survey->time_busy = survey_info->time_busy;
+	survey->time_tx = survey_info->time_tx;
+	survey->time_rx = survey_info->time_rx;
+	do_div(survey->time, 1000);
+	do_div(survey->time_busy, 1000);
+	do_div(survey->time_tx, 1000);
+	do_div(survey->time_rx, 1000);
 	survey->noise = survey_info->noise;
 
 	return 0;

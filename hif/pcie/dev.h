@@ -51,6 +51,7 @@ enum {
 #define MCU_CCA_CNT               MAC_REG_ADDR(0x06A0)
 #define MCU_TXPE_CNT              MAC_REG_ADDR(0x06A4)
 #define MCU_LAST_READ             MAC_REG_ADDR(0x06A8)
+#define BBU_RXRDY_CNT_REG	  MAC_REG_ADDR(0x0860)
 
 /* Map to 0x80000000 (Bus control) on BAR0 */
 #define MACREG_REG_H2A_INTERRUPT_EVENTS      0x00000C18 /* (From host to ARM) */
@@ -804,13 +805,20 @@ static inline void pcie_tx_encapsulate_frame(struct mwl_priv *priv,
 		switch (k_conf->cipher) {
 		case WLAN_CIPHER_SUITE_WEP40:
 		case WLAN_CIPHER_SUITE_WEP104:
-			data_pad = 4;
+			data_pad = IEEE80211_WEP_IV_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_TKIP:
-			data_pad = 12;
+			data_pad = IEEE80211_TKIP_IV_LEN + IEEE80211_TKIP_ICV_LEN;
 			break;
 		case WLAN_CIPHER_SUITE_CCMP:
-			data_pad = 8;
+			data_pad = IEEE80211_CCMP_MIC_LEN;
+			break;
+		case WLAN_CIPHER_SUITE_CCMP_256:
+			data_pad = IEEE80211_CCMP_256_MIC_LEN;
+			break;
+		case WLAN_CIPHER_SUITE_GCMP:
+		case WLAN_CIPHER_SUITE_GCMP_256:
+			data_pad = IEEE80211_GCMP_MIC_LEN;
 			break;
 		}
 	}

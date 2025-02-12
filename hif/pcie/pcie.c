@@ -682,10 +682,12 @@ static void pcie_get_survey(struct ieee80211_hw *hw,
 	survey_info->filled = SURVEY_INFO_TIME |
 			      SURVEY_INFO_TIME_BUSY |
 			      SURVEY_INFO_TIME_TX |
+			      SURVEY_INFO_TIME_RX |
 			      SURVEY_INFO_NOISE_DBM;
 	survey_info->time_period += pcie_read_mac_reg(pcie_priv, MCU_LAST_READ);
 	survey_info->time_busy += pcie_read_mac_reg(pcie_priv, MCU_CCA_CNT);
 	survey_info->time_tx += pcie_read_mac_reg(pcie_priv, MCU_TXPE_CNT);
+	survey_info->time_rx += pcie_read_mac_reg(pcie_priv, BBU_RXRDY_CNT_REG);
 	survey_info->noise = priv->noise;
 }
 
