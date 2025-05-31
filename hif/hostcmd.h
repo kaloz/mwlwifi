@@ -1121,9 +1121,8 @@ struct hostcmd_cmd_get_fw_region_code_sc4 {
 #define HAL_TRPC_ID_MAX_SC4        32
 #define MAX_GROUP_PER_CHANNEL_5G   39
 #define MAX_GROUP_PER_CHANNEL_2G   21
-#define	MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MAX_GROUP_PER_CHANNEL_RATE \
-	MAX(MAX_GROUP_PER_CHANNEL_5G, MAX_GROUP_PER_CHANNEL_2G)
+	((MAX_GROUP_PER_CHANNEL_5G > MAX_GROUP_PER_CHANNEL_2G) ? MAX_GROUP_PER_CHANNEL_5G : MAX_GROUP_PER_CHANNEL_2G)
 
 struct channel_power_tbl_sc4 {
 	u8 channel;
