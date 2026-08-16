@@ -1505,7 +1505,7 @@ int mwl_fwcmd_set_cfg_data(struct ieee80211_hw *hw, u16 type)
 	pcmd->data_len = parsed_len;
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_SET_CFG);
 	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
-		le16_to_cpu(pcmd->data_len) - sizeof(pcmd->data));
+		le16_to_cpu(pcmd->data_len));
 	pcmd->action = cpu_to_le16(HOSTCMD_ACT_GEN_SET);
 	pcmd->type = cpu_to_le16(type);
 
@@ -2529,7 +2529,7 @@ int mwl_fwcmd_update_encryption_enable(struct ieee80211_hw *hw,
 
 	memset(pcmd, 0x00, sizeof(*pcmd));
 	pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_UPDATE_ENCRYPTION);
-	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd));
+	pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) + 1);
 	pcmd->cmd_hdr.macid = mwl_vif->macid;
 
 	pcmd->action_type = cpu_to_le32(ENCR_ACTION_ENABLE_HW_ENCR);
@@ -3785,8 +3785,7 @@ int mwl_fwcmd_set_txpwrlmt_cfg_data(struct ieee80211_hw *hw)
 		size -= parsed_len;
 
 		pcmd->cmd_hdr.cmd = cpu_to_le16(HOSTCMD_CMD_TXPWRLMT_CFG);
-		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) +
-			data_len - sizeof(pcmd->data));
+		pcmd->cmd_hdr.len = cpu_to_le16(sizeof(*pcmd) + data_len);
 
 		if (size < sizeof(struct mwl_txpwrlmt_cfg_entry_hdr))
 			pcmd->cfgComplete = 1;

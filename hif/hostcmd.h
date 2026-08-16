@@ -414,7 +414,7 @@ struct hostcmd_cmd_set_cfg {
 	/* Data length */
 	__le16 data_len;
 	/* Data */
-	u8 data[1];
+	u8 data[];
 } __packed;
 
 /* HOSTCMD_CMD_SET_RF_CHANNEL */
@@ -815,7 +815,7 @@ struct hostcmd_cmd_update_encryption {
 	/* size of the data buffer attached. */
 	__le32 data_length;
 	u8 mac_addr[ETH_ALEN];
-	u8 action_data[1];
+	u8 action_data[];
 } __packed;
 
 struct wep_type_key {
@@ -1264,7 +1264,7 @@ struct hostcmd_cmd_txpwrlmt_cfg {
 	/*number of entries*/
 	__le16 num_entries;
 	/* Data */
-	u8 data[1];
+	u8 data[];
 } __packed;
 
 struct mwl_txpwrlmt_cfg_entry_hdr {
