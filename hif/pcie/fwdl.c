@@ -18,6 +18,7 @@
  */
 
 #include <linux/io.h>
+#include <linux/jiffies.h>
 
 #include "sysadpt.h"
 #include "core.h"
@@ -30,6 +31,7 @@
 #define FW_CHECK_MSECS                  3
 
 #define FW_MAX_NUM_CHECKS               0xffff
+#define FW_BOOTROM_TIMEOUT_MSECS        1000
 
 static void pcie_trigger_pcicmd_bootcode(struct pcie_priv *pcie_priv)
 {
@@ -135,6 +137,7 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 	u32 int_code = 0;
 	u32 len = 0;
 	u32 fwreadysignature = HOSTCMD_SOFTAP_FWRDY_SIGNATURE;
+	unsigned long timeout;
 
 	pcie_reset(hw);
 
@@ -174,8 +177,14 @@ int pcie_download_firmware(struct ieee80211_hw *hw)
 		writel(0x100, pcie_priv->iobase1 + 0xE0E4);
 
 	/* make sure SCRATCH2 C40 is clear, in case we are too quick */
-	while (readl(pcie_priv->iobase1 + 0xc40) == 0)
-		cond_resched();
+	timeout = jiffies + msecs_to_jiffies(FW_BOOTROM_TIMEOUT_MSECS);
+	while (readl(pcie_priv->iobase1 + 0xc40) == 0) {
+		if (time_after(jiffies, timeout)) {
+			wiphy_err(hw->wiphy, "boot ROM not ready\n");
+			goto err_download;
+		}
+		usleep_range(1000, 2000);
+	}
 
 	if (priv->chip_type == MWL8964) {
 		if (!pcie_download_ddr_init(priv)) {
