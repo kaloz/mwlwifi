@@ -488,6 +488,10 @@ static void mwl_fwcmd_parse_beacon(struct mwl_priv *priv,
 			beacon_info->ie_mde_len = (elen + 2);
 			beacon_info->ie_mde_ptr = (pos - 2);
 			break;
+		case WLAN_EID_RSNX:
+			beacon_info->ie_rsnx_len = (elen + 2);
+			beacon_info->ie_rsnx_ptr = (pos - 2);
+			break;
 		case WLAN_EID_HT_CAPABILITY:
 		case WLAN_EID_HT_OPERATION:
 		case WLAN_EID_OVERLAP_BSS_SCAN_PARAM:
@@ -613,6 +617,13 @@ static int mwl_fwcmd_set_ies(struct mwl_priv *priv, struct mwl_vif *mwl_vif)
 	memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
 	       beacon->ie_mde_ptr, beacon->ie_mde_len);
 	ie_list_len_proprietary += mwl_vif->beacon_info.ie_mde_len;
+
+	if (ie_list_len_proprietary + beacon->ie_rsnx_len <=
+	    sizeof(pcmd->ie_list_proprietary)) {
+		memcpy(pcmd->ie_list_proprietary + ie_list_len_proprietary,
+		       beacon->ie_rsnx_ptr, beacon->ie_rsnx_len);
+		ie_list_len_proprietary += beacon->ie_rsnx_len;
+	}
 
 	pcmd->ie_list_len_proprietary = cpu_to_le16(ie_list_len_proprietary);
 

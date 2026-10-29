@@ -522,6 +522,14 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 	mwl_vif = mwl_dev_get_vif(vif);
 	addr = sta ? sta->addr : vif->addr;
 
+	/* mac80211 does BIP in software. Don't tell the firmware anything
+	 * about the IGTK: an UPDATE_ENCRYPTION with ENCR_TYPE_DISABLE for
+	 * the BSS address would override the encryption type set for the
+	 * GTK, and break group addressed traffic.
+	 */
+	if (key->cipher == WLAN_CIPHER_SUITE_AES_CMAC)
+		return 1;
+
 	if (cmd_param == SET_KEY) {
 		if ((key->cipher == WLAN_CIPHER_SUITE_WEP40) ||
 		    (key->cipher == WLAN_CIPHER_SUITE_WEP104)) {
@@ -530,6 +538,13 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 			encr_type = ENCR_TYPE_AES;
 			if (priv->chip_type != MWL8964)
 				key->flags |= IEEE80211_KEY_FLAG_GENERATE_IV;
+			else
+				/* The 88W8964 firmware fills in the CCMP
+				 * header of data frames, but not of
+				 * protected management frames.
+				 */
+				key->flags |=
+					IEEE80211_KEY_FLAG_GENERATE_IV_MGMT;
 		} else if (key->cipher == WLAN_CIPHER_SUITE_TKIP) {
 			if (priv->chip_type != MWL8964)
 				key->flags |= IEEE80211_KEY_FLAG_GENERATE_MMIC | IEEE80211_KEY_FLAG_GENERATE_IV;
