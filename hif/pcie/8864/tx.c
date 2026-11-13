@@ -732,7 +732,8 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 
 	if (sta && sta->ht_cap.ht_supported &&
 	  !(xmitcontrol & EAGLE_TXD_XMITCTRL_USE_MC_RATE) &&
-	    ieee80211_is_data_qos(wh->frame_control)) {
+	    ieee80211_is_data_qos(wh->frame_control) &&
+	    !ieee80211_is_qos_nullfunc(wh->frame_control)) {
 		tid = qos & 0xf;
 		pcie_tx_count_packet(sta, tid);
 
