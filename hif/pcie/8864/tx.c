@@ -656,12 +656,9 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 		mgmtframe = true;
 		mgmt = (struct ieee80211_mgmt *)skb->data;
 	} else {
-		u16 pkt_type;
 		struct mwl_sta *sta_info;
 
-		pkt_type = be16_to_cpu(*((__be16 *)
-			&skb->data[ieee80211_hdrlen(wh->frame_control) + 6]));
-		if (pkt_type == ETH_P_PAE) {
+		if (skb->protocol == cpu_to_be16(ETH_P_PAE)) {
 			index = IEEE80211_AC_VO;
 			eapol_frame = true;
 		}
@@ -732,7 +729,8 @@ void pcie_8864_tx_xmit(struct ieee80211_hw *hw,
 
 	if (sta && sta->ht_cap.ht_supported &&
 	  !(xmitcontrol & EAGLE_TXD_XMITCTRL_USE_MC_RATE) &&
-	    ieee80211_is_data_qos(wh->frame_control)) {
+	    ieee80211_is_data_qos(wh->frame_control) &&
+	    !ieee80211_is_qos_nullfunc(wh->frame_control)) {
 		tid = qos & 0xf;
 		pcie_tx_count_packet(sta, tid);
 
