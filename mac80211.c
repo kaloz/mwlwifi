@@ -538,6 +538,16 @@ static int mwl_mac80211_set_key(struct ieee80211_hw *hw,
 			encr_type = ENCR_TYPE_DISABLE;
 		}
 
+		/* The 88W8864 firmware encrypts only data frames; 802.11w
+		 * protected management frames (deauth, SA Query) must be
+		 * encrypted by mac80211 in software or they go out as
+		 * plaintext. CCMP is the only PMF-capable cipher this driver
+		 * offers. Other chips are untested and left unchanged.
+		 */
+		if (priv->chip_type == MWL8864 &&
+		    key->cipher == WLAN_CIPHER_SUITE_CCMP)
+			key->flags |= IEEE80211_KEY_FLAG_SW_MGMT_TX;
+
 		rc = mwl_fwcmd_update_encryption_enable(hw, vif, addr,
 							encr_type);
 		if (rc)

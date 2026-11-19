@@ -395,6 +395,7 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 	struct ieee80211_hdr *wh;
 	u8 *_data;
 	u8 *qc;
+	bool fw_decrypted;
 	const u8 eapol[] = {0x88, 0x8e};
 
 	desc = &pcie_priv->desc_data[0];
@@ -434,7 +435,15 @@ int pcie_8864_poll_napi(struct napi_struct *napi, int budget)
 
 		wh = &((struct pcie_dma_data *)prx_skb->data)->wh;
 
-		if (utils_is_crypted(wh)) {
+		/* The firmware decrypts only data frames. A protected
+		 * management frame (802.11w) reaches the host still
+		 * encrypted; leave its flags clear so that mac80211
+		 * decrypts it in software.
+		 */
+		fw_decrypted = utils_is_crypted(wh) &&
+			       ieee80211_is_data(wh->frame_control);
+
+		if (fw_decrypted) {
 			/* When MMIC ERROR is encountered
 			* by the firmware, payload is
 			* dropped and only 32 bytes of
